@@ -1,0 +1,398 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import dayjs from 'dayjs';
+import DateTimePicker from 'react-native-ui-datepicker';
+import { theme } from '@/constants/theme';
+import { TransactionType, Category, Wallet } from '@/types';
+import { NumericInput } from '../ui/NumericInput';
+import { Input } from '../ui/Input';
+import { Button } from '../ui/Button';
+
+interface TransactionFormProps {
+  initialType?: TransactionType;
+  categories: Category[];
+  wallets: Wallet[];
+  onSubmit: (data: {
+    type: TransactionType;
+    amount: number;
+    category_id: number;
+    wallet_id: number;
+    transaction_date: string;
+    notes: string;
+  }) => void;
+  loading?: boolean;
+}
+
+export const TransactionForm: React.FC<TransactionFormProps> = ({
+  initialType = 'expense',
+  categories,
+  wallets,
+  onSubmit,
+  loading = false,
+}) => {
+  const [type, setType] = useState<TransactionType>(initialType);
+  const [amount, setAmount] = useState<number>(0);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [walletId, setWalletId] = useState<number | null>(wallets[0]?.id || null);
+  const [date, setDate] = useState(dayjs());
+  const [notes, setNotes] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Filter categories based on selected type
+  const filteredCategories = categories.filter(c => c.type === type);
+
+  const handleTypeChange = (newType: TransactionType) => {
+    setType(newType);
+    const newFiltered = categories.filter(c => c.type === newType);
+    if (newFiltered.length > 0) {
+      setCategoryId(newFiltered[0].id);
+    } else {
+      setCategoryId(null);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (amount <= 0 || !categoryId || !walletId) return;
+
+    onSubmit({
+      type,
+      amount,
+      category_id: categoryId,
+      wallet_id: walletId,
+      transaction_date: date.format('YYYY-MM-DD'),
+      notes,
+    });
+  };
+
+  const isFormValid = amount > 0 && categoryId !== null && walletId !== null;
+
+  return (
+    <View style={styles.container}>
+      {/* Type Switcher */}
+      <View style={styles.typeSwitcher}>
+        <TouchableOpacity
+          style={[styles.typeTab, type === 'income' && styles.typeTabActiveIncome]}
+          onPress={() => handleTypeChange('income')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.typeText, type === 'income' && styles.typeTextActive]}>
+            Pemasukan
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.typeTab, type === 'expense' && styles.typeTabActiveExpense]}
+          onPress={() => handleTypeChange('expense')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.typeText, type === 'expense' && styles.typeTextActive]}>
+            Pengeluaran
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        
+        {/* Amount Input */}
+        <View style={styles.amountContainer}>
+          <NumericInput
+            value={amount}
+            onChangeValue={setAmount}
+            autoFocus
+          />
+        </View>
+
+        {/* Date Selector */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tanggal</Text>
+          <TouchableOpacity 
+            style={styles.dateSelector}
+            onPress={() => setShowDatePicker(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+            <Text style={styles.dateText}>
+              {date.isSame(dayjs(), 'day') ? 'Hari ini, ' : ''}{date.format('DD MMMM YYYY')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Category Selector */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Kategori</Text>
+          <View style={styles.categoryGrid}>
+            {filteredCategories.map(cat => (
+              <TouchableOpacity
+                key={cat.id}
+                activeOpacity={0.7}
+                style={[
+                  styles.categoryItem,
+                  categoryId === cat.id && styles.categoryItemActive,
+                  categoryId === cat.id && { borderColor: cat.color }
+                ]}
+                onPress={() => setCategoryId(cat.id)}
+              >
+                <View style={[
+                  styles.categoryIconContainer,
+                  { backgroundColor: categoryId === cat.id ? cat.color : theme.colors.surfaceElevated }
+                ]}>
+                  <Ionicons 
+                    name={cat.icon as any} 
+                    size={24} 
+                    color={categoryId === cat.id ? '#FFF' : cat.color} 
+                  />
+                </View>
+                <Text style={[
+                  styles.categoryLabel,
+                  categoryId === cat.id && { color: theme.colors.textPrimary, fontWeight: '600' }
+                ]} numberOfLines={1}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Wallet Selector */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Dompet</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.walletScroll}>
+            {wallets.map(wallet => (
+              <TouchableOpacity
+                key={wallet.id}
+                activeOpacity={0.7}
+                style={[
+                  styles.walletChip,
+                  walletId === wallet.id && styles.walletChipActive
+                ]}
+                onPress={() => setWalletId(wallet.id)}
+              >
+                {wallet.icon && (
+                  <Ionicons 
+                    name={wallet.icon as any} 
+                    size={16} 
+                    color={walletId === wallet.id ? '#FFF' : wallet.color || theme.colors.textSecondary}
+                    style={{ marginRight: 6 }}
+                  />
+                )}
+                <Text style={[
+                  styles.walletChipText,
+                  walletId === wallet.id && styles.walletChipTextActive
+                ]}>
+                  {wallet.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Notes */}
+        <View style={styles.section}>
+          <Input
+            label="Catatan (Opsional)"
+            placeholder="Makan siang, bensin, dll"
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            numberOfLines={2}
+            style={{ height: 80, paddingTop: 12 }}
+          />
+        </View>
+        
+        {/* Padding for bottom */}
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
+      {/* Submit Button */}
+      <View style={styles.footer}>
+        <Button 
+          title="Simpan Transaksi" 
+          fullWidth 
+          disabled={!isFormValid}
+          loading={loading}
+          onPress={handleSubmit}
+        />
+      </View>
+
+      {/* Date Picker Modal */}
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pilih Tanggal</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.pickerContainer}>
+              <DateTimePicker
+                mode="single"
+                date={date.toDate()}
+                onChange={(params: any) => {
+                  setDate(dayjs(params.date));
+                  setShowDatePicker(false);
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  typeSwitcher: {
+    flexDirection: 'row',
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radius.md,
+    padding: 4,
+  },
+  typeTab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: theme.radius.sm,
+  },
+  typeTabActiveIncome: {
+    backgroundColor: theme.colors.income,
+  },
+  typeTabActiveExpense: {
+    backgroundColor: theme.colors.expense,
+  },
+  typeText: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+  },
+  typeTextActive: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  scrollContent: {
+    padding: theme.spacing.md,
+  },
+  amountContainer: {
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  section: {
+    marginBottom: theme.spacing.xl,
+  },
+  sectionTitle: {
+    ...theme.typography.subtitle,
+    marginBottom: theme.spacing.md,
+  },
+  dateSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+  },
+  dateText: {
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    marginLeft: theme.spacing.sm,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -theme.spacing.xs,
+  },
+  categoryItem: {
+    width: '25%',
+    alignItems: 'center',
+    padding: theme.spacing.xs,
+    marginBottom: theme.spacing.md,
+  },
+  categoryItemActive: {
+    // Add subtle background or border if needed
+  },
+  categoryIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  categoryLabel: {
+    ...theme.typography.caption,
+    textAlign: 'center',
+  },
+  walletScroll: {
+    marginHorizontal: -theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+  },
+  walletChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.round,
+    marginRight: theme.spacing.sm,
+  },
+  walletChipActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  walletChipText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+  },
+  walletChipTextActive: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  footer: {
+    padding: theme.spacing.md,
+    paddingBottom: theme.spacing.xl,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  modalTitle: {
+    ...theme.typography.h3,
+  },
+  pickerContainer: {
+    marginHorizontal: -theme.spacing.sm,
+  }
+});
