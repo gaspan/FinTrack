@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
@@ -19,36 +19,41 @@ export default function TransactionDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    const fetchTx = async () => {
-      try {
-        const txId = parseInt(id, 10);
-        if (isNaN(txId)) return;
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      const fetchTx = async () => {
+        try {
+          setLoading(true);
+          const txId = parseInt(id, 10);
+          if (isNaN(txId)) return;
 
-        // Custom query to get detail for 1 tx
-        const tx = await db.getFirstAsync<TransactionWithDetails>(`
-          SELECT 
-            t.*, 
-            c.name as category_name, 
-            c.icon as category_icon, 
-            c.color as category_color, 
-            w.name as wallet_name 
-          FROM transactions t
-          JOIN categories c ON t.category_id = c.id
-          JOIN wallets w ON t.wallet_id = w.id
-          WHERE t.id = ?
-        `, [txId]);
+          const tx = await db.getFirstAsync<TransactionWithDetails>(`
+            SELECT 
+              t.*, 
+              c.name as category_name, 
+              c.icon as category_icon, 
+              c.color as category_color, 
+              w.name as wallet_name 
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.id
+            JOIN wallets w ON t.wallet_id = w.id
+            WHERE t.id = ?
+          `, [txId]);
 
-        if (tx) setTransaction(tx);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
+          if (mounted && tx) setTransaction(tx);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          if (mounted) setLoading(false);
+        }
+      };
 
-    fetchTx();
-  }, [id, db]);
+      fetchTx();
+
+      return () => { mounted = false; };
+    }, [id, db])
+  );
 
   const handleDelete = () => {
     Alert.alert(
@@ -76,7 +81,7 @@ export default function TransactionDetailScreen() {
     );
   };
 
-  const formatRp = (val: number) => `Rp ${val.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".")}`;
+  const formatRp = (val: number) => `Rp ${val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
 
   if (loading) {
     return (
@@ -109,6 +114,26 @@ export default function TransactionDetailScreen() {
         </Text>
       </View>
 
+      <View style={styles.actionRow}>
+        <View style={{ flex: 1 }}>
+          <Button 
+            title="Edit Transaksi" 
+            variant="primary" 
+            onPress={() => router.push(`/transaction/edit/${transaction.id}`)}
+            fullWidth
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button 
+            title="Hapus Transaksi" 
+            variant="danger" 
+            onPress={handleDelete}
+            loading={deleting}
+            fullWidth
+          />
+        </View>
+      </View>
+
       <View style={styles.detailsCard}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Tanggal</Text>
@@ -131,17 +156,6 @@ export default function TransactionDetailScreen() {
           </View>
         )}
       </View>
-
-      <View style={{ flex: 1 }} />
-      
-      <Button 
-        title="Hapus Transaksi" 
-        variant="danger" 
-        onPress={handleDelete}
-        loading={deleting}
-        fullWidth
-        style={{ marginBottom: theme.spacing.xl }}
-      />
     </View>
   );
 }
@@ -200,5 +214,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'right',
     maxWidth: '60%',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   }
 });

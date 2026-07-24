@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
-import DateTimePicker from 'react-native-ui-datepicker';
+import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
 import { theme } from '@/constants/theme';
 import { TransactionType, Category, Wallet } from '@/types';
 import { NumericInput } from '../ui/NumericInput';
@@ -11,6 +11,14 @@ import { Button } from '../ui/Button';
 
 interface TransactionFormProps {
   initialType?: TransactionType;
+  initialData?: {
+    type: TransactionType;
+    amount: number;
+    category_id: number;
+    wallet_id: number;
+    transaction_date: string;
+    notes: string | null;
+  };
   categories: Category[];
   wallets: Wallet[];
   onSubmit: (data: {
@@ -26,17 +34,20 @@ interface TransactionFormProps {
 
 export const TransactionForm: React.FC<TransactionFormProps> = ({
   initialType = 'expense',
+  initialData,
   categories,
   wallets,
   onSubmit,
   loading = false,
 }) => {
-  const [type, setType] = useState<TransactionType>(initialType);
-  const [amount, setAmount] = useState<number>(0);
-  const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [walletId, setWalletId] = useState<number | null>(wallets[0]?.id || null);
-  const [date, setDate] = useState(dayjs());
-  const [notes, setNotes] = useState('');
+  const isEditing = !!initialData;
+  const defaultStyles = useDefaultStyles('light');
+  const [type, setType] = useState<TransactionType>(initialData?.type || initialType);
+  const [amount, setAmount] = useState<number>(initialData?.amount || 0);
+  const [categoryId, setCategoryId] = useState<number | null>(initialData?.category_id || null);
+  const [walletId, setWalletId] = useState<number | null>(initialData?.wallet_id || wallets[0]?.id || null);
+  const [date, setDate] = useState(initialData ? dayjs(initialData.transaction_date) : dayjs());
+  const [notes, setNotes] = useState(initialData?.notes || '');
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Filter categories based on selected type
@@ -206,7 +217,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       {/* Submit Button */}
       <View style={styles.footer}>
         <Button 
-          title="Simpan Transaksi" 
+          title={isEditing ? "Simpan Perubahan" : "Simpan Transaksi"} 
           fullWidth 
           disabled={!isFormValid}
           loading={loading}
@@ -236,6 +247,23 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 onChange={(params: any) => {
                   setDate(dayjs(params.date));
                   setShowDatePicker(false);
+                }}
+                styles={{
+                  ...defaultStyles,
+                  header: { backgroundColor: '#4A90D9', borderBottomWidth: 0 },
+                  month_selector_label: { color: '#FFFFFF', fontWeight: '600' },
+                  year_selector_label: { color: '#FFFFFF', fontWeight: '600' },
+                  button_prev_image: { tintColor: '#FFFFFF' },
+                  button_next_image: { tintColor: '#FFFFFF' },
+                  weekdays: { backgroundColor: '#F0F4FF' },
+                  weekday_label: { color: '#4A90D9', fontWeight: '600' },
+                  day: { backgroundColor: '#FFFFFF' },
+                  day_label: { color: '#1A1A2E' },
+                  selected: { backgroundColor: '#4A90D9', borderRadius: 8 },
+                  selected_label: { color: '#FFFFFF', fontWeight: '700' },
+                  today: { borderColor: '#4A90D9', borderWidth: 2, borderRadius: 8 },
+                  today_label: { color: '#4A90D9', fontWeight: '700' },
+                  days: { backgroundColor: '#F8FAFF' },
                 }}
               />
             </View>

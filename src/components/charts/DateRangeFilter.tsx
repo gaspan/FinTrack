@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
-import DateTimePicker from 'react-native-ui-datepicker';
+import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ interface DateRangeFilterProps {
 }
 
 export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, endDate, onChange }) => {
+  const defaultStyles = useDefaultStyles('light');
   const [modalVisible, setModalVisible] = useState(false);
   
   // Local state for the picker before applying
@@ -106,6 +107,23 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, end
                 startDate={range.startDate}
                 endDate={range.endDate}
                 onChange={(params: any) => setRange(params)}
+                styles={{
+                  ...defaultStyles,
+                  header: { backgroundColor: '#4A90D9', borderBottomWidth: 0 },
+                  month_selector_label: { color: '#FFFFFF', fontWeight: '600' },
+                  year_selector_label: { color: '#FFFFFF', fontWeight: '600' },
+                  button_prev_image: { tintColor: '#FFFFFF' },
+                  button_next_image: { tintColor: '#FFFFFF' },
+                  weekdays: { backgroundColor: '#F0F4FF' },
+                  weekday_label: { color: '#4A90D9', fontWeight: '600' },
+                  day: { backgroundColor: '#FFFFFF' },
+                  day_label: { color: '#1A1A2E' },
+                  selected: { backgroundColor: '#4A90D9', borderRadius: 8 },
+                  selected_label: { color: '#FFFFFF', fontWeight: '700' },
+                  today: { borderColor: '#4A90D9', borderWidth: 2, borderRadius: 8 },
+                  today_label: { color: '#4A90D9', fontWeight: '700' },
+                  days: { backgroundColor: '#F8FAFF' },
+                }}
               />
             </View>
 

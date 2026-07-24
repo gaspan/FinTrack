@@ -10,7 +10,6 @@ import { View, ActivityIndicator } from 'react-native';
 import { migrateDbIfNeeded } from '@/lib/database';
 import { theme } from '@/constants/theme';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -45,6 +44,16 @@ export default function RootLayout() {
                 presentation: 'modal', 
                 headerShown: true, 
                 title: 'Detail Transaksi',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="transaction/edit/[id]" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Edit Transaksi',
                 headerStyle: { backgroundColor: theme.colors.surfaceElevated },
                 headerTintColor: theme.colors.textPrimary
               }} 

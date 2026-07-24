@@ -79,6 +79,40 @@ export class TransactionQueries {
       }
     });
   }
+
+  async update(id: number, data: {
+    type: TransactionType;
+    amount: number;
+    category_id: number;
+    wallet_id: number;
+    transaction_date: string;
+    notes: string | null;
+  }): Promise<void> {
+    await this.db.withTransactionAsync(async () => {
+      const oldTx = await this.db.getFirstAsync<Transaction>(
+        'SELECT * FROM transactions WHERE id = ?',
+        [id]
+      );
+      if (!oldTx) return;
+
+      const reverseOp = oldTx.type === 'income' ? '-' : '+';
+      await this.db.runAsync(
+        `UPDATE wallets SET balance = balance ${reverseOp} ? WHERE id = ?`,
+        [oldTx.amount, oldTx.wallet_id]
+      );
+
+      const applyOp = data.type === 'income' ? '+' : '-';
+      await this.db.runAsync(
+        `UPDATE wallets SET balance = balance ${applyOp} ? WHERE id = ?`,
+        [data.amount, data.wallet_id]
+      );
+
+      await this.db.runAsync(
+        'UPDATE transactions SET type=?, amount=?, category_id=?, wallet_id=?, transaction_date=?, notes=? WHERE id=?',
+        [data.type, data.amount, data.category_id, data.wallet_id, data.transaction_date, data.notes, id]
+      );
+    });
+  }
 }
 
 export class CategoryQueries {

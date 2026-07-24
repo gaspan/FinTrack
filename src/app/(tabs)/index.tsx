@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import dayjs from 'dayjs';
+import { Ionicons } from '@expo/vector-icons';
 
 import { theme } from '@/constants/theme';
 import { ChartQueries, WalletQueries, TransactionQueries } from '@/lib/queries';
@@ -14,6 +15,7 @@ import { CategoryBarChart } from '@/components/charts/CategoryBarChart';
 import { Card } from '@/components/ui/Card';
 import { TransactionWithDetails } from '@/types';
 import { formatRupiah } from '@/utils/format';
+import { generateAndSharePDF } from '@/features/export/pdfGenerator';
 
 export default function DashboardScreen() {
   const db = useSQLiteContext();
@@ -22,6 +24,7 @@ export default function DashboardScreen() {
   const [startDate, setStartDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
   const [endDate, setEndDate] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));
   const [chartType, setChartType] = useState<'income' | 'expense'>('expense');
+  const [exporting, setExporting] = useState(false);
   
   const [totalBalance, setTotalBalance] = useState(0);
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0 });
@@ -74,6 +77,32 @@ export default function DashboardScreen() {
 
   const formatRp = formatRupiah;
 
+  const handleExportPDF = useCallback(async () => {
+    try {
+      setExporting(true);
+      const chartQueries = new ChartQueries(db);
+      const txQueries = new TransactionQueries(db);
+
+      const [currentSummary, breakdown, allTx] = await Promise.all([
+        chartQueries.getSummary(startDate, endDate),
+        chartQueries.getCategoryBreakdown(startDate, endDate, chartType),
+        txQueries.getByDateRange(startDate, endDate),
+      ]);
+
+      const period = startDate === dayjs(startDate).startOf('month').format('YYYY-MM-DD') && 
+                      endDate === dayjs(endDate).endOf('month').format('YYYY-MM-DD')
+        ? dayjs(startDate).format('MMMM YYYY')
+        : `${dayjs(startDate).format('DD MMM')} - ${dayjs(endDate).format('DD MMM YYYY')}`;
+
+      await generateAndSharePDF(allTx, { ...currentSummary, categoryBreakdown: breakdown }, period);
+    } catch (e) {
+      console.error('Export PDF error:', e);
+      Alert.alert('Gagal', `Tidak dapat mengekspor PDF: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExporting(false);
+    }
+  }, [db, startDate, endDate, chartType]);
+
   const currentChartTotal = useMemo(() => {
     return chartType === 'income' ? summary.totalIncome : summary.totalExpense;
   }, [chartType, summary]);
@@ -85,14 +114,28 @@ export default function DashboardScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.greeting}>Halo,</Text>
-        <DateRangeFilter 
-          startDate={startDate} 
-          endDate={endDate} 
-          onChange={(start, end) => {
-            setStartDate(start);
-            setEndDate(end);
-          }} 
-        />
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.exportBtn} 
+            onPress={handleExportPDF}
+            disabled={exporting}
+            activeOpacity={0.7}
+          >
+            {exporting ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <Ionicons name="download-outline" size={18} color={theme.colors.primary} />
+            )}
+          </TouchableOpacity>
+          <DateRangeFilter 
+            startDate={startDate} 
+            endDate={endDate} 
+            onChange={(start, end) => {
+              setStartDate(start);
+              setEndDate(end);
+            }} 
+          />
+        </View>
       </View>
 
       {/* Summary Cards */}
@@ -162,6 +205,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: theme.spacing.md,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  exportBtn: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.round,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginRight: theme.spacing.xs,
   },
   greeting: {
     ...theme.typography.h2,
