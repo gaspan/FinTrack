@@ -13,13 +13,27 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 
 ## ✨ Fitur Utama
 
-- **📊 Dashboard Interaktif**: Pantau total saldo, arus kas masuk/keluar, dan tren keuangan Anda dalam satu layar.
-- **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan mudah melalui *Donut Chart* dan *Bar Chart* yang cantik dan interaktif.
-- **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank (BCA, Mandiri), dan E-Wallet (OVO, GoPay) dengan saldo yang terpisah.
-- **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi dengan *progress bar* visual.
-- **📝 Pencatatan Cepat**: Tambah transaksi pemasukan atau pengeluaran hanya dalam beberapa ketukan. Mendukung auto-format mata uang (Rupiah).
-- **📂 Ekspor Laporan**: Ekspor seluruh data transaksi Anda ke format Excel (`.xlsx`) untuk analisis lebih mendalam atau keperluan backup.
-- **🔒 Offline & Privat**: Seluruh data disimpan langsung di memori perangkat Anda menggunakan SQLite. Tidak ada data yang dikirim ke server eksternal.
+- **📊 Dashboard Interaktif**: Pantau total saldo, arus kas masuk/keluar, dan tren keuangan Anda dalam satu layar. Dilengkapi pull-to-refresh dan filter rentang tanggal (Bulan Ini, Bulan Lalu, Tahun Ini, atau kustom).
+- **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan mudah melalui *Overview Donut Chart*, *Expense Category Donut Chart*, dan *Category Bar Chart* yang cantik dan interaktif. Toggle untuk beralih antara grafik pemasukan & pengeluaran.
+- **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tambah dompet baru dengan pilihan ikon (5) dan warna (6), serta hapus dengan konfirmasi.
+- **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi dengan *progress bar* visual dengan indikator warna (hijau <70%, kuning 70–90%, merah >90%).
+- **📝 Pencatatan Cepat**: Tambah transaksi pemasukan atau pengeluaran hanya dalam beberapa ketukan. Mendukung auto-format mata uang (Rupiah), pemilihan kategori, dompet, dan tanggal.
+- **🔄 Transaksi Berulang (Recurring)**: Buat transaksi otomatis berulang harian, mingguan, bulanan, atau tahunan. Engine berjalan otomatis saat aplikasi dibuka dan menangani periode yang terlewat.
+- **📂 Ekspor Laporan**: Ekspor data transaksi ke format **Excel (`.xlsx`)** untuk analisis mendalam, atau **PDF** untuk laporan siap bagikan dengan desain gradient header dan bagan warna.
+- **🔍 Detail & Edit Transaksi**: Lihat detail lengkap transaksi, edit nominal/kategori/dompet, atau hapus transaksi (dengan pembalikan saldo otomatis).
+- **💰 Transfer antar Dompet**: Pindahkan dana dari satu dompet ke dompet lain dengan mudah. Saldo otomatis terupdate di kedua dompet.
+- **🔍 Pencarian & Filter**: Cari transaksi berdasarkan catatan/ nama kategori, filter berdasarkan kategori, dompet, atau tipe (pemasukan/pengeluaran).
+- **📂 Kustomisasi Kategori**: Tambah, edit, atau hapus kategori transaksi sendiri dengan pilihan ikon dan warna.
+- **💾 Backup & Restore**: Ekspor seluruh data ke JSON untuk cadangan, atau impor dari file JSON untuk memulihkan data.
+- **📱 Onboarding**: Panduan 3 langkah untuk pengguna baru saat pertama kali membuka aplikasi.
+- **✏️ Edit Cepat**: Long-press pada item transaksi di daftar untuk langsung Edit atau Hapus tanpa perlu masuk ke halaman detail.
+- **🎉 Animasi Sukses**: Checkmark animasi memuaskan setelah berhasil menyimpan transaksi baru.
+- **⚡ Quick-Amount Chips**: 6 tombol nominal cepat (10K–500K) untuk input transaksi tanpa keyboard.
+- **👆 Haptic Feedback**: Getaran halus di berbagai interaksi (pilih kategori, submit form, ubah filter) untuk umpan balik taktil.
+- **⌛ Skeleton Loaders**: Shimmer placeholder saat pertama kali membuka dashboard atau daftar transaksi.
+- **📈 Trend Indicator**: Indikator persentase kenaikan/penurunan pemasukan vs pengeluaran dibandingkan bulan lalu.
+- **🔔 Pengingat Anggaran**: Notifikasi (Alert) otomatis saat pengeluaran kategori mencapai 90% atau lebih dari batas anggaran.
+- **🔒 Offline & Privat**: Seluruh data disimpan langsung di memori perangkat Anda menggunakan SQLite. Tidak ada data yang dikirim ke server eksternal. 100% offline.
 
 ---
 
@@ -27,22 +41,34 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 
 *(Silakan ganti tautan di bawah ini dengan screenshot aplikasi Anda yang sebenarnya)*
 
-| Dashboard | Riwayat Transaksi | Anggaran (Budget) | Pengaturan Dompet |
+| Dashboard | Riwayat Transaksi | Anggaran (Budget) | Pengaturan |
 | :---: | :---: | :---: | :---: |
-| <img src="https://via.placeholder.com/250x500.png?text=Dashboard" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Transaksi" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Budget" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Settings" width="200"/> |
+| <img src="https://via.placeholder.com/250x500.png?text=Dashboard" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Transaksi" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Budget" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Pengaturan" width="200"/> |
+
+| Detail Transaksi | Tambah Transaksi | Dompet (Wallet) | Kategori (Category) | Onboarding |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="https://via.placeholder.com/250x500.png?text=Detail" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Tambah" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Dompet" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Kategori" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Onboarding" width="200"/> |
 
 ---
 
 ## 🛠️ Teknologi yang Digunakan
 
-* **Framework**: React Native & Expo SDK 57
+* **Framework**: React Native 0.86 & Expo SDK ~57
 * **Routing**: Expo Router (File-based routing)
 * **Bahasa**: TypeScript
 * **Database**: `expo-sqlite` (Lokal Database)
 * **Visualisasi Data**: `react-native-gifted-charts`
+* **Date Picker**: `react-native-ui-datepicker`
 * **Manajemen Tanggal**: `dayjs`
 * **Animasi**: `react-native-reanimated`
-* **Ekspor Data**: `xlsx`
+* **Font**: `@expo-google-fonts/inter` (Inter)
+* **Gradient**: `expo-linear-gradient`
+* **Ikon**: `@expo/vector-icons` (Ionicons)
+* **Ekspor PDF**: `expo-print` + `expo-file-system` + `expo-sharing`
+* **Ekspor Excel**: `xlsx` + `expo-file-system` + `expo-sharing`
+* **Haptic Feedback**: `expo-haptics`
+* **Penyimpanan Lokal**: `@react-native-async-storage/async-storage`
+* **Path Alias**: `@/` → `./src/`
 
 ---
 
@@ -85,16 +111,32 @@ Pastikan Anda sudah menginstal:
 ```text
 FinTrack/
 ├── src/
-│   ├── app/             # Konfigurasi routing (Expo Router) dan layar tab
-│   ├── components/      # Komponen UI yang dapat digunakan ulang (Forms, Charts, dll)
-│   ├── constants/       # Konfigurasi konstanta, tema (colors, spacing, typography)
-│   ├── lib/             # Konfigurasi SQLite dan sistem query (database)
-│   ├── types/           # Definisi tipe TypeScript global
-│   └── utils/           # Fungsi utilitas bantuan (seperti formatRupiah)
-├── assets/              # Gambar, icon, dan font statis
-├── app.json             # Konfigurasi Expo aplikasi
-├── package.json         # Dependensi dan script NPM
-└── tsconfig.json        # Konfigurasi TypeScript
+│   ├── app/                    # Konfigurasi routing (Expo Router) dan layar
+│   │   ├── (tabs)/             # 4 layar tab (Dashboard, Transaksi, Budget, Pengaturan)
+│   │   ├── transaction/        # Detail & Edit transaksi (modal)
+│   │   ├── recurring.tsx       # CRUD transaksi berulang
+│   │   ├── transfer.tsx        # Transfer antar dompet
+│   │   ├── wallets.tsx         # Manajemen dompet (sub-screen)
+│   │   ├── categories.tsx      # Manajemen kategori (sub-screen)
+│   │   ├── onboarding.tsx      # 3-slide onboarding untuk pengguna baru
+│   │   └── export.tsx          # Ekspor laporan Excel
+│   ├── components/             # Komponen UI reusable
+│   │   ├── charts/             # Donut chart, bar chart, toggle, filter tanggal
+│   │   ├── forms/              # Form transaksi, budget, dompet, kategori
+│   │   └── ui/                 # Button, Card, Input, FAB, Skeleton, SuccessAnimation, dll
+│   ├── constants/              # Tema (dark mode), kategori default, dompet default
+│   ├── features/               # Modul fitur
+│   │   ├── recurring/          # Engine transaksi berulang
+│   │   ├── export/             # Generator PDF, Excel, dan backup/restore JSON
+│   │   └── notifications/      # Pengingat anggaran (budget reminder)
+│   ├── lib/                    # SQLite schema, migration, seed, query classes
+│   ├── types/                  # Definisi tipe TypeScript global
+│   └── utils/                  # Format Rupiah, haptic feedback, utilitas lainnya
+├── assets/                     # Gambar, icon, dan font statis
+├── app.json                    # Konfigurasi Expo aplikasi
+├── eas.json                    # Konfigurasi EAS Build
+├── package.json                # Dependensi dan script NPM
+└── tsconfig.json               # Konfigurasi TypeScript
 ```
 
 ---

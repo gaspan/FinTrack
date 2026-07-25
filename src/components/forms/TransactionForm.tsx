@@ -8,6 +8,7 @@ import { TransactionType, Category, Wallet } from '@/types';
 import { NumericInput } from '../ui/NumericInput';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { hapticLight, hapticSuccess } from '@/utils/haptic';
 
 interface TransactionFormProps {
   initialType?: TransactionType;
@@ -65,7 +66,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
   const handleSubmit = () => {
     if (amount <= 0 || !categoryId || !walletId) return;
-
+    hapticSuccess();
     onSubmit({
       type,
       amount,
@@ -111,6 +112,19 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             onChangeValue={setAmount}
             autoFocus
           />
+          <View style={styles.quickAmountRow}>
+            {[10000, 25000, 50000, 100000, 250000, 500000].map(q => (
+              <TouchableOpacity
+                key={q}
+                style={[styles.quickChip, amount === q && styles.quickChipActive]}
+                onPress={() => setAmount(q)}
+              >
+                <Text style={[styles.quickChipText, amount === q && styles.quickChipTextActive]}>
+                  {q >= 1000 ? `${(q / 1000).toLocaleString('id')}K` : String(q)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Date Selector */}
@@ -141,7 +155,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   categoryId === cat.id && styles.categoryItemActive,
                   categoryId === cat.id && { borderColor: cat.color }
                 ]}
-                onPress={() => setCategoryId(cat.id)}
+                onPress={() => { setCategoryId(cat.id); hapticLight(); }}
               >
                 <View style={[
                   styles.categoryIconContainer,
@@ -315,6 +329,18 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     marginBottom: theme.spacing.lg,
   },
+  quickAmountRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs,
+    marginTop: theme.spacing.sm, justifyContent: 'center',
+  },
+  quickChip: {
+    paddingVertical: 6, paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.round, backgroundColor: theme.colors.surface,
+    borderWidth: 1, borderColor: theme.colors.border,
+  },
+  quickChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  quickChipText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '600' },
+  quickChipTextActive: { color: '#FFF' },
   section: {
     marginBottom: theme.spacing.xl,
   },

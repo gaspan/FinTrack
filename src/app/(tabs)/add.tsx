@@ -7,6 +7,9 @@ import { theme } from '@/constants/theme';
 import { CategoryQueries, WalletQueries, TransactionQueries } from '@/lib/queries';
 import { Category, Wallet, TransactionType } from '@/types';
 import { TransactionForm } from '@/components/forms/TransactionForm';
+import { checkBudgetAlerts } from '@/features/notifications/budgetReminder';
+import { hapticSuccess } from '@/utils/haptic';
+import { SuccessAnimation } from '@/components/ui/SuccessAnimation';
 
 export default function AddTransactionScreen() {
   const db = useSQLiteContext();
@@ -14,6 +17,7 @@ export default function AddTransactionScreen() {
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
 
@@ -60,9 +64,12 @@ export default function AddTransactionScreen() {
         ...data,
         recurring_id: null
       });
+      hapticSuccess();
+      setShowSuccess(true);
       
-      // Go back to Dashboard after saving
-      router.navigate('/(tabs)/');
+      if (data.type === 'expense') {
+        checkBudgetAlerts(db).catch(console.error);
+      }
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'Gagal menyimpan transaksi');
@@ -86,6 +93,11 @@ export default function AddTransactionScreen() {
         wallets={wallets}
         onSubmit={handleSubmit}
         loading={submitting}
+      />
+      <SuccessAnimation
+        visible={showSuccess}
+        message="Transaksi tersimpan!"
+        onFinish={() => router.navigate('/(tabs)' as any)}
       />
     </View>
   );

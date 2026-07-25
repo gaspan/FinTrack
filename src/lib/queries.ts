@@ -130,6 +130,29 @@ export class CategoryQueries {
       [type]
     );
   }
+
+  async create(data: { name: string; type: TransactionType; icon: string; color: string }) {
+    const maxOrder = await this.db.getFirstAsync<{ max: number }>(
+      'SELECT MAX(sort_order) as max FROM categories WHERE type = ?',
+      [data.type]
+    );
+    const sortOrder = (maxOrder?.max || 0) + 1;
+    await this.db.runAsync(
+      'INSERT INTO categories (name, type, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)',
+      [data.name, data.type, data.icon, data.color, sortOrder]
+    );
+  }
+
+  async update(id: number, data: { name: string; icon: string; color: string }) {
+    await this.db.runAsync(
+      'UPDATE categories SET name = ?, icon = ?, color = ? WHERE id = ?',
+      [data.name, data.icon, data.color, id]
+    );
+  }
+
+  async delete(id: number) {
+    await this.db.runAsync('DELETE FROM categories WHERE id = ?', [id]);
+  }
 }
 
 export class WalletQueries {
@@ -240,6 +263,10 @@ export class RecurringQueries {
     );
   }
   
+  async delete(id: number) {
+    await this.db.runAsync('DELETE FROM recurring_transactions WHERE id = ?', [id]);
+  }
+
   async toggle(id: number, isActive: boolean) {
     await this.db.runAsync(
       'UPDATE recurring_transactions SET is_active = ? WHERE id = ?',

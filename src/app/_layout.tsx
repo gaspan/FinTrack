@@ -1,11 +1,12 @@
 import { useFonts } from 'expo-font';
-import { Stack, ThemeProvider, DarkTheme } from 'expo-router';
+import { Stack, ThemeProvider, DarkTheme, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, Suspense } from 'react';
+import { useEffect, Suspense, useState } from 'react';
 import { SQLiteProvider } from 'expo-sqlite';
 import 'react-native-reanimated';
 import { View, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { migrateDbIfNeeded } from '@/lib/database';
 import { theme } from '@/constants/theme';
@@ -17,13 +18,21 @@ export default function RootLayout() {
     SpaceMono: require('../../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+      AsyncStorage.getItem('onboarding_done').then(val => {
+        if (val !== 'true') {
+          router.replace('/onboarding');
+        }
+        setOnboardingDone(true);
+      });
     }
   }, [loaded]);
 
-  if (!loaded) {
+  if (!loaded || onboardingDone === null) {
     return null;
   }
 
@@ -67,6 +76,50 @@ export default function RootLayout() {
                 headerStyle: { backgroundColor: theme.colors.surfaceElevated },
                 headerTintColor: theme.colors.textPrimary
               }} 
+            />
+            <Stack.Screen 
+              name="recurring" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Transaksi Berulang',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="transfer" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Transfer Dompet',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="wallets" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Manajemen Dompet',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="categories" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Manajemen Kategori',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="onboarding" 
+              options={{ headerShown: false }} 
             />
           </Stack>
         </SQLiteProvider>

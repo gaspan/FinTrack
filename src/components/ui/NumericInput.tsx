@@ -37,7 +37,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
         styles.inputContainer,
         error && styles.inputError,
         isFocused && styles.inputFocused,
-        style
+        style as any,
       ]}>
         <Text style={styles.prefix}>Rp</Text>
         <TextInput

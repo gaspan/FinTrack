@@ -37,7 +37,6 @@ const buildHTML = (
     : 1;
 
   const transactionRows = transactions
-    .slice(0, 50)
     .map(t => `
       <tr>
         <td>${dayjs(t.transaction_date).format('DD MMM YYYY')}</td>
