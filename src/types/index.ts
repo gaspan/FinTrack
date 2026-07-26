@@ -15,6 +15,7 @@ export interface Wallet {
   balance: number;
   icon: string | null;
   color: string | null;
+  is_primary?: number;
 }
 
 export interface Transaction {
@@ -23,7 +24,7 @@ export interface Transaction {
   amount: number;
   category_id: number;
   wallet_id: number;
-  transaction_date: string; // ISO 8601 string (YYYY-MM-DD)
+  transaction_date: string;
   notes: string | null;
   recurring_id: number | null;
   created_at: string;
@@ -40,7 +41,7 @@ export interface Budget {
   id: number;
   category_id: number;
   monthly_limit: number;
-  month: string; // YYYY-MM
+  month: string;
 }
 
 export interface RecurringFrequency {
@@ -56,7 +57,46 @@ export interface RecurringTransaction {
   frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
   next_date: string;
   notes: string | null;
-  is_active: number; // 0 or 1
+  is_active: number;
+}
+
+export interface SavingsGoal {
+  id: number;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  deadline: string | null;
+  wallet_id: number | null;
+  icon: string;
+  color: string;
+  is_completed: number;
+  created_at: string;
+}
+
+export interface BillReminder {
+  id: number;
+  name: string;
+  amount: number;
+  due_date: string;
+  frequency: 'one_time' | 'monthly' | 'yearly';
+  is_paid: number;
+  category_id: number | null;
+  wallet_id: number | null;
+  notes: string | null;
+  created_at: string;
+  calendar_event_id?: string | null;
+}
+
+export interface AppLock {
+  id: number;
+  pin_hash: string | null;
+  biometric_enabled: number;
+}
+
+export interface MonthlyTrendPoint {
+  month: string;
+  income: number;
+  expense: number;
 }
 
 export interface ChartDataPoint {

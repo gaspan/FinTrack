@@ -78,12 +78,77 @@ export default function SettingsScreen() {
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/goals' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#EC489920' }]}>
+              <Ionicons name="flag-outline" size={20} color="#EC4899" />
+            </View>
+            <Text style={styles.itemTitle}>Target Menabung</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/reminders' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#F9731620' }]}>
+              <Ionicons name="alarm-outline" size={20} color="#F97316" />
+            </View>
+            <Text style={styles.itemTitle}>Pengingat Tagihan</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.item} onPress={() => router.push('/export' as any)}>
           <View style={styles.itemLeft}>
             <View style={[styles.iconBg, { backgroundColor: '#F59E0B20' }]}>
               <Ionicons name="download-outline" size={20} color="#F59E0B" />
             </View>
             <Text style={styles.itemTitle}>Ekspor Laporan (Excel)</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/annual' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
+              <Ionicons name="bar-chart-outline" size={20} color="#8B5CF6" />
+            </View>
+            <Text style={styles.itemTitle}>Laporan Tahunan</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/import' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#10B98120' }]}>
+              <Ionicons name="cloud-upload-outline" size={20} color="#10B981" />
+            </View>
+            <Text style={styles.itemTitle}>Impor CSV Rekening Koran</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* Security Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Keamanan</Text>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/lock' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#6366F120' }]}>
+              <Ionicons name="lock-closed-outline" size={20} color="#6366F1" />
+            </View>
+            <Text style={styles.itemTitle}>Kunci Aplikasi</Text>
           </View>
           <View style={styles.itemRight}>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />

@@ -13,18 +13,18 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 
 ## ✨ Fitur Utama
 
-- **📊 Dashboard Interaktif**: Pantau total saldo, arus kas masuk/keluar, dan tren keuangan Anda dalam satu layar. Dilengkapi pull-to-refresh dan filter rentang tanggal (Bulan Ini, Bulan Lalu, Tahun Ini, atau kustom).
-- **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan mudah melalui *Overview Donut Chart*, *Expense Category Donut Chart*, dan *Category Bar Chart* yang cantik dan interaktif. Toggle untuk beralih antara grafik pemasukan & pengeluaran.
-- **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tambah dompet baru dengan pilihan ikon (5) dan warna (6), serta hapus dengan konfirmasi.
+- **📊 Dashboard Interaktif**: Pantau total saldo, arus kas masuk/keluar, dan tren keuangan Anda dalam satu layar. Dilengkapi pull-to-refresh, search cepat, dan filter rentang tanggal (Bulan Ini, Bulan Lalu, Tahun Ini, atau kustom).
+- **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan mudah melalui *Overview Donut Chart*, *Expense Category Donut Chart*, *Category Bar Chart*, dan *Monthly Trend Bar Chart* (6 bulan) yang cantik dan interaktif.
+- **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tandai satu dompet sebagai **Dompet Utama** (primary), tambah dompet baru dengan pilihan ikon dan warna, serta hapus dengan konfirmasi.
 - **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi dengan *progress bar* visual dengan indikator warna (hijau <70%, kuning 70–90%, merah >90%).
 - **📝 Pencatatan Cepat**: Tambah transaksi pemasukan atau pengeluaran hanya dalam beberapa ketukan. Mendukung auto-format mata uang (Rupiah), pemilihan kategori, dompet, dan tanggal.
 - **🔄 Transaksi Berulang (Recurring)**: Buat transaksi otomatis berulang harian, mingguan, bulanan, atau tahunan. Engine berjalan otomatis saat aplikasi dibuka dan menangani periode yang terlewat.
 - **📂 Ekspor Laporan**: Ekspor data transaksi ke format **Excel (`.xlsx`)** untuk analisis mendalam, atau **PDF** untuk laporan siap bagikan dengan desain gradient header dan bagan warna.
 - **🔍 Detail & Edit Transaksi**: Lihat detail lengkap transaksi, edit nominal/kategori/dompet, atau hapus transaksi (dengan pembalikan saldo otomatis).
 - **💰 Transfer antar Dompet**: Pindahkan dana dari satu dompet ke dompet lain dengan mudah. Saldo otomatis terupdate di kedua dompet.
-- **🔍 Pencarian & Filter**: Cari transaksi berdasarkan catatan/ nama kategori, filter berdasarkan kategori, dompet, atau tipe (pemasukan/pengeluaran).
+- **🔍 Pencarian & Filter**: Cari transaksi berdasarkan catatan/ nama kategori, filter berdasarkan kategori, dompet, tipe, atau **rentang tanggal multi-bulan**.
 - **📂 Kustomisasi Kategori**: Tambah, edit, atau hapus kategori transaksi sendiri dengan pilihan ikon dan warna.
-- **💾 Backup & Restore**: Ekspor seluruh data ke JSON untuk cadangan, atau impor dari file JSON untuk memulihkan data.
+- **💾 Backup & Restore**: Ekspor seluruh data ke JSON untuk cadangan, atau impor dari file JSON untuk memulihkan data. Support tabel baru (goals, reminders).
 - **📱 Onboarding**: Panduan 3 langkah untuk pengguna baru saat pertama kali membuka aplikasi.
 - **✏️ Edit Cepat**: Long-press pada item transaksi di daftar untuk langsung Edit atau Hapus tanpa perlu masuk ke halaman detail.
 - **🎉 Animasi Sukses**: Checkmark animasi memuaskan setelah berhasil menyimpan transaksi baru.
@@ -34,6 +34,12 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 - **📈 Trend Indicator**: Indikator persentase kenaikan/penurunan pemasukan vs pengeluaran dibandingkan bulan lalu.
 - **🔔 Pengingat Anggaran**: Notifikasi (Alert) otomatis saat pengeluaran kategori mencapai 90% atau lebih dari batas anggaran.
 - **🔒 Offline & Privat**: Seluruh data disimpan langsung di memori perangkat Anda menggunakan SQLite. Tidak ada data yang dikirim ke server eksternal. 100% offline.
+- **🎯 Target Menabung (Savings Goals)**: Tetapkan target tabungan dengan nominal dan deadline. Pantau progress secara visual dengan progress bar dan persentase. Tambah dana langsung dari halaman target.
+- **⏰ Pengingat Tagihan (Bill Reminders)**: Catat tagihan rutin (listrik, internet, dll) dengan frekuensi bulanan/tahunan. Dapatkan pengingat otomatis via **sinkronisasi ke Kalender Sistem** (Google Calendar / Apple Calendar) dengan alarm H-1.
+- **📄 Laporan Tahunan**: Lihat ringkasan finansial sepanjang tahun dengan bar chart perbandingan pemasukan vs pengeluaran per bulan. Navigasi antar tahun.
+- **🔐 Kunci Aplikasi (PIN/Biometric)**: Amankan aplikasi dengan PIN 4 digit atau biometrik (Face ID / Fingerprint). Aktifkan/nonaktifkan dari pengaturan.
+- **📥 Impor CSV Rekening Koran**: Impor transaksi dari file CSV bank Indonesia (BCA, Mandiri, BRI, dll) secara otomatis dengan deteksi kolom dan cek duplikat.
+- **💳 Arus Kas (Cash Flow)**: Lihat net cash flow tahun berjalan dengan indikator positif/negatif di dashboard.
 
 ---
 
@@ -45,9 +51,13 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 | :---: | :---: | :---: | :---: |
 | <img src="https://via.placeholder.com/250x500.png?text=Dashboard" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Transaksi" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Budget" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Pengaturan" width="200"/> |
 
-| Detail Transaksi | Tambah Transaksi | Dompet (Wallet) | Kategori (Category) | Onboarding |
+| Detail Transaksi | Tambah Transaksi | Dompet (Wallet) | Kategori | Target Menabung |
 | :---: | :---: | :---: | :---: | :---: |
-| <img src="https://via.placeholder.com/250x500.png?text=Detail" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Tambah" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Dompet" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Kategori" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Onboarding" width="200"/> |
+| <img src="https://via.placeholder.com/250x500.png?text=Detail" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Tambah" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Dompet" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Kategori" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Goals" width="200"/> |
+
+| Pengingat Tagihan | Laporan Tahunan | Impor CSV | Kunci Aplikasi | Onboarding |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="https://via.placeholder.com/250x500.png?text=Reminder" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Tahunan" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Import" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Lock" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Onboarding" width="200"/> |
 
 ---
 
@@ -67,6 +77,10 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 * **Ekspor PDF**: `expo-print` + `expo-file-system` + `expo-sharing`
 * **Ekspor Excel**: `xlsx` + `expo-file-system` + `expo-sharing`
 * **Haptic Feedback**: `expo-haptics`
+* **Autentikasi Biometrik**: `expo-local-authentication`
+* **Sinkronisasi Kalender**: `expo-calendar`
+* **Pemilih Berkas**: `expo-document-picker` (Impor CSV)
+* **Parsing CSV**: `papaparse`
 * **Penyimpanan Lokal**: `@react-native-async-storage/async-storage`
 * **Path Alias**: `@/` → `./src/`
 
@@ -114,6 +128,12 @@ FinTrack/
 │   ├── app/                    # Konfigurasi routing (Expo Router) dan layar
 │   │   ├── (tabs)/             # 4 layar tab (Dashboard, Transaksi, Budget, Pengaturan)
 │   │   ├── transaction/        # Detail & Edit transaksi (modal)
+│   │   ├── goals.tsx           # Target menabung (Savings Goals)
+│   │   ├── reminders.tsx       # Pengingat tagihan (Bill Reminders)
+│   │   ├── annual.tsx          # Laporan tahunan
+│   │   ├── import.tsx          # Impor CSV rekening koran
+│   │   ├── lock.tsx            # Pengaturan PIN/biometric
+│   │   ├── lock-screen.tsx     # Layar masuk PIN/biometric
 │   │   ├── recurring.tsx       # CRUD transaksi berulang
 │   │   ├── transfer.tsx        # Transfer antar dompet
 │   │   ├── wallets.tsx         # Manajemen dompet (sub-screen)
@@ -121,14 +141,14 @@ FinTrack/
 │   │   ├── onboarding.tsx      # 3-slide onboarding untuk pengguna baru
 │   │   └── export.tsx          # Ekspor laporan Excel
 │   ├── components/             # Komponen UI reusable
-│   │   ├── charts/             # Donut chart, bar chart, toggle, filter tanggal
+│   │   ├── charts/             # Donut chart, bar chart, monthly trend chart, filter tanggal
 │   │   ├── forms/              # Form transaksi, budget, dompet, kategori
 │   │   └── ui/                 # Button, Card, Input, FAB, Skeleton, SuccessAnimation, dll
 │   ├── constants/              # Tema (dark mode), kategori default, dompet default
 │   ├── features/               # Modul fitur
 │   │   ├── recurring/          # Engine transaksi berulang
 │   │   ├── export/             # Generator PDF, Excel, dan backup/restore JSON
-│   │   └── notifications/      # Pengingat anggaran (budget reminder)
+│   │   └── notifications/      # Kalender sync & budget reminder
 │   ├── lib/                    # SQLite schema, migration, seed, query classes
 │   ├── types/                  # Definisi tipe TypeScript global
 │   └── utils/                  # Format Rupiah, haptic feedback, utilitas lainnya
@@ -138,6 +158,26 @@ FinTrack/
 ├── package.json                # Dependensi dan script NPM
 └── tsconfig.json               # Konfigurasi TypeScript
 ```
+
+---
+
+## 🚧 Fitur yang Akan Datang (Roadmap)
+
+Berikut fitur-fitur yang sedang direncanakan untuk pengembangan selanjutnya:
+
+- 🌓 **Toggle Tema Terang/Gelap** — pilihan tema sesuai preferensi pengguna
+- 📸 **Lampiran Foto/Resi** — foto bukti transaksi sebagai arsip digital
+- 🏷️ **Tag/Label pada Transaksi** — tagging bebas untuk kategorisasi alternatif
+- 💱 **Multi Mata Uang** — dukung mata uang selain IDR dengan kurs dinamis
+- 💳 **Pencatatan Utang/Piutang (Debt Tracking)** — catat siapa yang berutang atau memberi utang
+- 📊 **Split Transaksi** — satu transaksi dibagi ke beberapa kategori
+- 🔄 **Budget Rollover** — sisa anggaran bulan lalu otomatis ditambahkan ke bulan ini
+- ☁️ **Backup Cloud (iCloud/Google Drive)** — sinkronisasi cadangan otomatis
+- 📥 **Export CSV** — ekspor data transaksi ke format CSV
+- 📱 **Widget Home Screen** — ringkasan cepat di layar utama HP Android/iOS
+- 🤖 **Analisis Belanja (Spending Insights)** — insight otomatis pola pengeluaran bulanan
+
+Ada ide fitur lain? Silakan buka *issue* atau ajukan *Pull Request*!
 
 ---
 

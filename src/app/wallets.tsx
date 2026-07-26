@@ -39,6 +39,11 @@ export default function WalletsScreen() {
     ]);
   };
 
+  const handleSetPrimary = async (id: number) => {
+    await new WalletQueries(db).setPrimary(id);
+    loadData();
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -49,15 +54,26 @@ export default function WalletsScreen() {
       </View>
       {wallets.map(w => (
         <View key={w.id} style={styles.item}>
-          <View style={styles.itemLeft}>
-            <View style={[styles.icon, { backgroundColor: (w.color || theme.colors.primary) + '20' }]}>
-              <Ionicons name={(w.icon || 'wallet') as any} size={20} color={w.color || theme.colors.primary} />
+          <TouchableOpacity style={styles.itemLeft} onPress={() => !w.is_primary && handleSetPrimary(w.id)}>
+            <View style={{ position: 'relative' }}>
+              <View style={[styles.icon, { backgroundColor: (w.color || theme.colors.primary) + '20' }]}>
+                <Ionicons name={(w.icon || 'wallet') as any} size={20} color={w.color || theme.colors.primary} />
+              </View>
+              {w.is_primary ? (
+                <View style={styles.starBadge}>
+                  <Ionicons name="star" size={12} color={theme.colors.warning} />
+                </View>
+              ) : (
+                <View style={[styles.starBadge, styles.starBadgeInactive]}>
+                  <Ionicons name="star-outline" size={12} color={theme.colors.textSecondary} />
+                </View>
+              )}
             </View>
             <View>
-              <Text style={styles.itemName}>{w.name}</Text>
+              <Text style={styles.itemName}>{w.name} {w.is_primary ? '(Utama)' : ''}</Text>
               <Text style={styles.itemBalance}>{formatRupiah(w.balance)}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => handleDelete(w.id)}>
             <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
           </TouchableOpacity>
@@ -81,8 +97,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface, margin: theme.spacing.md, marginBottom: 0,
     padding: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border,
   },
-  itemLeft: { flexDirection: 'row', alignItems: 'center' },
+  itemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   icon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
+  starBadge: { position: 'absolute', top: -4, right: theme.spacing.md - 4, backgroundColor: theme.colors.surface, borderRadius: 8, padding: 1 },
+  starBadgeInactive: { opacity: 0.5 },
   itemName: { ...theme.typography.body, fontWeight: '500', marginBottom: 2 },
   itemBalance: { ...theme.typography.caption },
   modal: { flex: 1, backgroundColor: theme.colors.background, paddingTop: 40 },

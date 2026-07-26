@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider, DarkTheme, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, Suspense, useState, useCallback } from 'react';
+import { useEffect, Suspense, useState, useCallback, useRef } from 'react';
 import { SQLiteProvider } from 'expo-sqlite';
 import 'react-native-reanimated';
 import { View, ActivityIndicator, Text } from 'react-native';
@@ -18,42 +18,41 @@ export default function RootLayout() {
     SpaceMono: require('../../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
-
-  const checkOnboarding = useCallback(async () => {
-    try {
-      const val = await AsyncStorage.getItem('onboarding_done');
-      setOnboardingDone(val === 'true');
-    } catch (e) {
-      console.error('Onboarding check failed:', e);
-      setOnboardingDone(false);
-    }
-  }, []);
+  const redirectDone = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
     async function init() {
       try {
-        if (loaded) {
-          await checkOnboarding();
-          if (isMounted) {
-            SplashScreen.hideAsync();
-          }
+        if (!loaded) return;
+        const done = await AsyncStorage.getItem('onboarding_done');
+        const pin = await AsyncStorage.getItem('app_pin_hash');
+        if (!isMounted) return;
+
+        SplashScreen.hideAsync();
+        setReady(true);
+
+        if (done !== 'true') {
+          router.replace('/onboarding');
+        } else if (pin) {
+          router.replace('/lock-screen');
         }
       } catch (e) {
         console.error('Init error:', e);
         if (isMounted) {
           setInitError(e as Error);
           SplashScreen.hideAsync();
+          setReady(true);
         }
       }
     }
     init();
     return () => { isMounted = false; };
-  }, [loaded, checkOnboarding]);
+  }, [loaded]);
 
-  if (!loaded || onboardingDone === null) {
+  if (!loaded || !ready) {
     return null;
   }
 
@@ -76,6 +75,7 @@ export default function RootLayout() {
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
+            <Stack.Screen name="lock-screen" options={{ headerShown: false }} />
             <Stack.Screen 
               name="transaction/[id]" 
               options={{ 
@@ -92,6 +92,56 @@ export default function RootLayout() {
                 presentation: 'modal', 
                 headerShown: true, 
                 title: 'Edit Transaksi',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="goals" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Target Menabung',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="reminders" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Pengingat Tagihan',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="import" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Impor CSV',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="lock" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Kunci Aplikasi',
+                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
+                headerTintColor: theme.colors.textPrimary
+              }} 
+            />
+            <Stack.Screen 
+              name="annual" 
+              options={{ 
+                presentation: 'modal', 
+                headerShown: true, 
+                title: 'Laporan Tahunan',
                 headerStyle: { backgroundColor: theme.colors.surfaceElevated },
                 headerTintColor: theme.colors.textPrimary
               }} 

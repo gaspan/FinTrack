@@ -7,6 +7,9 @@ import {
   Budget,
   RecurringTransaction,
   TransactionType,
+  SavingsGoal,
+  BillReminder,
+  MonthlyTrendPoint,
 } from '@/types';
 
 export class TransactionQueries {
@@ -160,8 +163,21 @@ export class WalletQueries {
 
   async getAll(): Promise<Wallet[]> {
     return this.db.getAllAsync<Wallet>(
-      'SELECT * FROM wallets ORDER BY id ASC'
+      'SELECT * FROM wallets ORDER BY is_primary DESC, id ASC'
     );
+  }
+
+  async getPrimary(): Promise<Wallet | null> {
+    return this.db.getFirstAsync<Wallet>(
+      "SELECT * FROM wallets WHERE is_primary = 1 LIMIT 1"
+    );
+  }
+
+  async setPrimary(id: number) {
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync('UPDATE wallets SET is_primary = 0');
+      await this.db.runAsync('UPDATE wallets SET is_primary = 1 WHERE id = ?', [id]);
+    });
   }
 }
 
@@ -279,5 +295,138 @@ export class RecurringQueries {
       'UPDATE recurring_transactions SET next_date = ? WHERE id = ?',
       [nextDate, id]
     );
+  }
+}
+
+export class SavingsGoalQueries {
+  constructor(private db: SQLiteDatabase) {}
+
+  async getAll(): Promise<SavingsGoal[]> {
+    return this.db.getAllAsync<SavingsGoal>(
+      'SELECT * FROM savings_goals ORDER BY is_completed ASC, deadline ASC'
+    );
+  }
+
+  async create(data: { name: string; target_amount: number; deadline: string | null; wallet_id: number | null; icon: string; color: string }) {
+    return this.db.runAsync(
+      'INSERT INTO savings_goals (name, target_amount, deadline, wallet_id, icon, color) VALUES (?, ?, ?, ?, ?, ?)',
+      [data.name, data.target_amount, data.deadline, data.wallet_id, data.icon, data.color]
+    );
+  }
+
+  async update(id: number, data: Partial<{ name: string; target_amount: number; deadline: string | null; icon: string; color: string }>) {
+    const fields: string[] = [];
+    const values: any[] = [];
+    if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+    if (data.target_amount !== undefined) { fields.push('target_amount = ?'); values.push(data.target_amount); }
+    if (data.deadline !== undefined) { fields.push('deadline = ?'); values.push(data.deadline); }
+    if (data.icon !== undefined) { fields.push('icon = ?'); values.push(data.icon); }
+    if (data.color !== undefined) { fields.push('color = ?'); values.push(data.color); }
+    if (fields.length === 0) return;
+    values.push(id);
+    await this.db.runAsync(`UPDATE savings_goals SET ${fields.join(', ')} WHERE id = ?`, values);
+  }
+
+  async addFunds(id: number, amount: number) {
+    await this.db.runAsync(
+      'UPDATE savings_goals SET current_amount = current_amount + ? WHERE id = ?',
+      [amount, id]
+    );
+  }
+
+  async markCompleted(id: number, completed: boolean) {
+    await this.db.runAsync(
+      'UPDATE savings_goals SET is_completed = ? WHERE id = ?',
+      [completed ? 1 : 0, id]
+    );
+  }
+
+  async delete(id: number) {
+    await this.db.runAsync('DELETE FROM savings_goals WHERE id = ?', [id]);
+  }
+}
+
+export class BillReminderQueries {
+  constructor(private db: SQLiteDatabase) {}
+
+  async getAll(): Promise<(BillReminder & { category_name?: string; wallet_name?: string })[]> {
+    return this.db.getAllAsync(`
+      SELECT b.*, c.name as category_name, w.name as wallet_name
+      FROM bill_reminders b
+      LEFT JOIN categories c ON b.category_id = c.id
+      LEFT JOIN wallets w ON b.wallet_id = w.id
+      ORDER BY b.is_paid ASC, b.due_date ASC
+    `);
+  }
+
+  async create(data: Omit<BillReminder, 'id' | 'created_at'>) {
+    return this.db.runAsync(
+      'INSERT INTO bill_reminders (name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [data.name, data.amount, data.due_date, data.frequency, data.is_paid, data.category_id, data.wallet_id, data.notes]
+    );
+  }
+
+  async update(id: number, data: Partial<Omit<BillReminder, 'id' | 'created_at'>> & { calendar_event_id?: string }) {
+    const fields: string[] = [];
+    const values: any[] = [];
+    if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+    if (data.amount !== undefined) { fields.push('amount = ?'); values.push(data.amount); }
+    if (data.due_date !== undefined) { fields.push('due_date = ?'); values.push(data.due_date); }
+    if (data.frequency !== undefined) { fields.push('frequency = ?'); values.push(data.frequency); }
+    if (data.is_paid !== undefined) { fields.push('is_paid = ?'); values.push(data.is_paid ? 1 : 0); }
+    if (data.category_id !== undefined) { fields.push('category_id = ?'); values.push(data.category_id); }
+    if (data.wallet_id !== undefined) { fields.push('wallet_id = ?'); values.push(data.wallet_id); }
+    if (data.notes !== undefined) { fields.push('notes = ?'); values.push(data.notes); }
+    if (data.calendar_event_id !== undefined) { fields.push('calendar_event_id = ?'); values.push(data.calendar_event_id); }
+    if (fields.length === 0) return;
+    values.push(id);
+    await this.db.runAsync(`UPDATE bill_reminders SET ${fields.join(', ')} WHERE id = ?`, values);
+  }
+
+  async delete(id: number) {
+    await this.db.runAsync('DELETE FROM bill_reminders WHERE id = ?', [id]);
+  }
+
+  async togglePaid(id: number, isPaid: boolean) {
+    await this.db.runAsync('UPDATE bill_reminders SET is_paid = ? WHERE id = ?', [isPaid ? 1 : 0, id]);
+  }
+
+  async updateCalendarEventId(id: number, eventId: string) {
+    await this.db.runAsync('UPDATE bill_reminders SET calendar_event_id = ? WHERE id = ?', [eventId, id]);
+  }
+}
+
+export class TrendQueries {
+  constructor(private db: SQLiteDatabase) {}
+
+  async getMonthlyTrend(months: number = 12): Promise<MonthlyTrendPoint[]> {
+    return this.db.getAllAsync<MonthlyTrendPoint>(`
+      SELECT 
+        strftime('%Y-%m', transaction_date) as month,
+        SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
+        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
+      FROM transactions
+      WHERE transaction_date >= date('now', '-${months} months')
+      GROUP BY strftime('%Y-%m', transaction_date)
+      ORDER BY month ASC
+    `);
+  }
+
+  async getCashFlow(walletId?: number): Promise<{ month: string; flow: number }[]> {
+    let whereClause = '';
+    const params: any[] = [];
+    if (walletId) {
+      whereClause = 'AND wallet_id = ?';
+      params.push(walletId);
+    }
+    return this.db.getAllAsync(`
+      SELECT 
+        strftime('%Y-%m', transaction_date) as month,
+        SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as flow
+      FROM transactions
+      WHERE transaction_date >= date('now', '-12 months') ${whereClause}
+      GROUP BY strftime('%Y-%m', transaction_date)
+      ORDER BY month ASC
+    `, params);
   }
 }

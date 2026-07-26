@@ -12,22 +12,28 @@ interface BackupData {
   transactions: any[];
   budgets: any[];
   recurring_transactions: any[];
+  savings_goals?: any[];
+  bill_reminders?: any[];
 }
 
 export const exportBackup = async (db: SQLiteDatabase) => {
-  const [wallets, categories, transactions, budgets, recurring] = await Promise.all([
+  const [wallets, categories, transactions, budgets, recurring, goals, reminders] = await Promise.all([
     db.getAllAsync('SELECT * FROM wallets'),
     db.getAllAsync('SELECT * FROM categories'),
     db.getAllAsync('SELECT * FROM transactions'),
     db.getAllAsync('SELECT * FROM budgets'),
     db.getAllAsync('SELECT * FROM recurring_transactions'),
+    db.getAllAsync('SELECT * FROM savings_goals'),
+    db.getAllAsync('SELECT * FROM bill_reminders'),
   ]);
 
   const data: BackupData = {
-    version: 1,
+    version: 2,
     exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     wallets, categories, transactions, budgets,
     recurring_transactions: recurring,
+    savings_goals: goals,
+    bill_reminders: reminders,
   };
 
   const json = JSON.stringify(data, null, 2);
@@ -64,6 +70,8 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
   }
 
   await db.withTransactionAsync(async () => {
+    await db.execAsync('DELETE FROM bill_reminders');
+    await db.execAsync('DELETE FROM savings_goals');
     await db.execAsync('DELETE FROM transactions');
     await db.execAsync('DELETE FROM budgets');
     await db.execAsync('DELETE FROM recurring_transactions');
@@ -78,8 +86,8 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
     }
     for (const w of data.wallets) {
       await db.runAsync(
-        'INSERT INTO wallets (id, name, balance, icon, color) VALUES (?, ?, ?, ?, ?)',
-        [w.id, w.name, w.balance, w.icon, w.color]
+        'INSERT INTO wallets (id, name, balance, icon, color, is_primary) VALUES (?, ?, ?, ?, ?, ?)',
+        [w.id, w.name, w.balance, w.icon, w.color, w.is_primary || 0]
       );
     }
     for (const tx of data.transactions) {
@@ -98,6 +106,18 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
       await db.runAsync(
         'INSERT INTO recurring_transactions (id, type, amount, category_id, wallet_id, frequency, next_date, notes, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [r.id, r.type, r.amount, r.category_id, r.wallet_id, r.frequency, r.next_date, r.notes, r.is_active]
+      );
+    }
+    for (const g of data.savings_goals || []) {
+      await db.runAsync(
+        'INSERT INTO savings_goals (id, name, target_amount, current_amount, deadline, wallet_id, icon, color, is_completed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [g.id, g.name, g.target_amount, g.current_amount, g.deadline, g.wallet_id, g.icon, g.color, g.is_completed, g.created_at]
+      );
+    }
+    for (const r of data.bill_reminders || []) {
+      await db.runAsync(
+        'INSERT INTO bill_reminders (id, name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes, calendar_event_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [r.id, r.name, r.amount, r.due_date, r.frequency, r.is_paid, r.category_id, r.wallet_id, r.notes, r.calendar_event_id, r.created_at]
       );
     }
   });

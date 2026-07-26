@@ -3,9 +3,8 @@ import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { DEFAULT_WALLETS } from '../constants/wallets';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 1;
+  const DATABASE_VERSION = 2;
 
-  // Retrieve current version
   let { user_version: currentDbVersion } = await db.getFirstAsync<{ user_version: number }>(
     'PRAGMA user_version'
   ) ?? { user_version: 0 };
@@ -15,9 +14,7 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
   }
 
   if (currentDbVersion === 0) {
-    // Initial schema setup
     await db.withTransactionAsync(async () => {
-      // 1. Categories Table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS categories (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +26,6 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
         );
       `);
 
-      // 2. Wallets Table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS wallets (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +36,6 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
         );
       `);
 
-      // 3. Transactions Table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS transactions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +52,6 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
         );
       `);
 
-      // 4. Budgets Table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS budgets (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +62,6 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
         );
       `);
 
-      // 5. Recurring Transactions Table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS recurring_transactions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,8 +78,6 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
         );
       `);
 
-      // Seed Initial Data
-      // Seed Categories
       for (const cat of DEFAULT_CATEGORIES) {
         await db.runAsync(
           'INSERT INTO categories (name, type, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)',
@@ -94,7 +85,6 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
         );
       }
 
-      // Seed Wallets
       for (const wallet of DEFAULT_WALLETS) {
         await db.runAsync(
           'INSERT INTO wallets (name, balance, icon, color) VALUES (?, ?, ?, ?)',
@@ -106,6 +96,53 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     currentDbVersion = 1;
   }
 
-  // Update PRAGMA user_version to the latest version
+  if (currentDbVersion === 1) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS savings_goals (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          target_amount REAL NOT NULL,
+          current_amount REAL NOT NULL DEFAULT 0,
+          deadline TEXT,
+          wallet_id INTEGER,
+          icon TEXT DEFAULT 'flag-outline',
+          color TEXT DEFAULT '#00D09C',
+          is_completed INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (wallet_id) REFERENCES wallets(id)
+        );
+      `);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS bill_reminders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          amount REAL NOT NULL,
+          due_date TEXT NOT NULL,
+          frequency TEXT NOT NULL DEFAULT 'monthly' CHECK(frequency IN ('one_time', 'monthly', 'yearly')),
+          is_paid INTEGER DEFAULT 0,
+          category_id INTEGER,
+          wallet_id INTEGER,
+          notes TEXT,
+          calendar_event_id TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (category_id) REFERENCES categories(id),
+          FOREIGN KEY (wallet_id) REFERENCES wallets(id)
+        );
+      `);
+
+      await db.execAsync(`ALTER TABLE wallets ADD COLUMN is_primary INTEGER DEFAULT 0;`);
+
+      await db.execAsync(`CREATE TABLE IF NOT EXISTS app_lock (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pin_hash TEXT,
+        biometric_enabled INTEGER DEFAULT 0
+      );`);
+    });
+
+    currentDbVersion = 2;
+  }
+
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

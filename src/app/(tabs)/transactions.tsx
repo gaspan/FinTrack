@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { TransactionQueries, CategoryQueries, WalletQueries } from '@/lib/queries';
 import { TransactionWithDetails, Category, Wallet } from '@/types';
+import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Chip } from '@/components/ui/Chip';
 import { formatRupiah } from '@/utils/format';
@@ -28,6 +29,8 @@ export default function TransactionsScreen() {
   const [filterCategory, setFilterCategory] = useState<number | null>(null);
   const [filterWallet, setFilterWallet] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const loadData = useCallback(async () => {
     try {
@@ -55,6 +58,10 @@ export default function TransactionsScreen() {
   const filtered = useMemo(() => {
     let result = allTransactions;
 
+    if (startDate && endDate) {
+      result = result.filter(t => t.transaction_date >= startDate && t.transaction_date <= endDate);
+    }
+
     if (filterType !== 'all') {
       result = result.filter(t => t.type === filterType);
     }
@@ -74,7 +81,7 @@ export default function TransactionsScreen() {
       );
     }
     return result;
-  }, [allTransactions, filterType, filterCategory, filterWallet, searchText]);
+  }, [allTransactions, filterType, filterCategory, filterWallet, searchText, startDate, endDate]);
 
   const summaryTotal = useMemo(() => {
     let income = 0, expense = 0;
@@ -103,9 +110,11 @@ export default function TransactionsScreen() {
     setFilterWallet(null);
     setFilterType('all');
     setSearchText('');
+    setStartDate('');
+    setEndDate('');
   };
 
-  const hasActiveFilter = filterCategory !== null || filterWallet !== null || filterType !== 'all' || searchText.trim().length > 0;
+  const hasActiveFilter = filterCategory !== null || filterWallet !== null || filterType !== 'all' || searchText.trim().length > 0 || !!startDate;
 
   const handleDeleteTx = async (id: number) => {
     try {
@@ -169,6 +178,15 @@ export default function TransactionsScreen() {
             </TouchableOpacity>
           )}
         </View>
+      </View>
+
+      {/* Date Range Filter */}
+      <View style={styles.dateRangeRow}>
+        <DateRangeFilter
+          startDate={startDate || dayjs().startOf('month').format('YYYY-MM-DD')}
+          endDate={endDate || dayjs().endOf('month').format('YYYY-MM-DD')}
+          onChange={(start, end) => { setStartDate(start); setEndDate(end); }}
+        />
       </View>
 
       {/* Filter Chips */}
@@ -267,6 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md, height: 40,
   },
   searchInput: { flex: 1, ...theme.typography.body, color: theme.colors.textPrimary, marginLeft: theme.spacing.sm, paddingVertical: 0 },
+  dateRangeRow: { paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.xs },
   filterRow: { paddingVertical: theme.spacing.sm, paddingLeft: theme.spacing.md, marginBottom: 4 },
   filterChip: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: theme.spacing.md,
