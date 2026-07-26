@@ -2,10 +2,10 @@ import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider, DarkTheme, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, Suspense, useState } from 'react';
+import { useEffect, Suspense, useState, useCallback } from 'react';
 import { SQLiteProvider } from 'expo-sqlite';
 import 'react-native-reanimated';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { migrateDbIfNeeded } from '@/lib/database';
@@ -19,21 +19,50 @@ export default function RootLayout() {
   });
 
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [initError, setInitError] = useState<Error | null>(null);
+
+  const checkOnboarding = useCallback(async () => {
+    try {
+      const val = await AsyncStorage.getItem('onboarding_done');
+      setOnboardingDone(val === 'true');
+    } catch (e) {
+      console.error('Onboarding check failed:', e);
+      setOnboardingDone(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-      AsyncStorage.getItem('onboarding_done').then(val => {
-        if (val !== 'true') {
-          router.replace('/onboarding');
+    let isMounted = true;
+    async function init() {
+      try {
+        if (loaded) {
+          await checkOnboarding();
+          if (isMounted) {
+            SplashScreen.hideAsync();
+          }
         }
-        setOnboardingDone(true);
-      });
+      } catch (e) {
+        console.error('Init error:', e);
+        if (isMounted) {
+          setInitError(e as Error);
+          SplashScreen.hideAsync();
+        }
+      }
     }
-  }, [loaded]);
+    init();
+    return () => { isMounted = false; };
+  }, [loaded, checkOnboarding]);
 
   if (!loaded || onboardingDone === null) {
     return null;
+  }
+
+  if (initError) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+        <Text style={{ color: theme.colors.textPrimary }}>Gagal memuat aplikasi. Silakan restart.</Text>
+      </View>
+    );
   }
 
   return (

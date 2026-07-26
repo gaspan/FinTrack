@@ -44,6 +44,7 @@ export default function AddTransactionScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setShowSuccess(false);
       loadData();
     }, [loadData])
   );
