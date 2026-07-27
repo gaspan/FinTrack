@@ -38,6 +38,7 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 - **⏰ Pengingat Tagihan (Bill Reminders)**: Catat tagihan rutin (listrik, internet, dll) dengan frekuensi bulanan/tahunan. Dapatkan pengingat otomatis via **sinkronisasi ke Kalender Sistem** (Google Calendar / Apple Calendar) dengan alarm H-1.
 - **📄 Laporan Tahunan**: Lihat ringkasan finansial sepanjang tahun dengan bar chart perbandingan pemasukan vs pengeluaran per bulan. Navigasi antar tahun.
 - **🔐 Kunci Aplikasi (PIN/Biometric)**: Amankan aplikasi dengan PIN 4 digit atau biometrik (Face ID / Fingerprint). Aktifkan/nonaktifkan dari pengaturan.
+- **🌓 Pengaturan Tema (Dark/Light/Auto)**: Pilih tema tampilan sesuai preferensi Anda. Mode Auto mengikuti pengaturan sistem, atau pilih manual antara Tema Gelap atau Terang dari tab Pengaturan.
 - **📥 Impor CSV Rekening Koran**: Impor transaksi dari file CSV bank Indonesia (BCA, Mandiri, BRI, dll) secara otomatis dengan deteksi kolom dan cek duplikat.
 - **💳 Arus Kas (Cash Flow)**: Lihat net cash flow tahun berjalan dengan indikator positif/negatif di dashboard.
 
@@ -165,7 +166,6 @@ FinTrack/
 
 Berikut fitur-fitur yang sedang direncanakan untuk pengembangan selanjutnya:
 
-- 🌓 **Toggle Tema Terang/Gelap** — pilihan tema sesuai preferensi pengguna
 - 📸 **Lampiran Foto/Resi** — foto bukti transaksi sebagai arsip digital
 - 🏷️ **Tag/Label pada Transaksi** — tagging bebas untuk kategorisasi alternatif
 - 💱 **Multi Mata Uang** — dukung mata uang selain IDR dengan kurs dinamis

@@ -1,17 +1,23 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { exportBackup, importBackup } from '@/features/export/backupRestore';
 import { formatRupiah } from '@/utils/format';
 
 export default function SettingsScreen() {
+  const { theme, themeName, cycleTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   const [backingUp, setBackingUp] = useState(false);
   const [importing, setImporting] = useState(false);
+
+  const handleThemeCycle = useCallback(() => {
+    cycleTheme();
+  }, [cycleTheme]);
 
   useFocusEffect(useCallback(() => {}, []));
 
@@ -156,6 +162,30 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Tampilan Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Tampilan</Text>
+
+        <TouchableOpacity style={styles.item} onPress={handleThemeCycle}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.primary + '20' }]}>
+              <Ionicons 
+                name={themeName === 'dark' ? 'moon-outline' : themeName === 'light' ? 'sunny-outline' : 'contrast-outline'} 
+                size={20} 
+                color={theme.colors.primary} 
+              />
+            </View>
+            <Text style={styles.itemTitle}>Tema</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Text style={styles.itemSub}>
+              {themeName === 'auto' ? 'Auto' : themeName === 'dark' ? 'Gelap' : 'Terang'}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+      </View>
+
       {/* Data Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Data</Text>
@@ -208,7 +238,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   pageTitle: { ...theme.typography.h1, padding: theme.spacing.md, paddingBottom: 0 },
   section: { marginTop: theme.spacing.lg, paddingHorizontal: theme.spacing.md },
