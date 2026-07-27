@@ -406,10 +406,10 @@ export class TrendQueries {
         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
         SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
       FROM transactions
-      WHERE transaction_date >= date('now', '-${months} months')
+      WHERE transaction_date >= date('now', ?||' months')
       GROUP BY strftime('%Y-%m', transaction_date)
       ORDER BY month ASC
-    `);
+    `, [`-${months}`]);
   }
 
   async getCashFlow(walletId?: number): Promise<{ month: string; flow: number }[]> {

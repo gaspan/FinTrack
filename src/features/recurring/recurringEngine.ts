@@ -12,7 +12,6 @@ export class RecurringEngine {
   }
 
   async processRecurringTransactions() {
-    console.log('[RecurringEngine] Checking for due transactions...');
     const today = dayjs().format('YYYY-MM-DD');
     
     // 1. Get all active recurring transactions
@@ -24,7 +23,6 @@ export class RecurringEngine {
       
       // 2. Loop in case it's overdue by multiple periods
       while (nextDate.isBefore(dayjs(today).add(1, 'day'), 'day') && count < 10) {
-        console.log(`[RecurringEngine] Processing recurring ID ${rt.id} for date ${nextDate.format('YYYY-MM-DD')}`);
         
         // 3. Create the transaction
         await this.transactionQueries.create({

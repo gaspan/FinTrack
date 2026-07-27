@@ -28,7 +28,6 @@ export async function checkBudgetAlerts(db: SQLiteDatabase) {
         [{ text: 'Mengerti', style: 'default' }]
       );
     }
-  } catch (e) {
-    console.error('[BudgetReminder] Error:', e);
+  } catch {
   }
 }

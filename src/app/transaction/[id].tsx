@@ -9,6 +9,7 @@ import { theme } from '@/constants/theme';
 import { TransactionQueries } from '@/lib/queries';
 import { TransactionWithDetails } from '@/types';
 import { Button } from '@/components/ui/Button';
+import { formatRupiah } from '@/utils/format';
 
 export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -81,7 +82,7 @@ export default function TransactionDetailScreen() {
     );
   };
 
-  const formatRp = (val: number) => `Rp ${val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+  const formatRp = formatRupiah;
 
   if (loading) {
     return (
