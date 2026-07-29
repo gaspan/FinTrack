@@ -7,7 +7,7 @@ import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
-import { ChartQueries, WalletQueries, TransactionQueries, TrendQueries } from '@/lib/queries';
+import { ChartQueries, WalletQueries, TransactionQueries, TrendQueries, NetWorthQueries } from '@/lib/queries';
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
 import { ChartToggle } from '@/components/charts/ChartToggle';
 import { ExpenseDonutChart } from '@/components/charts/ExpenseDonutChart';
@@ -21,7 +21,12 @@ import { generateAndSharePDF } from '@/features/export/pdfGenerator';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { SpendingInsightCard } from '@/features/insights/SpendingInsightCard';
 import { FinancialTipsCard } from '@/features/insights/FinancialTipsCard';
+import { NetWorthSummaryCard } from '@/components/networth/NetWorthSummaryCard';
+import { SafeToSpendCard } from '@/components/dashboard/SafeToSpendCard';
 import { loadInsights } from '@/features/insights';
+import { calculateSafeToSpend } from '@/features/forecast/forecastEngine';
+import { SafeToSpendData } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CategoryInsight, SpendingAlert, FinancialHealthScore, FinancialTip } from '@/types';
 
 dayjs.locale('id');
@@ -57,6 +62,9 @@ export default function DashboardScreen() {
   const [primaryWallet, setPrimaryWallet] = useState<Wallet | null>(null);
   const [cashFlow, setCashFlow] = useState<number>(0);
   const [insightData, setInsightData] = useState<{ comparisons: CategoryInsight[]; alerts: SpendingAlert[]; financialHealth: FinancialHealthScore | null; financialTips: FinancialTip[] }>({ comparisons: [], alerts: [], financialHealth: null, financialTips: [] });
+  const [netWorthData, setNetWorthData] = useState<{ totalAssets: number; totalLiabilities: number; netWorth: number } | null>(null);
+  const [safeToSpendData, setSafeToSpendData] = useState<SafeToSpendData | null>(null);
+  const [safeToSpendEnabled, setSafeToSpendEnabled] = useState(true);
 
   const loadData = useCallback(async () => {
     try {
@@ -95,6 +103,16 @@ export default function DashboardScreen() {
 
       const txs = await txQueries.getByDateRange(startDate, endDate);
       setRecentTransactions(txs.slice(0, 5));
+
+      const nwQ = new NetWorthQueries(db);
+      const nw = await nwQ.getCurrentNetWorth();
+      setNetWorthData(nw);
+
+      const enabled = await AsyncStorage.getItem('safe_to_spend_enabled');
+      setSafeToSpendEnabled(enabled !== 'false');
+
+      const safeData = await calculateSafeToSpend(db);
+      setSafeToSpendData(safeData);
 
       const insights = await loadInsights(db);
       setInsightData(insights);
@@ -260,6 +278,24 @@ export default function DashboardScreen() {
           </Card>
         </View>
       </View>
+
+      {/* Net Worth */}
+      {netWorthData && (
+        <View style={styles.chartSection}>
+          <NetWorthSummaryCard
+            totalAssets={netWorthData.totalAssets}
+            totalLiabilities={netWorthData.totalLiabilities}
+            netWorth={netWorthData.netWorth}
+          />
+        </View>
+      )}
+
+      {/* Safe to Spend */}
+      {safeToSpendEnabled && safeToSpendData && (
+        <View style={styles.chartSection}>
+          <SafeToSpendCard data={safeToSpendData} />
+        </View>
+      )}
 
       {/* Monthly Trend */}
       <View style={styles.chartSection}>

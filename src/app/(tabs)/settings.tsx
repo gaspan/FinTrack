@@ -7,6 +7,9 @@ import { useFocusEffect, router } from 'expo-router';
 import { useTheme, type Theme } from '@/constants/theme';
 import { exportBackup, importBackup } from '@/features/export/backupRestore';
 import { formatRupiah } from '@/utils/format';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SAFE_TO_SPEND_KEY = 'safe_to_spend_enabled';
 
 export default function SettingsScreen() {
   const { theme, themeName, cycleTheme } = useTheme();
@@ -14,6 +17,13 @@ export default function SettingsScreen() {
   const db = useSQLiteContext();
   const [backingUp, setBackingUp] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [safeToSpendEnabled, setSafeToSpendEnabled] = useState(true);
+
+  useFocusEffect(useCallback(() => {
+    AsyncStorage.getItem(SAFE_TO_SPEND_KEY).then((val) => {
+      setSafeToSpendEnabled(val !== 'false');
+    });
+  }, []));
 
   const handleThemeCycle = useCallback(() => {
     cycleTheme();
@@ -130,6 +140,48 @@ export default function SettingsScreen() {
           <View style={styles.itemRight}>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
           </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/net-worth' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#10B98120' }]}>
+              <Ionicons name="wallet-outline" size={20} color="#10B981" />
+            </View>
+            <Text style={styles.itemTitle}>Kekayaan Bersih</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/subscriptions' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
+              <Ionicons name="card-outline" size={20} color="#8B5CF6" />
+            </View>
+            <Text style={styles.itemTitle}>Langganan</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => {
+          const newVal = !safeToSpendEnabled;
+          setSafeToSpendEnabled(newVal);
+          AsyncStorage.setItem(SAFE_TO_SPEND_KEY, newVal ? 'true' : 'false');
+        }}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#38BDF820' }]}>
+              <Ionicons 
+                name={safeToSpendEnabled ? 'checkbox' : 'square-outline'} 
+                size={20} 
+                color="#38BDF8" 
+              />
+            </View>
+            <Text style={styles.itemTitle}>Sisa Budget Harian</Text>
+          </View>
+          <Text style={styles.itemSub}>{safeToSpendEnabled ? 'Aktif' : 'Nonaktif'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/import' as any)}>

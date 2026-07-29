@@ -57,7 +57,7 @@ export default function LockSettingsScreen() {
   React.useEffect(() => { loadStatus(); }, [loadStatus]);
 
   const handleSetPin = async () => {
-    if (newPin.length < 4) { Alert.alert('Error', 'PIN minimal 4 digit'); return; }
+    if (newPin.length !== 4) { Alert.alert('Error', 'PIN harus 4 digit'); return; }
     if (newPin !== confirmPin) { Alert.alert('Error', 'PIN tidak cocok'); return; }
 
     if (hasPin) {
@@ -112,28 +112,31 @@ export default function LockSettingsScreen() {
           label="PIN Saat Ini"
           placeholder="Masukkan PIN saat ini"
           value={currentPin}
-          onChangeText={setCurrentPin}
+          onChangeText={(t) => setCurrentPin(t.replace(/\D/g, '').slice(0, 4))}
           secureTextEntry
           keyboardType="number-pad"
+          maxLength={4}
         />
       )}
 
       <Input
-        label={hasPin ? 'PIN Baru' : 'PIN Baru (min 4 digit)'}
-        placeholder="Masukkan PIN"
+        label={hasPin ? 'PIN Baru' : 'PIN Baru (4 digit)'}
+        placeholder="Masukkan PIN 4 digit"
         value={newPin}
-        onChangeText={setNewPin}
+        onChangeText={(t) => setNewPin(t.replace(/\D/g, '').slice(0, 4))}
         secureTextEntry
         keyboardType="number-pad"
+        maxLength={4}
       />
 
       <Input
         label="Konfirmasi PIN"
         placeholder="Masukkan ulang PIN"
         value={confirmPin}
-        onChangeText={setConfirmPin}
+        onChangeText={(t) => setConfirmPin(t.replace(/\D/g, '').slice(0, 4))}
         secureTextEntry
         keyboardType="number-pad"
+        maxLength={4}
       />
 
       <TouchableOpacity style={styles.biometricRow} onPress={() => setBiometric(!biometric)}>
@@ -149,7 +152,7 @@ export default function LockSettingsScreen() {
       <Button
         title={hasPin ? 'Ubah PIN' : 'Simpan PIN'}
         onPress={handleSetPin}
-        disabled={newPin.length < 4 || newPin !== confirmPin || (hasPin && !currentPin)}
+        disabled={newPin.length !== 4 || newPin !== confirmPin || (hasPin && !currentPin)}
         loading={loading}
         fullWidth
       />

@@ -14,10 +14,14 @@ interface BackupData {
   recurring_transactions: any[];
   savings_goals?: any[];
   bill_reminders?: any[];
+  assets?: any[];
+  liabilities?: any[];
+  net_worth_snapshots?: any[];
+  subscriptions?: any[];
 }
 
 export const exportBackup = async (db: SQLiteDatabase) => {
-  const [wallets, categories, transactions, budgets, recurring, goals, reminders] = await Promise.all([
+  const [wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs] = await Promise.all([
     db.getAllAsync('SELECT * FROM wallets'),
     db.getAllAsync('SELECT * FROM categories'),
     db.getAllAsync('SELECT * FROM transactions'),
@@ -25,15 +29,22 @@ export const exportBackup = async (db: SQLiteDatabase) => {
     db.getAllAsync('SELECT * FROM recurring_transactions'),
     db.getAllAsync('SELECT * FROM savings_goals'),
     db.getAllAsync('SELECT * FROM bill_reminders'),
+    db.getAllAsync('SELECT * FROM assets'),
+    db.getAllAsync('SELECT * FROM liabilities'),
+    db.getAllAsync('SELECT * FROM net_worth_snapshots'),
+    db.getAllAsync('SELECT * FROM subscriptions'),
   ]);
 
   const data: BackupData = {
-    version: 2,
+    version: 3,
     exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     wallets, categories, transactions, budgets,
     recurring_transactions: recurring,
     savings_goals: goals,
     bill_reminders: reminders,
+    assets, liabilities,
+    net_worth_snapshots: snapshots,
+    subscriptions: subs,
   };
 
   const json = JSON.stringify(data, null, 2);
@@ -70,11 +81,15 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
   }
 
   await db.withTransactionAsync(async () => {
+    await db.execAsync('DELETE FROM subscriptions');
+    await db.execAsync('DELETE FROM net_worth_snapshots');
     await db.execAsync('DELETE FROM bill_reminders');
     await db.execAsync('DELETE FROM savings_goals');
     await db.execAsync('DELETE FROM transactions');
     await db.execAsync('DELETE FROM budgets');
     await db.execAsync('DELETE FROM recurring_transactions');
+    await db.execAsync('DELETE FROM assets');
+    await db.execAsync('DELETE FROM liabilities');
     await db.execAsync('DELETE FROM wallets');
     await db.execAsync('DELETE FROM categories');
 
@@ -88,6 +103,30 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
       await db.runAsync(
         'INSERT INTO wallets (id, name, balance, icon, color, is_primary) VALUES (?, ?, ?, ?, ?, ?)',
         [w.id, w.name, w.balance, w.icon, w.color, w.is_primary || 0]
+      );
+    }
+    for (const a of data.assets || []) {
+      await db.runAsync(
+        'INSERT INTO assets (id, name, type, current_value, initial_value, purchase_date, notes, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [a.id, a.name, a.type, a.current_value, a.initial_value, a.purchase_date, a.notes, a.icon, a.color, a.created_at, a.updated_at]
+      );
+    }
+    for (const l of data.liabilities || []) {
+      await db.runAsync(
+        'INSERT INTO liabilities (id, name, type, current_balance, original_amount, interest_rate, monthly_payment, due_date, notes, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [l.id, l.name, l.type, l.current_balance, l.original_amount, l.interest_rate, l.monthly_payment, l.due_date, l.notes, l.icon, l.color, l.created_at, l.updated_at]
+      );
+    }
+    for (const s of data.net_worth_snapshots || []) {
+      await db.runAsync(
+        'INSERT INTO net_worth_snapshots (id, snapshot_date, total_assets, total_liabilities, net_worth, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [s.id, s.snapshot_date, s.total_assets, s.total_liabilities, s.net_worth, s.created_at]
+      );
+    }
+    for (const s of data.subscriptions || []) {
+      await db.runAsync(
+        'INSERT INTO subscriptions (id, name, category, amount, billing_cycle, start_date, next_billing_date, wallet_id, category_id, icon, color, is_active, cancelled_date, auto_create, remind, calendar_event_id, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [s.id, s.name, s.category, s.amount, s.billing_cycle, s.start_date, s.next_billing_date, s.wallet_id, s.category_id, s.icon, s.color, s.is_active, s.cancelled_date, s.auto_create, s.remind, s.calendar_event_id, s.notes, s.created_at, s.updated_at]
       );
     }
     for (const tx of data.transactions) {

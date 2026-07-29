@@ -3,7 +3,7 @@ import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { DEFAULT_WALLETS } from '../constants/wallets';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 3;
+  const DATABASE_VERSION = 4;
 
   let { user_version: currentDbVersion } = await db.getFirstAsync<{ user_version: number }>(
     'PRAGMA user_version'
@@ -181,6 +181,95 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     });
 
     currentDbVersion = 3;
+  }
+
+  if (currentDbVersion === 3) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS assets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('investment','property','other')),
+          current_value REAL NOT NULL,
+          initial_value REAL,
+          purchase_date TEXT,
+          notes TEXT,
+          icon TEXT DEFAULT 'trending-up-outline',
+          color TEXT DEFAULT '#6366F1',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS liabilities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('loan','credit_card','debt','other')),
+          current_balance REAL NOT NULL,
+          original_amount REAL,
+          interest_rate REAL,
+          monthly_payment REAL,
+          due_date TEXT,
+          notes TEXT,
+          icon TEXT DEFAULT 'card-outline',
+          color TEXT DEFAULT '#EF4444',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          snapshot_date TEXT NOT NULL,
+          total_assets REAL NOT NULL,
+          total_liabilities REAL NOT NULL,
+          net_worth REAL NOT NULL,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
+      await db.execAsync(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_month ON net_worth_snapshots(snapshot_date);
+      `);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL CHECK(category IN ('streaming','software','fitness','news','other')),
+          amount REAL NOT NULL,
+          billing_cycle TEXT DEFAULT 'monthly' CHECK(billing_cycle IN ('monthly','yearly','quarterly')),
+          start_date TEXT NOT NULL,
+          next_billing_date TEXT NOT NULL,
+          wallet_id INTEGER,
+          category_id INTEGER,
+          icon TEXT DEFAULT 'card-outline',
+          color TEXT DEFAULT '#8B5CF6',
+          is_active INTEGER DEFAULT 1,
+          cancelled_date TEXT,
+          auto_create INTEGER DEFAULT 1,
+          remind INTEGER DEFAULT 1,
+          calendar_event_id TEXT,
+          notes TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (wallet_id) REFERENCES wallets(id),
+          FOREIGN KEY (category_id) REFERENCES categories(id)
+        );
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_subs_active ON subscriptions(is_active);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_subs_next ON subscriptions(next_billing_date);
+      `);
+    });
+
+    currentDbVersion = 4;
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

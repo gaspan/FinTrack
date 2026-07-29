@@ -179,3 +179,92 @@ export interface FinancialTip {
   message: string;
   priority: 'high' | 'medium' | 'low';
 }
+
+export interface Asset {
+  id: number;
+  name: string;
+  type: 'investment' | 'property' | 'other';
+  current_value: number;
+  initial_value?: number;
+  purchase_date?: string;
+  notes?: string;
+  icon: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Liability {
+  id: number;
+  name: string;
+  type: 'loan' | 'credit_card' | 'debt' | 'other';
+  current_balance: number;
+  original_amount?: number;
+  interest_rate?: number;
+  monthly_payment?: number;
+  due_date?: string;
+  notes?: string;
+  icon: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NetWorthSnapshot {
+  id: number;
+  snapshot_date: string;
+  total_assets: number;
+  total_liabilities: number;
+  net_worth: number;
+  created_at: string;
+}
+
+export interface Subscription {
+  id: number;
+  name: string;
+  category: 'streaming' | 'software' | 'fitness' | 'news' | 'other';
+  amount: number;
+  billing_cycle: 'monthly' | 'yearly' | 'quarterly';
+  start_date: string;
+  next_billing_date: string;
+  wallet_id?: number;
+  category_id?: number;
+  icon: string;
+  color: string;
+  is_active: number;
+  cancelled_date?: string;
+  auto_create: number;
+  remind: number;
+  calendar_event_id?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SafeToSpendData {
+  safeToSpend: number;
+  safeToSpendDaily: number;
+  totalBalance: number;
+  upcomingBills: number;
+  savingsTarget: number;
+  remainingBalance: number;
+  daysRemaining: number;
+  color: string;
+  status: 'healthy' | 'caution' | 'danger';
+}
+
+export interface ForecastPoint {
+  date: string;
+  projected_balance: number;
+  income: number;
+  expense: number;
+}
+
+export interface CalendarDayData {
+  date: string;
+  income: number;
+  expense: number;
+  net: number;
+  transactionCount: number;
+  transactions: TransactionWithDetails[];
+}

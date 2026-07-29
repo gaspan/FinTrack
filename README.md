@@ -46,6 +46,10 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 - **🌓 Pengaturan Tema (Dark/Light/Auto)**: Pilih tema tampilan sesuai preferensi Anda. Mode Auto mengikuti pengaturan sistem, atau pilih manual antara Tema Gelap atau Terang dari tab Pengaturan.
 - **📥 Impor CSV Rekening Koran**: Impor transaksi dari file CSV bank Indonesia (BCA, Mandiri, BRI, dll) secara otomatis dengan deteksi kolom dan cek duplikat.
 - **💳 Arus Kas (Cash Flow)**: Lihat net cash flow tahun berjalan dengan indikator positif/negatif di dashboard.
+- **📊 Kekayaan Bersih (Net Worth)**: Pantau total kekayaan bersih secara real-time (saldo wallet + aset manual — utang). Dilengkapi line chart tren 12 bulan dan snapshot otomatis setiap bulan. Card ringkas di dashboard.
+- **📅 Kalender Transaksi**: Lihat transaksi harian dalam tampilan kalender grid 7×6 dengan dot indikator. Tap hari untuk melihat detail transaksi via bottom sheet. Navigasi bulan dengan swipe gesture.
+- **🔁 Manajemen Langganan (Subscriptions)**: Catat semua langganan (Netflix, Spotify, dll) dengan siklus bulanan/tahunan. Engine auto-create transaksi saat tagihan jatuh tempo + reminder H-1 via kalender. Total biaya bulanan otomatis dihitung.
+- **💰 Sisa Budget Harian (Safe to Spend)**: Proyeksi sisa saldo yang aman dibelanjakan per hari berdasarkan saldo, tagihan mendatang, dan target tabungan. Toggle on/off di pengaturan. Dilengkapi halaman forecast 30 hari dengan line chart.
 
 ---
 
@@ -140,6 +144,13 @@ FinTrack/
 │   │   ├── import.tsx          # Impor CSV rekening koran
 │   │   ├── lock.tsx            # Pengaturan PIN/biometric
 │   │   ├── lock-screen.tsx     # Layar masuk PIN/biometric
+│   │   ├── subscriptions.tsx   # Manajemen langganan (subscriptions)
+│   │   ├── subscription/       # Form langganan [id].tsx
+│   │   ├── net-worth.tsx       # Kekayaan bersih (Net Worth Tracker)
+│   │   ├── asset/              # Form aset [id].tsx
+│   │   ├── liability/          # Form utang [id].tsx
+│   │   ├── forecast.tsx        # Proyeksi 30 hari (Safe to Spend)
+│   │   ├── transactions/calendar.tsx  # Kalender transaksi
 │   │   ├── recurring.tsx       # CRUD transaksi berulang
 │   │   ├── transfer.tsx        # Transfer antar dompet
 │   │   ├── wallets.tsx         # Manajemen dompet (sub-screen)
@@ -147,14 +158,18 @@ FinTrack/
 │   │   ├── onboarding.tsx      # 3-slide onboarding untuk pengguna baru
 │   │   └── export.tsx          # Ekspor laporan Excel
 │   ├── components/             # Komponen UI reusable
+│   │   ├── calendar/           # TransactionCalendar, CalendarDay, DayTransactionSheet
 │   │   ├── charts/             # Donut chart, bar chart, monthly trend chart, filter tanggal
+│   │   ├── dashboard/          # SafeToSpendCard
 │   │   ├── forms/              # Form transaksi, budget, dompet, kategori
-│   │   └── ui/                 # Button, Card, Input, FAB, Skeleton, SuccessAnimation, dll
+│   │   ├── networth/           # NetWorthSummaryCard, NetWorthChart, AssetsList, LiabilitiesList
+│   │   └── ui/                 # Button, Card, Input, FAB, Skeleton, IconPicker, ColorPicker, dll
 │   ├── constants/              # Tema (dark mode), kategori default, dompet default
 │   ├── features/               # Modul fitur
 │   │   ├── recurring/          # Engine transaksi berulang
 │   │   ├── insights/           # Spending insights, financial literacy engine & card
 │   │   ├── export/             # Generator PDF, Excel, dan backup/restore JSON
+│   │   ├── forecast/           # Safe to spend & forecast engine
 │   │   └── notifications/      # Kalender sync & budget reminder
 │   ├── lib/                    # SQLite schema, migration, seed, query classes
 │   ├── types/                  # Definisi tipe TypeScript global

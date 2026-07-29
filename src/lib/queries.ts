@@ -16,6 +16,10 @@ import {
   CategoryInsight,
   SpendingAlert,
   PaginatedResult,
+  Asset,
+  Liability,
+  NetWorthSnapshot,
+  Subscription,
 } from '@/types';
 import { CATEGORY_CLASSIFICATION } from '@/constants/categories';
 
@@ -821,5 +825,207 @@ export class TrendQueries {
       GROUP BY strftime('%Y-%m', transaction_date)
       ORDER BY month ASC
     `, params);
+  }
+}
+
+export class NetWorthQueries {
+  constructor(private db: SQLiteDatabase) {}
+
+  async getAssets(): Promise<Asset[]> {
+    return this.db.getAllAsync<Asset>('SELECT * FROM assets ORDER BY created_at DESC');
+  }
+
+  async getAssetById(id: number): Promise<Asset | null> {
+    return this.db.getFirstAsync<Asset>('SELECT * FROM assets WHERE id = ?', [id]);
+  }
+
+  async addAsset(data: Omit<Asset, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
+    const result = await this.db.runAsync(
+      `INSERT INTO assets (name, type, current_value, initial_value, purchase_date, notes, icon, color)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.name, data.type, data.current_value, data.initial_value ?? null, data.purchase_date ?? null, data.notes ?? null, data.icon, data.color]
+    );
+    return result.lastInsertRowId;
+  }
+
+  async updateAsset(id: number, data: Partial<Omit<Asset, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
+    const fields: string[] = [];
+    const params: any[] = [];
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+    }
+    fields.push("updated_at = datetime('now')");
+    params.push(id);
+    await this.db.runAsync(`UPDATE assets SET ${fields.join(', ')} WHERE id = ?`, params);
+  }
+
+  async deleteAsset(id: number): Promise<void> {
+    await this.db.runAsync('DELETE FROM assets WHERE id = ?', [id]);
+  }
+
+  async getLiabilities(): Promise<Liability[]> {
+    return this.db.getAllAsync<Liability>('SELECT * FROM liabilities ORDER BY created_at DESC');
+  }
+
+  async getLiabilityById(id: number): Promise<Liability | null> {
+    return this.db.getFirstAsync<Liability>('SELECT * FROM liabilities WHERE id = ?', [id]);
+  }
+
+  async addLiability(data: Omit<Liability, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
+    const result = await this.db.runAsync(
+      `INSERT INTO liabilities (name, type, current_balance, original_amount, interest_rate, monthly_payment, due_date, notes, icon, color)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.name, data.type, data.current_balance, data.original_amount ?? null, data.interest_rate ?? null, data.monthly_payment ?? null, data.due_date ?? null, data.notes ?? null, data.icon, data.color]
+    );
+    return result.lastInsertRowId;
+  }
+
+  async updateLiability(id: number, data: Partial<Omit<Liability, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
+    const fields: string[] = [];
+    const params: any[] = [];
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+    }
+    fields.push("updated_at = datetime('now')");
+    params.push(id);
+    await this.db.runAsync(`UPDATE liabilities SET ${fields.join(', ')} WHERE id = ?`, params);
+  }
+
+  async deleteLiability(id: number): Promise<void> {
+    await this.db.runAsync('DELETE FROM liabilities WHERE id = ?', [id]);
+  }
+
+  async getCurrentNetWorth(): Promise<{ totalAssets: number; totalLiabilities: number; netWorth: number }> {
+    const walletSum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(balance), 0) as total FROM wallets');
+    const assetSum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(current_value), 0) as total FROM assets');
+    const liabilitySum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(current_balance), 0) as total FROM liabilities');
+
+    const totalAssets = (walletSum?.total ?? 0) + (assetSum?.total ?? 0);
+    const totalLiabilities = liabilitySum?.total ?? 0;
+    return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities };
+  }
+
+  async getNetWorthHistory(months: number = 12): Promise<NetWorthSnapshot[]> {
+    return this.db.getAllAsync<NetWorthSnapshot>(
+      'SELECT * FROM net_worth_snapshots ORDER BY snapshot_date DESC LIMIT ?',
+      [months]
+    );
+  }
+
+  async ensureMonthlySnapshot(): Promise<void> {
+    const monthStart = dayjs().startOf('month').format('YYYY-MM-DD');
+    const existing = await this.db.getFirstAsync<NetWorthSnapshot>(
+      'SELECT id FROM net_worth_snapshots WHERE snapshot_date = ?', [monthStart]
+    );
+    if (existing) return;
+
+    const { totalAssets, totalLiabilities, netWorth } = await this.getCurrentNetWorth();
+    await this.db.runAsync(
+      'INSERT INTO net_worth_snapshots (snapshot_date, total_assets, total_liabilities, net_worth) VALUES (?, ?, ?, ?)',
+      [monthStart, totalAssets, totalLiabilities, netWorth]
+    );
+  }
+}
+
+export class SubscriptionQueries {
+  constructor(private db: SQLiteDatabase) {}
+
+  async getAll(includeInactive?: boolean): Promise<Subscription[]> {
+    const where = includeInactive ? '' : 'WHERE is_active = 1';
+    return this.db.getAllAsync<Subscription>(`SELECT * FROM subscriptions ${where} ORDER BY name ASC`);
+  }
+
+  async getById(id: number): Promise<Subscription | null> {
+    return this.db.getFirstAsync<Subscription>('SELECT * FROM subscriptions WHERE id = ?', [id]);
+  }
+
+  async getTotalMonthly(): Promise<number> {
+    const rows = await this.db.getAllAsync<{ amount: number; billing_cycle: string }>(
+      'SELECT amount, billing_cycle FROM subscriptions WHERE is_active = 1'
+    );
+    return rows.reduce((sum, r) => {
+      const monthly = r.billing_cycle === 'yearly' ? r.amount / 12 : r.billing_cycle === 'quarterly' ? r.amount / 3 : r.amount;
+      return sum + monthly;
+    }, 0);
+  }
+
+  async getUpcomingRenewals(days: number): Promise<Subscription[]> {
+    const until = dayjs().add(days, 'day').format('YYYY-MM-DD');
+    return this.db.getAllAsync<Subscription>(
+      'SELECT * FROM subscriptions WHERE is_active = 1 AND next_billing_date <= ? ORDER BY next_billing_date ASC',
+      [until]
+    );
+  }
+
+  async add(data: Omit<Subscription, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
+    const result = await this.db.runAsync(
+      `INSERT INTO subscriptions (name, category, amount, billing_cycle, start_date, next_billing_date, wallet_id, category_id, icon, color, is_active, auto_create, remind, calendar_event_id, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.name, data.category, data.amount, data.billing_cycle, data.start_date, data.next_billing_date,
+       data.wallet_id ?? null, data.category_id ?? null, data.icon, data.color, data.is_active ?? 1,
+       data.auto_create ?? 1, data.remind ?? 1, data.calendar_event_id ?? null, data.notes ?? null]
+    );
+    return result.lastInsertRowId;
+  }
+
+  async update(id: number, updates: Partial<Subscription>): Promise<void> {
+    const fields: string[] = [];
+    const params: any[] = [];
+    for (const [key, value] of Object.entries(updates)) {
+      if (value !== undefined && !['id', 'created_at', 'updated_at'].includes(key)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+    }
+    fields.push("updated_at = datetime('now')");
+    params.push(id);
+    await this.db.runAsync(`UPDATE subscriptions SET ${fields.join(', ')} WHERE id = ?`, params);
+  }
+
+  async cancel(id: number): Promise<void> {
+    const today = dayjs().format('YYYY-MM-DD');
+    await this.db.runAsync(
+      "UPDATE subscriptions SET is_active = 0, cancelled_date = ?, updated_at = datetime('now') WHERE id = ?",
+      [today, id]
+    );
+  }
+
+  async processRenewals(): Promise<void> {
+    const today = dayjs().format('YYYY-MM-DD');
+    const dueSubs = await this.db.getAllAsync<Subscription>(
+      'SELECT * FROM subscriptions WHERE is_active = 1 AND next_billing_date <= ?',
+      [today]
+    );
+
+    const txnQueries = new TransactionQueries(this.db);
+
+    for (const sub of dueSubs) {
+      if (sub.auto_create && sub.wallet_id && sub.category_id) {
+        await txnQueries.create({
+          type: 'expense',
+          amount: sub.amount,
+          category_id: sub.category_id,
+          wallet_id: sub.wallet_id,
+          transaction_date: today,
+          notes: `Langganan ${sub.name}`,
+          recurring_id: null,
+        });
+      }
+
+      const nextDate = dayjs(sub.next_billing_date)
+        .add(sub.billing_cycle === 'monthly' ? 1 : sub.billing_cycle === 'yearly' ? 12 : 3, 'month')
+        .format('YYYY-MM-DD');
+
+      await this.db.runAsync(
+        "UPDATE subscriptions SET next_billing_date = ?, updated_at = datetime('now') WHERE id = ?",
+        [nextDate, sub.id]
+      );
+    }
   }
 }
