@@ -35,3 +35,15 @@ export const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
   { name: 'Parfum & Perawatan', type: 'expense', icon: 'color-wand-outline', color: CATEGORY_COLORS.EXPENSE.YELLOW, sort_order: 5 },
   { name: 'Lainnya', type: 'expense', icon: 'ellipsis-horizontal-circle-outline', color: CATEGORY_COLORS.EXPENSE.GRAY, sort_order: 6 },
 ];
+
+export const CATEGORY_CLASSIFICATION: Record<string, 'needs' | 'wants' | 'savings'> = {
+  'Kebutuhan Makan': 'needs',
+  Transportasi: 'needs',
+  Gaji: 'savings',
+  Usaha: 'savings',
+  Freelancer: 'savings',
+  'Investasi (Profit)': 'savings',
+  'Investasi (Modal Masuk)': 'savings',
+  'Jajan/Hiburan': 'wants',
+  'Parfum & Perawatan': 'wants',
+};

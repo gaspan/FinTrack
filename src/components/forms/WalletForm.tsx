@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { Input } from '../ui/Input';
 import { NumericInput } from '../ui/NumericInput';
 import { Button } from '../ui/Button';
@@ -22,6 +22,8 @@ export const WalletForm: React.FC<WalletFormProps> = ({
   onCancel,
   loading = false,
 }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [name, setName] = useState(initialData?.name || '');
   const [balance, setBalance] = useState(initialData?.balance || 0);
   const [icon, setIcon] = useState(initialData?.icon || AVAILABLE_ICONS[0]);
@@ -93,7 +95,7 @@ export const WalletForm: React.FC<WalletFormProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     padding: theme.spacing.md,
   },

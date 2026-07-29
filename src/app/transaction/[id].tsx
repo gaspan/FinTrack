@@ -1,17 +1,19 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Image, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 
-import { theme } from '@/constants/theme';
-import { TransactionQueries } from '@/lib/queries';
-import { TransactionWithDetails } from '@/types';
+import { useTheme, type Theme } from '@/constants/theme';
+import { TransactionQueries, TagQueries } from '@/lib/queries';
+import { TransactionWithDetails, Tag, TransactionAttachment } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { formatRupiah } from '@/utils/format';
 
 export default function TransactionDetailScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
   const router = useRouter();
@@ -19,6 +21,9 @@ export default function TransactionDetailScreen() {
   const [transaction, setTransaction] = useState<TransactionWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [attachments, setAttachments] = useState<TransactionAttachment[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -28,7 +33,6 @@ export default function TransactionDetailScreen() {
           setLoading(true);
           const txId = parseInt(id, 10);
           if (isNaN(txId)) return;
-
           const tx = await db.getFirstAsync<TransactionWithDetails>(`
             SELECT 
               t.*, 
@@ -42,7 +46,17 @@ export default function TransactionDetailScreen() {
             WHERE t.id = ?
           `, [txId]);
 
-          if (mounted && tx) setTransaction(tx);
+          if (mounted && tx) {
+            setTransaction(tx);
+            const [txTags, txAttachments] = await Promise.all([
+              new TagQueries(db).getByTransaction(txId),
+              new TransactionQueries(db).getAttachments(txId),
+            ]);
+            if (mounted) {
+              setTags(txTags);
+              setAttachments(txAttachments);
+            }
+          }
         } catch (e) {
           console.error(e);
         } finally {
@@ -101,7 +115,7 @@ export default function TransactionDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.headerCard}>
         <View style={[styles.iconContainer, { backgroundColor: transaction.category_color + '20' }]}>
           <Ionicons name={transaction.category_icon as any} size={40} color={transaction.category_color} />
@@ -150,6 +164,18 @@ export default function TransactionDetailScreen() {
             {transaction.type === 'income' ? 'Pemasukan' : 'Pengeluaran'}
           </Text>
         </View>
+        {tags.length > 0 && (
+          <View style={[styles.detailRow, { flexDirection: 'column', alignItems: 'flex-start' }]}>
+            <Text style={styles.detailLabel}>Tag</Text>
+            <View style={styles.tagRow}>
+              {tags.map(tag => (
+                <View key={tag.id} style={[styles.tagChip, { backgroundColor: tag.color + '20', borderColor: tag.color }]}>
+                  <Text style={[styles.tagText, { color: tag.color }]}>{tag.name}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
         {transaction.notes && (
           <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
             <Text style={styles.detailLabel}>Catatan</Text>
@@ -157,11 +183,40 @@ export default function TransactionDetailScreen() {
           </View>
         )}
       </View>
-    </View>
+
+      {attachments.length > 0 && (
+        <View style={styles.attachmentsSection}>
+          <Text style={styles.attachmentsTitle}>Lampiran</Text>
+          <View style={styles.attachmentsGrid}>
+            {attachments.map(att => (
+              <TouchableOpacity
+                key={att.id}
+                onPress={() => setPreviewImage(att.file_path)}
+              >
+                <Image source={{ uri: att.file_path }} style={styles.attachmentThumb} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      <View style={{ height: 40 }} />
+
+      <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+        <View style={styles.previewOverlay}>
+          <TouchableOpacity style={styles.previewClose} onPress={() => setPreviewImage(null)}>
+            <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+          {previewImage && (
+            <Image source={{ uri: previewImage }} style={styles.previewImage} resizeMode="contain" />
+          )}
+        </View>
+      </Modal>
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -220,5 +275,64 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.md,
-  }
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: theme.spacing.xs,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.round,
+    borderWidth: 1,
+  },
+  tagText: {
+    ...theme.typography.caption,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  attachmentsSection: {
+    marginTop: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  attachmentsTitle: {
+    ...theme.typography.subtitle,
+    marginBottom: theme.spacing.md,
+  },
+  attachmentsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  attachmentThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewClose: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  previewImage: {
+    width: '100%',
+    height: '80%',
+  },
 });

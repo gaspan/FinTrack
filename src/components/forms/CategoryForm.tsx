@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { TransactionType } from '@/types';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -32,6 +32,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
   onCancel,
   loading = false,
 }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [name, setName] = useState(initialData?.name || '');
   const [type, setType] = useState<TransactionType>(initialData?.type || 'expense');
   const [icon, setIcon] = useState(initialData?.icon || AVAILABLE_ICONS[0]);
@@ -111,7 +113,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { padding: theme.spacing.md },
   title: { ...theme.typography.h3, marginBottom: theme.spacing.lg },
   sectionLabel: {

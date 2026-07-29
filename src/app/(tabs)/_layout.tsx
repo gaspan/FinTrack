@@ -4,12 +4,13 @@ import { Platform, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { theme } from '@/constants/theme';
+import { useTheme } from '@/constants/theme';
 import { RecurringEngine } from '@/features/recurring/recurringEngine';
 import { checkBudgetAlerts } from '@/features/notifications/budgetReminder';
 import { FAB } from '@/components/ui/FAB';
 
 export default function TabLayout() {
+  const { theme } = useTheme();
   const db = useSQLiteContext();
 
   useEffect(() => {

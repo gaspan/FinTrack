@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { Button } from '../ui/Button';
 
 dayjs.locale('id');
@@ -16,6 +16,8 @@ interface DateRangeFilterProps {
 }
 
 export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, endDate, onChange }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const defaultStyles = useDefaultStyles('light');
   const [modalVisible, setModalVisible] = useState(false);
   
@@ -142,7 +144,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, end
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   triggerButton: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, TouchableOpacityProps, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '@/constants/theme';
+import { useTheme } from '@/constants/theme';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -19,8 +19,59 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props 
 }) => {
+  const { theme } = useTheme();
   const isPrimary = variant === 'primary';
   const isDisabled = disabled || loading;
+
+  const styles = useMemo(() => StyleSheet.create({
+    button: {
+      height: 48,
+      borderRadius: theme.radius.md,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+    },
+    content: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    fullWidth: {
+      width: '100%',
+    },
+    secondary: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: theme.colors.primary,
+    },
+    ghost: {
+      backgroundColor: 'transparent',
+    },
+    danger: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: theme.colors.danger,
+    },
+    disabled: {
+      opacity: 0.5,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderColor: theme.colors.border,
+    },
+    text: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.primary,
+    },
+    textPrimary: {
+      color: '#FFF',
+    },
+    textDanger: {
+      color: theme.colors.danger,
+    },
+    textGhost: {
+      color: theme.colors.textSecondary,
+    },
+  }), [theme]);
 
   const content = (
     <View style={styles.content}>
@@ -76,53 +127,3 @@ export const Button: React.FC<ButtonProps> = ({
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    height: 48,
-    borderRadius: theme.radius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  secondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
-  danger: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: theme.colors.danger,
-  },
-  disabled: {
-    opacity: 0.5,
-    backgroundColor: theme.colors.surfaceElevated,
-    borderColor: theme.colors.border,
-  },
-  text: {
-    ...theme.typography.body,
-    fontWeight: '600',
-    color: theme.colors.primary,
-  },
-  textPrimary: {
-    color: '#FFF',
-  },
-  textDanger: {
-    color: theme.colors.danger,
-  },
-  textGhost: {
-    color: theme.colors.textSecondary,
-  }
-});

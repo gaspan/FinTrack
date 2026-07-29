@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, TextInput, Text, StyleSheet, TextInputProps } from 'react-native';
-import { theme } from '@/constants/theme';
+import { useTheme } from '@/constants/theme';
+import { formatRupiahNumberOnly } from '@/utils/format';
 
 interface NumericInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
   label?: string;
@@ -8,8 +9,6 @@ interface NumericInputProps extends Omit<TextInputProps, 'onChangeText' | 'value
   value: number;
   onChangeValue: (val: number) => void;
 }
-
-import { formatRupiahNumberOnly } from '@/utils/format';
 
 export const NumericInput: React.FC<NumericInputProps> = ({ 
   label, 
@@ -19,16 +18,63 @@ export const NumericInput: React.FC<NumericInputProps> = ({
   style, 
   ...props 
 }) => {
+  const { theme } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
   
   const displayValue = value === 0 ? '' : formatRupiahNumberOnly(value);
 
   const handleChangeText = (text: string) => {
-    // Remove non-numeric characters
     const numericStr = text.replace(/[^0-9]/g, '');
     const num = parseInt(numericStr, 10);
     onChangeValue(isNaN(num) ? 0 : num);
   };
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      marginBottom: theme.spacing.md,
+    },
+    label: {
+      fontSize: 12,
+      fontWeight: '400',
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.xs,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radius.md,
+      paddingHorizontal: theme.spacing.md,
+      height: 64,
+    },
+    inputFocused: {
+      borderColor: theme.colors.primary,
+    },
+    inputError: {
+      borderColor: theme.colors.danger,
+    },
+    prefix: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: theme.colors.textSecondary,
+      marginRight: theme.spacing.sm,
+    },
+    input: {
+      flex: 1,
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: theme.colors.textPrimary,
+      paddingVertical: 0,
+    },
+    errorText: {
+      fontSize: 10,
+      fontWeight: '400',
+      color: theme.colors.danger,
+      marginTop: theme.spacing.xs,
+    },
+  }), [theme]);
 
   return (
     <View style={styles.container}>
@@ -62,45 +108,3 @@ export const NumericInput: React.FC<NumericInputProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: theme.spacing.md,
-  },
-  label: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.md,
-    height: 64, // Taller for numeric input
-  },
-  inputFocused: {
-    borderColor: theme.colors.primary,
-  },
-  inputError: {
-    borderColor: theme.colors.danger,
-  },
-  prefix: {
-    ...theme.typography.h2,
-    color: theme.colors.textSecondary,
-    marginRight: theme.spacing.sm,
-  },
-  input: {
-    flex: 1,
-    ...theme.typography.h2,
-    paddingVertical: 0,
-  },
-  errorText: {
-    ...theme.typography.caption,
-    color: theme.colors.danger,
-    marginTop: theme.spacing.xs,
-  }
-});

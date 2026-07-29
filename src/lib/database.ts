@@ -3,7 +3,7 @@ import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { DEFAULT_WALLETS } from '../constants/wallets';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 2;
+  const DATABASE_VERSION = 3;
 
   let { user_version: currentDbVersion } = await db.getFirstAsync<{ user_version: number }>(
     'PRAGMA user_version'
@@ -144,5 +144,45 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     currentDbVersion = 2;
   }
 
+  if (currentDbVersion === 2) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`ALTER TABLE transactions ADD COLUMN attachment_path TEXT;`);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS transaction_attachments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          transaction_id INTEGER NOT NULL,
+          file_path TEXT NOT NULL,
+          file_type TEXT DEFAULT 'image',
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+        );
+      `);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS tags (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          color TEXT DEFAULT '#6366f1',
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS transaction_tags (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          transaction_id INTEGER NOT NULL,
+          tag_id INTEGER NOT NULL,
+          FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+          FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+          UNIQUE(transaction_id, tag_id)
+        );
+      `);
+    });
+
+    currentDbVersion = 3;
+  }
+
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+  await db.execAsync(`PRAGMA foreign_keys = ON`);
 }

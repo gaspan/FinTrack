@@ -1,96 +1,111 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, SectionList, RefreshControl, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, SectionList, RefreshControl, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
-import { theme } from '@/constants/theme';
-import { TransactionQueries, CategoryQueries, WalletQueries } from '@/lib/queries';
-import { TransactionWithDetails, Category, Wallet } from '@/types';
+import { useTheme, type Theme } from '@/constants/theme';
+import { TransactionQueries, CategoryQueries, WalletQueries, TagQueries } from '@/lib/queries';
+import { TransactionWithDetails, Category, Wallet, Tag } from '@/types';
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Chip } from '@/components/ui/Chip';
 import { formatRupiah } from '@/utils/format';
-import { hapticLight, hapticMedium } from '@/utils/haptic';
+import { hapticMedium } from '@/utils/haptic';
 import { ListSkeleton } from '@/components/ui/Skeleton';
 
 dayjs.locale('id');
 
+const PAGE_SIZE = 20;
+
 export default function TransactionsScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [allTransactions, setAllTransactions] = useState<TransactionWithDetails[]>([]);
+  const [transactions, setTransactions] = useState<TransactionWithDetails[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalFiltered, setTotalFiltered] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   const [searchText, setSearchText] = useState('');
   const [filterCategory, setFilterCategory] = useState<number | null>(null);
   const [filterWallet, setFilterWallet] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [filterTagIds, setFilterTagIds] = useState<number[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const getFilterParams = useCallback(() => ({
+    startDate: startDate || dayjs().startOf('month').format('YYYY-MM-DD'),
+    endDate: endDate || dayjs().endOf('month').format('YYYY-MM-DD'),
+    type: filterType,
+    categoryId: filterCategory,
+    walletId: filterWallet,
+    searchText: searchText.trim() || undefined,
+    tagIds: filterTagIds.length > 0 ? filterTagIds : undefined,
+  }), [startDate, endDate, filterType, filterCategory, filterWallet, searchText, filterTagIds]);
 
-  const loadData = useCallback(async () => {
+  const loadInitialData = useCallback(async () => {
     try {
-      setLoading(true);
-      const [txs, cats, walls] = await Promise.all([
-        new TransactionQueries(db).getAllWithDetails(),
+      setInitialLoading(true);
+      const params = getFilterParams();
+      const [result, cats, walls, tags] = await Promise.all([
+        new TransactionQueries(db).getAllPaginated({ ...params, limit: PAGE_SIZE, offset: 0 }),
         new CategoryQueries(db).getAll(),
         new WalletQueries(db).getAll(),
+        new TagQueries(db).getAll(),
       ]);
-      setAllTransactions(txs);
+      setTransactions(result.data);
+      setTotalFiltered(result.total);
+      setHasMore(result.hasMore);
+      setCurrentPage(0);
       setCategories(cats);
       setWallets(walls);
+      setAllTags(tags);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
-  }, [db]);
+    finally { setInitialLoading(false); }
+  }, [db, getFilterParams]);
 
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  useFocusEffect(useCallback(() => { loadInitialData(); }, [loadInitialData]));
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadInitialData();
     setRefreshing(false);
   };
 
-  const filtered = useMemo(() => {
-    let result = allTransactions;
-
-    if (startDate && endDate) {
-      result = result.filter(t => t.transaction_date >= startDate && t.transaction_date <= endDate);
-    }
-
-    if (filterType !== 'all') {
-      result = result.filter(t => t.type === filterType);
-    }
-    if (filterCategory !== null) {
-      result = result.filter(t => t.category_id === filterCategory);
-    }
-    if (filterWallet !== null) {
-      result = result.filter(t => t.wallet_id === filterWallet);
-    }
-    if (searchText.trim()) {
-      const q = searchText.trim().toLowerCase();
-      result = result.filter(t =>
-        t.category_name.toLowerCase().includes(q) ||
-        t.wallet_name.toLowerCase().includes(q) ||
-        (t.notes && t.notes.toLowerCase().includes(q)) ||
-        t.amount.toString().includes(q)
-      );
-    }
-    return result;
-  }, [allTransactions, filterType, filterCategory, filterWallet, searchText, startDate, endDate]);
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const params = getFilterParams();
+      const result = await new TransactionQueries(db).getAllPaginated({
+        ...params,
+        limit: PAGE_SIZE,
+        offset: nextPage * PAGE_SIZE,
+      });
+      setTransactions(prev => [...prev, ...result.data]);
+      setTotalFiltered(result.total);
+      setHasMore(result.hasMore);
+      setCurrentPage(nextPage);
+    } catch (e) { console.error(e); }
+    finally { setLoadingMore(false); }
+  };
 
   const summaryTotal = useMemo(() => {
     let income = 0, expense = 0;
-    filtered.forEach(t => { if (t.type === 'income') income += t.amount; else expense += t.amount; });
-    return { count: filtered.length, income, expense };
-  }, [filtered]);
+    transactions.forEach(t => { if (t.type === 'income') income += t.amount; else expense += t.amount; });
+    return { count: totalFiltered, income, expense };
+  }, [transactions, totalFiltered]);
 
   const sections = useMemo(() => {
-    const grouped = filtered.reduce((acc, tx) => {
+    const grouped = transactions.reduce((acc, tx) => {
       const dateStr = dayjs(tx.transaction_date).format('dddd, DD MMMM YYYY');
       if (!acc[dateStr]) acc[dateStr] = [];
       acc[dateStr].push(tx);
@@ -101,7 +116,7 @@ export default function TransactionsScreen() {
       title: date,
       data: grouped[date]
     }));
-  }, [filtered]);
+  }, [transactions]);
 
   const formatRp = formatRupiah;
 
@@ -109,18 +124,25 @@ export default function TransactionsScreen() {
     setFilterCategory(null);
     setFilterWallet(null);
     setFilterType('all');
+    setFilterTagIds([]);
     setSearchText('');
     setStartDate('');
     setEndDate('');
   };
 
-  const hasActiveFilter = filterCategory !== null || filterWallet !== null || filterType !== 'all' || searchText.trim().length > 0 || !!startDate;
+  const hasActiveFilter = filterCategory !== null || filterWallet !== null || filterType !== 'all' || filterTagIds.length > 0 || searchText.trim().length > 0 || !!startDate || !!endDate;
+
+  const toggleTagFilter = (tagId: number) => {
+    setFilterTagIds(prev =>
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    );
+  };
 
   const handleDeleteTx = async (id: number) => {
     try {
       await new TransactionQueries(db).delete(id);
       hapticMedium();
-      loadData();
+      loadInitialData();
     } catch (e) { console.error(e); }
   };
 
@@ -147,6 +169,18 @@ export default function TransactionsScreen() {
       <View style={styles.txDetails}>
         <Text style={styles.txCategory}>{item.category_name}</Text>
         <Text style={styles.txNotes} numberOfLines={1}>{item.notes || item.wallet_name}</Text>
+        {item.tags && item.tags.length > 0 && (
+          <View style={styles.itemTagRow}>
+            {item.tags.slice(0, 3).map(tag => (
+              <View key={tag.id} style={[styles.itemTagChip, { backgroundColor: tag.color + '20', borderColor: tag.color }]}>
+                <Text style={[styles.itemTagText, { color: tag.color }]}>{tag.name}</Text>
+              </View>
+            ))}
+            {item.tags.length > 3 && (
+              <Text style={styles.itemTagMore}>+{item.tags.length - 3}</Text>
+            )}
+          </View>
+        )}
       </View>
       <View style={styles.txAmountContainer}>
         <Text style={[
@@ -159,9 +193,29 @@ export default function TransactionsScreen() {
     </TouchableOpacity>
   );
 
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <Text style={styles.footerText}>Memuat lebih banyak...</Text>
+      </View>
+    );
+  };
+
+  const renderEmpty = () => {
+    if (initialLoading) return <ListSkeleton />;
+    return (
+      <EmptyState 
+        title={hasActiveFilter ? "Tidak Ada Hasil" : "Belum Ada Transaksi"}
+        message={hasActiveFilter ? "Coba ubah kata kunci atau filter" : "Catat transaksi pertama Anda dengan menekan tombol Tambah di bawah."}
+        icon="document-text-outline"
+      />
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
@@ -180,7 +234,6 @@ export default function TransactionsScreen() {
         </View>
       </View>
 
-      {/* Date Range Filter */}
       <View style={styles.dateRangeRow}>
         <DateRangeFilter
           startDate={startDate || dayjs().startOf('month').format('YYYY-MM-DD')}
@@ -189,7 +242,6 @@ export default function TransactionsScreen() {
         />
       </View>
 
-      {/* Filter Chips */}
       <View style={styles.filterRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {(['all', 'income', 'expense'] as const).map(t => (
@@ -223,10 +275,23 @@ export default function TransactionsScreen() {
               <Text style={[styles.filterChipText, filterWallet === w.id && styles.filterChipTextActive]}>{w.name}</Text>
             </TouchableOpacity>
           ))}
+          {allTags.length === 0 ? (
+            <View style={styles.filterChip}>
+              <Text style={styles.filterChipText}>Tag: belum ada</Text>
+            </View>
+          ) : allTags.map(tag => (
+            <TouchableOpacity
+              key={`tag-${tag.id}`}
+              style={[styles.filterChip, filterTagIds.includes(tag.id) && { backgroundColor: tag.color, borderColor: tag.color }]}
+              onPress={() => toggleTagFilter(tag.id)}
+            >
+              <Text style={[styles.filterChipText, filterTagIds.includes(tag.id) && styles.filterChipTextActive]}>{tag.name}</Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
       </View>
 
-      {sections.length > 0 && (
+      {transactions.length > 0 && (
         <View style={styles.summaryBar}>
           <Text style={styles.summaryText}>
             {summaryTotal.count} transaksi
@@ -247,14 +312,10 @@ export default function TransactionsScreen() {
         </TouchableOpacity>
       )}
 
-      {loading && !refreshing ? (
+      {initialLoading && !refreshing ? (
         <ListSkeleton />
-      ) : sections.length === 0 && !refreshing ? (
-        <EmptyState 
-          title={hasActiveFilter ? "Tidak Ada Hasil" : "Belum Ada Transaksi"}
-          message={hasActiveFilter ? "Coba ubah kata kunci atau filter" : "Catat transaksi pertama Anda dengan menekan tombol Tambah di bawah."}
-          icon="document-text-outline"
-        />
+      ) : !initialLoading && transactions.length === 0 ? (
+        renderEmpty()
       ) : (
         <SectionList
           sections={sections}
@@ -270,13 +331,16 @@ export default function TransactionsScreen() {
           }
           contentContainerStyle={styles.listContent}
           stickySectionHeadersEnabled={true}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={renderFooter}
         />
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   searchContainer: { paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.sm },
   searchBar: {
@@ -321,6 +385,24 @@ const styles = StyleSheet.create({
   txDetails: { flex: 1 },
   txCategory: { ...theme.typography.body, fontWeight: '600', marginBottom: 2 },
   txNotes: { ...theme.typography.bodySmall },
+  itemTagRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4,
+  },
+  itemTagChip: {
+    paddingVertical: 2, paddingHorizontal: 6,
+    borderRadius: theme.radius.round, borderWidth: 0.5,
+  },
+  itemTagText: {
+    fontSize: 10, fontWeight: '600',
+  },
+  itemTagMore: {
+    fontSize: 10, color: theme.colors.textSecondary,
+  },
   txAmountContainer: { alignItems: 'flex-end' },
   txAmount: { ...theme.typography.subtitle, fontWeight: 'bold' },
+  footerLoader: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    paddingVertical: theme.spacing.md, gap: theme.spacing.sm,
+  },
+  footerText: { ...theme.typography.caption, color: theme.colors.textSecondary },
 });

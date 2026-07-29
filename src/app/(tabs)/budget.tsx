@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { BudgetQueries, CategoryQueries } from '@/lib/queries';
 import { Category } from '@/types';
 import { BudgetForm } from '@/components/forms/BudgetForm';
@@ -14,6 +14,8 @@ import { formatRupiah } from '@/utils/format';
 import { hapticSuccess } from '@/utils/haptic';
 
 export default function BudgetScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   
   const [refreshing, setRefreshing] = useState(false);
@@ -160,7 +162,7 @@ export default function BudgetScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { padding: theme.spacing.md, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   monthText: { ...theme.typography.h3, color: theme.colors.primary },

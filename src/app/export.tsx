@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import dayjs from 'dayjs';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { ChartQueries, TransactionQueries } from '@/lib/queries';
 import { generateAndShareExcel } from '@/features/export/excelGenerator';
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
 import { Button } from '@/components/ui/Button';
 
 export default function ExportScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
@@ -85,7 +87,7 @@ export default function ExportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

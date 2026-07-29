@@ -35,6 +35,23 @@ export interface TransactionWithDetails extends Transaction {
   category_icon: string;
   category_color: string;
   wallet_name: string;
+  attachments?: TransactionAttachment[];
+  tags?: Tag[];
+}
+
+export interface TransactionAttachment {
+  id: number;
+  transaction_id: number;
+  file_path: string;
+  file_type: 'image' | 'document';
+  created_at: string;
+}
+
+export interface Tag {
+  id: number;
+  name: string;
+  color: string;
+  created_at: string;
 }
 
 export interface Budget {
@@ -105,4 +122,60 @@ export interface ChartDataPoint {
   frontColor?: string;
   color?: string;
   text?: string;
+}
+
+export interface CategoryInsight {
+  category_id: number;
+  category_name: string;
+  category_icon: string;
+  category_color: string;
+  current_total: number;
+  prev_total: number;
+  delta: number;
+  delta_percentage: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
+export interface SpendingAlert {
+  type: 'budget_warning' | 'anomaly' | 'deficit';
+  severity: 'low' | 'medium' | 'high';
+  message: string;
+  category_id?: number;
+  category_name?: string;
+  amount?: number;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  hasMore: boolean;
+}
+
+export interface FinancialMetrics {
+  savingsRate: number;
+  emergencyFundMonths: number;
+  expenseRatio: number;
+  needsPct: number;
+  wantsPct: number;
+  savingsPct: number;
+  overBudgetCount: number;
+  hasSavingsGoal: boolean;
+  topExpenseCategory: { name: string; total: number } | null;
+  monthlyIncome: number;
+  monthlyExpense: number;
+  totalBalance: number;
+  avgMonthlyExpense: number;
+}
+
+export interface FinancialHealthScore {
+  score: number;
+  label: 'Sangat Baik' | 'Baik' | 'Cukup' | 'Perlu Perhatian';
+  color: string;
+  metrics: FinancialMetrics;
+}
+
+export interface FinancialTip {
+  icon: string;
+  message: string;
+  priority: 'high' | 'medium' | 'low';
 }

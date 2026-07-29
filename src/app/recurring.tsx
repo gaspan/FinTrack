@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { RecurringQueries, CategoryQueries, WalletQueries } from '@/lib/queries';
 import { RecurringTransaction, Category, Wallet, TransactionType } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -34,6 +34,8 @@ function countdown(date: string) {
 }
 
 export default function RecurringScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   const router = useRouter();
   const [recurrings, setRecurrings] = useState<(RecurringTransaction & { category_name: string; wallet_name: string })[]>([]);
@@ -263,7 +265,7 @@ export default function RecurringScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.md, paddingBottom: 0 },
   title: { ...theme.typography.h2 },

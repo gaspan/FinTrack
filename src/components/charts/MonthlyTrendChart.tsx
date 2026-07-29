@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { formatRupiahShort } from '@/utils/format';
 import { EmptyState } from '../ui/EmptyState';
 
@@ -10,6 +10,8 @@ interface MonthlyTrendChartProps {
 }
 
 export const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ data }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   if (!data || data.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -64,7 +66,7 @@ export const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ data }) =>
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { alignItems: 'center', paddingVertical: theme.spacing.sm },
   emptyContainer: { height: 180, justifyContent: 'center' },
   barLabel: { ...theme.typography.caption, fontSize: 9, color: theme.colors.textSecondary, marginBottom: 4 },

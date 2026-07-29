@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Animated, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 
 interface SuccessAnimationProps {
   visible: boolean;
@@ -10,6 +10,8 @@ interface SuccessAnimationProps {
 }
 
 export const SuccessAnimation: React.FC<SuccessAnimationProps> = ({ visible, message = 'Berhasil!', onFinish }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const scale = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -42,7 +44,7 @@ export const SuccessAnimation: React.FC<SuccessAnimationProps> = ({ visible, mes
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'center',

@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useRouter, useFocusEffect } from 'expo-router';
 import dayjs from 'dayjs';
 import { Ionicons } from '@expo/vector-icons';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { WalletQueries } from '@/lib/queries';
 import { Wallet } from '@/types';
 import { NumericInput } from '@/components/ui/NumericInput';
@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/Button';
 import { formatRupiah } from '@/utils/format';
 
 export default function TransferScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   const router = useRouter();
 
@@ -138,7 +140,7 @@ export default function TransferScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   content: { padding: theme.spacing.md },
   title: { ...theme.typography.h2, marginBottom: theme.spacing.xs },

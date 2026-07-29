@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useRouter, useFocusEffect } from 'expo-router';
 
-import { theme } from '@/constants/theme';
-import { CategoryQueries, WalletQueries, TransactionQueries } from '@/lib/queries';
+import { useTheme, type Theme } from '@/constants/theme';
+import { CategoryQueries, WalletQueries, TransactionQueries, TagQueries } from '@/lib/queries';
 import { Category, Wallet, TransactionType } from '@/types';
 import { TransactionForm } from '@/components/forms/TransactionForm';
 import { checkBudgetAlerts } from '@/features/notifications/budgetReminder';
@@ -12,6 +12,8 @@ import { hapticSuccess } from '@/utils/haptic';
 import { SuccessAnimation } from '@/components/ui/SuccessAnimation';
 
 export default function AddTransactionScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   const router = useRouter();
   
@@ -56,15 +58,32 @@ export default function AddTransactionScreen() {
     wallet_id: number;
     transaction_date: string;
     notes: string;
+    tags: number[];
+    attachmentPaths: string[];
   }) => {
     try {
       setSubmitting(true);
       const txQueries = new TransactionQueries(db);
       
-      await txQueries.create({
-        ...data,
-        recurring_id: null
+      const newId = await txQueries.create({
+        type: data.type,
+        amount: data.amount,
+        category_id: data.category_id,
+        wallet_id: data.wallet_id,
+        transaction_date: data.transaction_date,
+        notes: data.notes,
+        recurring_id: null,
       });
+
+      if (data.tags.length > 0) {
+        const tagQueries = new TagQueries(db);
+        await tagQueries.setTransactionTags(newId, data.tags);
+      }
+
+      for (const path of data.attachmentPaths) {
+        await txQueries.addAttachment(newId, path);
+      }
+
       hapticSuccess();
       setShowSuccess(true);
       
@@ -104,7 +123,7 @@ export default function AddTransactionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

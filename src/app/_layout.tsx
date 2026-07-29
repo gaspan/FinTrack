@@ -1,5 +1,5 @@
 import { useFonts } from 'expo-font';
-import { Stack, ThemeProvider, DarkTheme, router } from 'expo-router';
+import { Stack, ThemeProvider as NavThemeProvider, DarkTheme, DefaultTheme, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, Suspense, useState, useCallback, useRef } from 'react';
@@ -9,18 +9,18 @@ import { View, ActivityIndicator, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { migrateDbIfNeeded } from '@/lib/database';
-import { theme } from '@/constants/theme';
+import { ThemeProvider, useTheme } from '@/constants/theme';
 
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootContent() {
+  const { theme, isDark } = useTheme();
   const [loaded] = useFonts({
     SpaceMono: require('../../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
-  const redirectDone = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -56,154 +56,57 @@ export default function RootLayout() {
     return null;
   }
 
-  if (initError) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
-        <Text style={{ color: theme.colors.textPrimary }}>Gagal memuat aplikasi. Silakan restart.</Text>
-      </View>
-    );
-  }
+  const navTheme = isDark ? DarkTheme : DefaultTheme;
 
   return (
-    <ThemeProvider value={DarkTheme}>
-      <Suspense fallback={
+    <NavThemeProvider value={navTheme}>
+      {initError ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={{ color: theme.colors.textPrimary }}>Gagal memuat aplikasi. Silakan restart.</Text>
         </View>
-      }>
-        <SQLiteProvider databaseName="fintrack.db" onInit={migrateDbIfNeeded} useSuspense>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-            <Stack.Screen name="lock-screen" options={{ headerShown: false }} />
-            <Stack.Screen 
-              name="transaction/[id]" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Detail Transaksi',
+      ) : (
+        <>
+          <Suspense fallback={
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+          }>
+            <SQLiteProvider databaseName="fintrack.db" onInit={migrateDbIfNeeded} useSuspense>
+              <Stack screenOptions={{
                 headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="transaction/edit/[id]" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Edit Transaksi',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="goals" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Target Menabung',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="reminders" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Pengingat Tagihan',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="import" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Impor CSV',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="lock" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Kunci Aplikasi',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="annual" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Laporan Tahunan',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="export" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Ekspor Laporan',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="recurring" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Transaksi Berulang',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="transfer" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Transfer Dompet',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="wallets" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Manajemen Dompet',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="categories" 
-              options={{ 
-                presentation: 'modal', 
-                headerShown: true, 
-                title: 'Manajemen Kategori',
-                headerStyle: { backgroundColor: theme.colors.surfaceElevated },
-                headerTintColor: theme.colors.textPrimary
-              }} 
-            />
-            <Stack.Screen 
-              name="onboarding" 
-              options={{ headerShown: false }} 
-            />
-          </Stack>
-        </SQLiteProvider>
-      </Suspense>
-      <StatusBar style="light" />
+                headerTintColor: theme.colors.textPrimary,
+                headerTitleStyle: { color: theme.colors.textPrimary },
+              }}>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+                <Stack.Screen name="lock-screen" options={{ headerShown: false }} />
+                <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Detail Transaksi' }} />
+                <Stack.Screen name="transaction/edit/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Edit Transaksi' }} />
+                <Stack.Screen name="goals" options={{ presentation: 'modal', headerShown: true, title: 'Target Menabung' }} />
+                <Stack.Screen name="reminders" options={{ presentation: 'modal', headerShown: true, title: 'Pengingat Tagihan' }} />
+                <Stack.Screen name="import" options={{ presentation: 'modal', headerShown: true, title: 'Impor CSV' }} />
+                <Stack.Screen name="lock" options={{ presentation: 'modal', headerShown: true, title: 'Kunci Aplikasi' }} />
+                <Stack.Screen name="annual" options={{ presentation: 'modal', headerShown: true, title: 'Laporan Tahunan' }} />
+                <Stack.Screen name="export" options={{ presentation: 'modal', headerShown: true, title: 'Ekspor Laporan' }} />
+                <Stack.Screen name="recurring" options={{ presentation: 'modal', headerShown: true, title: 'Transaksi Berulang' }} />
+                <Stack.Screen name="transfer" options={{ presentation: 'modal', headerShown: true, title: 'Transfer Dompet' }} />
+                <Stack.Screen name="wallets" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Dompet' }} />
+                <Stack.Screen name="categories" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Kategori' }} />
+                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+              </Stack>
+            </SQLiteProvider>
+          </Suspense>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+        </>
+      )}
+    </NavThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootContent />
     </ThemeProvider>
   );
 }

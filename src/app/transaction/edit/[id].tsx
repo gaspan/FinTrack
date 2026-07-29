@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { theme } from '@/constants/theme';
-import { CategoryQueries, WalletQueries, TransactionQueries } from '@/lib/queries';
-import { Category, Wallet, TransactionType, TransactionWithDetails } from '@/types';
+import { useTheme, type Theme } from '@/constants/theme';
+import { CategoryQueries, WalletQueries, TransactionQueries, TagQueries } from '@/lib/queries';
+import { Category, Wallet, TransactionType, TransactionWithDetails, Tag } from '@/types';
 import { TransactionForm } from '@/components/forms/TransactionForm';
 
 export default function EditTransactionScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
   const router = useRouter();
@@ -18,6 +20,8 @@ export default function EditTransactionScreen() {
   const [transaction, setTransaction] = useState<TransactionWithDetails | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [existingTags, setExistingTags] = useState<Tag[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -28,7 +32,7 @@ export default function EditTransactionScreen() {
         const categoryQueries = new CategoryQueries(db);
         const walletQueries = new WalletQueries(db);
 
-        const [tx, cats, walls] = await Promise.all([
+        const [tx, cats, walls, tags, attachments] = await Promise.all([
           db.getFirstAsync<TransactionWithDetails>(`
             SELECT 
               t.*, 
@@ -42,12 +46,16 @@ export default function EditTransactionScreen() {
             WHERE t.id = ?
           `, [txId]),
           categoryQueries.getAll(),
-          walletQueries.getAll()
+          walletQueries.getAll(),
+          new TagQueries(db).getByTransaction(txId),
+          new TransactionQueries(db).getAttachments(txId),
         ]);
 
         if (tx) setTransaction(tx);
         setCategories(cats);
         setWallets(walls);
+        setExistingTags(tags);
+        setExistingAttachments(attachments);
       } catch (e) {
         console.error(e);
         Alert.alert('Error', 'Gagal memuat data transaksi');
@@ -66,11 +74,26 @@ export default function EditTransactionScreen() {
     wallet_id: number;
     transaction_date: string;
     notes: string;
+    tags: number[];
+    attachmentPaths: string[];
   }) => {
     try {
       setSubmitting(true);
+      const txId = parseInt(id, 10);
       const txQueries = new TransactionQueries(db);
-      await txQueries.update(parseInt(id, 10), data);
+      await txQueries.update(txId, data);
+
+      const tagQueries = new TagQueries(db);
+      await tagQueries.setTransactionTags(txId, data.tags);
+
+      // Remove old attachments, add new ones
+      for (const att of existingAttachments) {
+        await txQueries.deleteAttachment(att.id);
+      }
+      for (const path of data.attachmentPaths) {
+        await txQueries.addAttachment(txId, path);
+      }
+
       router.back();
     } catch (error) {
       console.error(error);
@@ -106,6 +129,8 @@ export default function EditTransactionScreen() {
           wallet_id: transaction.wallet_id,
           transaction_date: transaction.transaction_date,
           notes: transaction.notes,
+          tags: existingTags,
+          attachments: existingAttachments,
         }}
         categories={categories}
         wallets={wallets}
@@ -116,7 +141,7 @@ export default function EditTransactionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

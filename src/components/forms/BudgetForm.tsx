@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { Category } from '@/types';
 import { NumericInput } from '../ui/NumericInput';
 import { Button } from '../ui/Button';
@@ -20,6 +20,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({
   onCancel,
   loading = false,
 }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [limit, setLimit] = useState(initialLimit);
 
   return (
@@ -53,7 +55,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     padding: theme.spacing.md,
   },

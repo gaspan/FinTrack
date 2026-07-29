@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from 'expo-router';
@@ -7,7 +7,7 @@ import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { BillReminderQueries, CategoryQueries, WalletQueries } from '@/lib/queries';
 import { BillReminder, Category, Wallet } from '@/types';
 import { syncBillToCalendar, deleteEventFromCalendar, updateEventInCalendar } from '@/features/notifications/calendarSync';
@@ -21,6 +21,8 @@ dayjs.locale('id');
 const FREQ_LABELS: Record<string, string> = { one_time: 'Sekali', monthly: 'Bulanan', yearly: 'Tahunan' };
 
 export default function RemindersScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   const [reminders, setReminders] = useState<(BillReminder & { category_name?: string; wallet_name?: string })[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -303,7 +305,7 @@ export default function RemindersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.md, paddingBottom: 0 },
   title: { ...theme.typography.h2 },

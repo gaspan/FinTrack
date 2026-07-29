@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { SavingsGoalQueries, WalletQueries } from '@/lib/queries';
 import { SavingsGoal, Wallet } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,8 @@ const GOAL_ICONS = ['flag-outline', 'rocket-outline', 'star-outline', 'heart-out
 const GOAL_COLORS = ['#00D09C', '#6366F1', '#F97316', '#EC4899', '#38BDF8', '#8B5CF6', '#FBBF24', '#FF6B6B', '#34D399', '#177AD5'];
 
 export default function GoalsScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   const router = useRouter();
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
@@ -241,7 +243,7 @@ export default function GoalsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.md, paddingBottom: 0 },
   title: { ...theme.typography.h2 },

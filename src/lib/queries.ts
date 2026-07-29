@@ -1,4 +1,5 @@
 import { SQLiteDatabase } from 'expo-sqlite';
+import dayjs from 'dayjs';
 import {
   Transaction,
   TransactionWithDetails,
@@ -10,13 +11,19 @@ import {
   SavingsGoal,
   BillReminder,
   MonthlyTrendPoint,
+  Tag,
+  TransactionAttachment,
+  CategoryInsight,
+  SpendingAlert,
+  PaginatedResult,
 } from '@/types';
+import { CATEGORY_CLASSIFICATION } from '@/constants/categories';
 
 export class TransactionQueries {
   constructor(private db: SQLiteDatabase) {}
 
   async getAllWithDetails(): Promise<TransactionWithDetails[]> {
-    return this.db.getAllAsync<TransactionWithDetails>(`
+    const txs = await this.db.getAllAsync<TransactionWithDetails>(`
       SELECT 
         t.*, 
         c.name as category_name, 
@@ -28,6 +35,38 @@ export class TransactionQueries {
       JOIN wallets w ON t.wallet_id = w.id
       ORDER BY t.transaction_date DESC, t.created_at DESC
     `);
+
+    const txIds = txs.map(t => t.id);
+    if (txIds.length === 0) return txs;
+
+    const tags = await this.db.getAllAsync<{ transaction_id: number; id: number; name: string; color: string; created_at: string }>(`
+      SELECT tt.transaction_id, tg.id, tg.name, tg.color, tg.created_at
+      FROM transaction_tags tt
+      JOIN tags tg ON tt.tag_id = tg.id
+      WHERE tt.transaction_id IN (${txIds.join(',')})
+    `);
+
+    const tagsByTxId = tags.reduce((acc, t) => {
+      if (!acc[t.transaction_id]) acc[t.transaction_id] = [];
+      acc[t.transaction_id].push({ id: t.id, name: t.name, color: t.color, created_at: t.created_at });
+      return acc;
+    }, {} as Record<number, Tag[]>);
+
+    const attachments = await this.db.getAllAsync<TransactionAttachment & { transaction_id: number }>(`
+      SELECT * FROM transaction_attachments WHERE transaction_id IN (${txIds.join(',')})
+    `);
+
+    const attByTxId = attachments.reduce((acc, a) => {
+      if (!acc[a.transaction_id]) acc[a.transaction_id] = [];
+      acc[a.transaction_id].push(a);
+      return acc;
+    }, {} as Record<number, TransactionAttachment[]>);
+
+    return txs.map(tx => ({
+      ...tx,
+      tags: tagsByTxId[tx.id] || [],
+      attachments: attByTxId[tx.id] || [],
+    }));
   }
 
   async getByDateRange(startDate: string, endDate: string): Promise<TransactionWithDetails[]> {
@@ -44,6 +83,132 @@ export class TransactionQueries {
       WHERE t.transaction_date >= ? AND t.transaction_date <= ?
       ORDER BY t.transaction_date DESC, t.created_at DESC
     `, [startDate, endDate]);
+  }
+
+  async getAllPaginated(options: {
+    limit?: number;
+    offset?: number;
+    startDate?: string;
+    endDate?: string;
+    type?: 'all' | 'income' | 'expense';
+    categoryId?: number | null;
+    walletId?: number | null;
+    searchText?: string;
+    tagIds?: number[];
+  }): Promise<PaginatedResult<TransactionWithDetails>> {
+    const { limit = 20, offset = 0, startDate, endDate, type, categoryId, walletId, searchText, tagIds } = options;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (startDate && endDate) {
+      conditions.push('t.transaction_date >= ? AND t.transaction_date <= ?');
+      params.push(startDate, endDate);
+    }
+    if (type && type !== 'all') {
+      conditions.push('t.type = ?');
+      params.push(type);
+    }
+    if (categoryId != null) {
+      conditions.push('t.category_id = ?');
+      params.push(categoryId);
+    }
+    if (walletId != null) {
+      conditions.push('t.wallet_id = ?');
+      params.push(walletId);
+    }
+    if (searchText?.trim()) {
+      const q = `%${searchText.trim()}%`;
+      conditions.push('(c.name LIKE ? OR w.name LIKE ? OR t.notes LIKE ? OR CAST(t.amount AS TEXT) LIKE ?)');
+      params.push(q, q, q, q);
+    }
+
+    let tagJoin = '';
+    if (tagIds && tagIds.length > 0) {
+      tagJoin = 'JOIN transaction_tags tt ON t.id = tt.transaction_id';
+      conditions.push(`tt.tag_id IN (${tagIds.map(() => '?').join(',')})`);
+      params.push(...tagIds);
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    const countResult = await this.db.getFirstAsync<{ total: number }>(
+      `SELECT COUNT(DISTINCT t.id) as total FROM transactions t
+       JOIN categories c ON t.category_id = c.id
+       JOIN wallets w ON t.wallet_id = w.id
+       ${tagJoin}
+       ${whereClause}`,
+      params
+    );
+    const total = countResult?.total || 0;
+
+    const txs = await this.db.getAllAsync<TransactionWithDetails>(
+      `SELECT DISTINCT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color, w.name as wallet_name
+       FROM transactions t
+       JOIN categories c ON t.category_id = c.id
+       JOIN wallets w ON t.wallet_id = w.id
+       ${tagJoin}
+       ${whereClause}
+       ORDER BY t.transaction_date DESC, t.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    const txIds = txs.map(t => t.id);
+    if (txIds.length > 0) {
+      const tags = await this.db.getAllAsync<{ transaction_id: number; id: number; name: string; color: string; created_at: string }>(`
+        SELECT tt.transaction_id, tg.id, tg.name, tg.color, tg.created_at
+        FROM transaction_tags tt
+        JOIN tags tg ON tt.tag_id = tg.id
+        WHERE tt.transaction_id IN (${txIds.join(',')})
+      `);
+
+      const tagsByTxId = tags.reduce((acc, t) => {
+        if (!acc[t.transaction_id]) acc[t.transaction_id] = [];
+        acc[t.transaction_id].push({ id: t.id, name: t.name, color: t.color, created_at: t.created_at });
+        return acc;
+      }, {} as Record<number, Tag[]>);
+
+      const attachments = await this.db.getAllAsync<TransactionAttachment & { transaction_id: number }>(`
+        SELECT * FROM transaction_attachments WHERE transaction_id IN (${txIds.join(',')})
+      `);
+
+      const attByTxId = attachments.reduce((acc, a) => {
+        if (!acc[a.transaction_id]) acc[a.transaction_id] = [];
+        acc[a.transaction_id].push(a);
+        return acc;
+      }, {} as Record<number, TransactionAttachment[]>);
+
+      return {
+        data: txs.map(tx => ({
+          ...tx,
+          tags: tagsByTxId[tx.id] || [],
+          attachments: attByTxId[tx.id] || [],
+        })),
+        total,
+        hasMore: offset + limit < total,
+      };
+    }
+
+    return { data: [], total: 0, hasMore: false };
+  }
+
+  async getAttachments(txId: number): Promise<TransactionAttachment[]> {
+    return this.db.getAllAsync<TransactionAttachment>(
+      'SELECT * FROM transaction_attachments WHERE transaction_id = ? ORDER BY created_at DESC',
+      [txId]
+    );
+  }
+
+  async addAttachment(txId: number, filePath: string, fileType: 'image' | 'document' = 'image') {
+    await this.db.runAsync(
+      'INSERT INTO transaction_attachments (transaction_id, file_path, file_type) VALUES (?, ?, ?)',
+      [txId, filePath, fileType]
+    );
+  }
+
+  async deleteAttachment(attachmentId: number) {
+    await this.db.runAsync('DELETE FROM transaction_attachments WHERE id = ?', [attachmentId]);
   }
 
   async create(tx: Omit<Transaction, 'id' | 'created_at'>): Promise<number> {
@@ -72,12 +237,13 @@ export class TransactionQueries {
         [id]
       );
       if (tx) {
-        // Reverse wallet balance
         const operator = tx.type === 'income' ? '-' : '+';
         await this.db.runAsync(
           `UPDATE wallets SET balance = balance ${operator} ? WHERE id = ?`,
           [tx.amount, tx.wallet_id]
         );
+        await this.db.runAsync('DELETE FROM transaction_tags WHERE transaction_id = ?', [id]);
+        await this.db.runAsync('DELETE FROM transaction_attachments WHERE transaction_id = ?', [id]);
         await this.db.runAsync('DELETE FROM transactions WHERE id = ?', [id]);
       }
     });
@@ -393,6 +559,233 @@ export class BillReminderQueries {
 
   async updateCalendarEventId(id: number, eventId: string) {
     await this.db.runAsync('UPDATE bill_reminders SET calendar_event_id = ? WHERE id = ?', [eventId, id]);
+  }
+}
+
+export class TagQueries {
+  constructor(private db: SQLiteDatabase) {}
+
+  async getAll(): Promise<Tag[]> {
+    return this.db.getAllAsync<Tag>('SELECT * FROM tags ORDER BY name ASC');
+  }
+
+  async search(query: string): Promise<Tag[]> {
+    return this.db.getAllAsync<Tag>(
+      'SELECT * FROM tags WHERE name LIKE ? ORDER BY name ASC LIMIT 10',
+      [`%${query}%`]
+    );
+  }
+
+  async create(name: string, color?: string): Promise<Tag> {
+    const result = await this.db.runAsync(
+      'INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)',
+      [name, color || '#6366f1']
+    );
+    if (result.changes === 0) {
+      const existing = await this.db.getFirstAsync<Tag>('SELECT * FROM tags WHERE name = ?', [name]);
+      return existing!;
+    }
+    return { id: result.lastInsertRowId, name, color: color || '#6366f1', created_at: new Date().toISOString() };
+  }
+
+  async delete(id: number) {
+    await this.db.runAsync('DELETE FROM tags WHERE id = ?', [id]);
+  }
+
+  async getByTransaction(txId: number): Promise<Tag[]> {
+    return this.db.getAllAsync<Tag>(`
+      SELECT tg.* FROM tags tg
+      JOIN transaction_tags tt ON tg.id = tt.tag_id
+      WHERE tt.transaction_id = ?
+      ORDER BY tg.name ASC
+    `, [txId]);
+  }
+
+  async addTagToTransaction(txId: number, tagId: number) {
+    await this.db.runAsync(
+      'INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)',
+      [txId, tagId]
+    );
+  }
+
+  async removeTagFromTransaction(txId: number, tagId: number) {
+    await this.db.runAsync(
+      'DELETE FROM transaction_tags WHERE transaction_id = ? AND tag_id = ?',
+      [txId, tagId]
+    );
+  }
+
+  async setTransactionTags(txId: number, tagIds: number[]) {
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync('DELETE FROM transaction_tags WHERE transaction_id = ?', [txId]);
+      for (const tagId of tagIds) {
+        await this.db.runAsync(
+          'INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)',
+          [txId, tagId]
+        );
+      }
+    });
+  }
+}
+
+export class InsightQueries {
+  constructor(private db: SQLiteDatabase) {}
+
+  async getCategoryComparison(currentMonth: string, prevMonth: string): Promise<CategoryInsight[]> {
+    const rows = await this.db.getAllAsync<any>(`
+      SELECT 
+        c.id as category_id,
+        c.name as category_name,
+        c.icon as category_icon,
+        c.color as category_color,
+        COALESCE(SUM(CASE WHEN strftime('%Y-%m', t.transaction_date) = ? THEN t.amount ELSE 0 END), 0) as current_total,
+        COALESCE(SUM(CASE WHEN strftime('%Y-%m', t.transaction_date) = ? THEN t.amount ELSE 0 END), 0) as prev_total
+      FROM categories c
+      LEFT JOIN transactions t ON c.id = t.category_id AND t.type = 'expense'
+        AND (strftime('%Y-%m', t.transaction_date) = ? OR strftime('%Y-%m', t.transaction_date) = ?)
+      WHERE c.type = 'expense'
+      GROUP BY c.id
+      HAVING current_total > 0 OR prev_total > 0
+      ORDER BY current_total DESC
+    `, [currentMonth, prevMonth, currentMonth, prevMonth]);
+
+    return rows.map(r => {
+      const delta = r.current_total - r.prev_total;
+      const delta_percentage = r.prev_total === 0
+        ? (r.current_total > 0 ? 100 : 0)
+        : (delta / r.prev_total) * 100;
+      const trend: 'up' | 'down' | 'stable' = delta > 0 ? 'up' : delta < 0 ? 'down' : 'stable';
+      return { ...r, delta, delta_percentage, trend };
+    });
+  }
+
+  async getAnomalies(month: string, lookbackMonths: number = 3): Promise<SpendingAlert[]> {
+    const startLookback = dayjs(month + '-01').subtract(lookbackMonths, 'month').format('YYYY-MM');
+
+    const avgData = await this.db.getAllAsync<{
+      category_id: number;
+      category_name: string;
+      avg_amount: number;
+      current_amount: number;
+    }>(`
+      SELECT 
+        c.id as category_id,
+        c.name as category_name,
+        COALESCE(AVG(CASE WHEN strftime('%Y-%m', t.transaction_date) >= ? AND strftime('%Y-%m', t.transaction_date) < ? THEN t.amount ELSE NULL END), 0) as avg_amount,
+        COALESCE(SUM(CASE WHEN strftime('%Y-%m', t.transaction_date) = ? THEN t.amount ELSE 0 END), 0) as current_amount
+      FROM categories c
+      LEFT JOIN transactions t ON c.id = t.category_id AND t.type = 'expense'
+      WHERE c.type = 'expense'
+      GROUP BY c.id
+      HAVING current_amount > avg_amount * 2 AND avg_amount > 0
+    `, [startLookback, month, month]);
+
+    return avgData.map(d => ({
+      type: 'anomaly' as const,
+      severity: (d.current_amount > d.avg_amount * 3 ? 'high' : d.current_amount > d.avg_amount * 2.5 ? 'medium' : 'low') as SpendingAlert['severity'],
+      message: `Pengeluaran ${d.category_name} bulan ini ${Math.round(d.current_amount / d.avg_amount)}x lipat dari biasanya`,
+      category_id: d.category_id,
+      category_name: d.category_name,
+      amount: d.current_amount,
+    }));
+  }
+
+  async getDeficitAlerts(): Promise<SpendingAlert[]> {
+    const monthlyFlow = await this.db.getAllAsync<{ month: string; flow: number }>(`
+      SELECT 
+        strftime('%Y-%m', transaction_date) as month,
+        SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as flow
+      FROM transactions
+      WHERE transaction_date >= date('now', '-5 months')
+      GROUP BY strftime('%Y-%m', transaction_date)
+      ORDER BY month ASC
+    `);
+
+    const alerts: SpendingAlert[] = [];
+    const deficitMonths = monthlyFlow.filter(m => m.flow < 0);
+
+    if (deficitMonths.length >= 2) {
+      alerts.push({
+        type: 'deficit',
+        severity: deficitMonths.length >= 3 ? 'high' : 'medium',
+        message: `Defisit ${deficitMonths.length} bulan berturut-turut. Pertimbangkan untuk mengatur ulang anggaran.`,
+        amount: Math.abs(deficitMonths.reduce((acc, m) => acc + m.flow, 0)),
+      });
+    }
+
+    return alerts;
+  }
+
+  async getFinancialHealthData(): Promise<{
+    monthlyIncome: number;
+    monthlyExpense: number;
+    totalBalance: number;
+    avgMonthlyExpense: number;
+    overBudgetCount: number;
+    hasSavingsGoal: boolean;
+    needsWantsBreakdown: { name: string; total: number; classification: string }[];
+    topExpenseCategory: { name: string; total: number } | null;
+  }> {
+    const currentMonth = dayjs().format('YYYY-MM');
+    const threeMosAgo = dayjs().subtract(3, 'month').format('YYYY-MM');
+
+    const income = await this.db.getFirstAsync<{ total: number }>(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+      WHERE type = 'income' AND strftime('%Y-%m', transaction_date) = ?
+    `, [currentMonth]);
+
+    const expense = await this.db.getFirstAsync<{ total: number }>(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+      WHERE type = 'expense' AND strftime('%Y-%m', transaction_date) = ?
+    `, [currentMonth]);
+
+    const avgExpense = await this.db.getFirstAsync<{ avg: number; total: number }>(`
+      SELECT COALESCE(SUM(amount), 0) / 3.0 as avg, COALESCE(SUM(amount), 0) as total FROM transactions
+      WHERE type = 'expense' AND strftime('%Y-%m', transaction_date) >= ?
+    `, [threeMosAgo]);
+
+    const balance = await this.db.getFirstAsync<{ total: number }>(`
+      SELECT COALESCE(SUM(balance), 0) as total FROM wallets
+    `);
+
+    const overBudget = await this.db.getFirstAsync<{ count: number }>(`
+      SELECT COUNT(*) as count FROM budgets b
+      WHERE b.month = ? AND b.monthly_limit < (
+        SELECT COALESCE(SUM(t.amount), 0) FROM transactions t
+        WHERE t.category_id = b.category_id AND t.type = 'expense'
+        AND strftime('%Y-%m', t.transaction_date) = b.month
+      )
+    `, [currentMonth]);
+
+    const goal = await this.db.getFirstAsync<{ count: number }>(`
+      SELECT COUNT(*) as count FROM savings_goals WHERE is_completed = 0
+    `);
+
+    const catBreakdown = await this.db.getAllAsync<{ name: string; total: number }>(`
+      SELECT c.name, COALESCE(SUM(t.amount), 0) as total
+      FROM transactions t
+      JOIN categories c ON t.category_id = c.id
+      WHERE t.type = 'expense' AND strftime('%Y-%m', t.transaction_date) = ?
+      GROUP BY c.id
+      ORDER BY total DESC
+    `, [currentMonth]);
+
+    const classification = catBreakdown.map(c => ({
+      name: c.name,
+      total: c.total,
+      classification: (CATEGORY_CLASSIFICATION as Record<string, string>)[c.name] || 'wants',
+    }));
+
+    return {
+      monthlyIncome: income?.total || 0,
+      monthlyExpense: expense?.total || 0,
+      totalBalance: balance?.total || 0,
+      avgMonthlyExpense: avgExpense?.avg || 0,
+      overBudgetCount: overBudget?.count || 0,
+      hasSavingsGoal: (goal?.count || 0) > 0,
+      needsWantsBreakdown: classification,
+      topExpenseCategory: catBreakdown[0] || null,
+    };
   }
 }
 

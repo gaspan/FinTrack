@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { getStoredPin, isBiometricEnabled } from './lock';
 
 const PIN_LENGTH = 4;
 
 export default function LockEntryScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [correctHash, setCorrectHash] = useState<string | null>(null);
@@ -104,7 +106,7 @@ export default function LockEntryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' },
   header: { alignItems: 'center', marginBottom: 40 },
   title: { ...theme.typography.h2, marginTop: theme.spacing.md },

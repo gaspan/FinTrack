@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { EmptyState } from '../ui/EmptyState';
 import { formatRupiahShort } from '@/utils/format';
 
@@ -11,6 +11,8 @@ interface OverviewDonutChartProps {
 }
 
 export const OverviewDonutChart: React.FC<OverviewDonutChartProps> = ({ income, expense }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const total = income + expense;
 
   if (total === 0) {
@@ -93,7 +95,7 @@ export const OverviewDonutChart: React.FC<OverviewDonutChartProps> = ({ income, 
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     alignItems: 'center',
     paddingVertical: theme.spacing.md,

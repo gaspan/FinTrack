@@ -1,8 +1,11 @@
 import { Stack } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '@/constants/theme';
+import { useMemo } from 'react';
+import { useTheme, type Theme } from '@/constants/theme';
 
 export default function NotFoundScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   return (
     <>
       <Stack.Screen options={{ title: 'Halaman Tidak Ditemukan' }} />
@@ -13,7 +16,7 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

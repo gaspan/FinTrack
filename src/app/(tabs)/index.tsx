@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { ChartQueries, WalletQueries, TransactionQueries, TrendQueries } from '@/lib/queries';
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
 import { ChartToggle } from '@/components/charts/ChartToggle';
@@ -19,6 +19,10 @@ import { TransactionWithDetails, Wallet } from '@/types';
 import { formatRupiah } from '@/utils/format';
 import { generateAndSharePDF } from '@/features/export/pdfGenerator';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
+import { SpendingInsightCard } from '@/features/insights/SpendingInsightCard';
+import { FinancialTipsCard } from '@/features/insights/FinancialTipsCard';
+import { loadInsights } from '@/features/insights';
+import { CategoryInsight, SpendingAlert, FinancialHealthScore, FinancialTip } from '@/types';
 
 dayjs.locale('id');
 
@@ -31,6 +35,8 @@ function getGreeting() {
 }
 
 export default function DashboardScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
   
   const [initialLoad, setInitialLoad] = useState(true);
@@ -50,6 +56,7 @@ export default function DashboardScreen() {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [primaryWallet, setPrimaryWallet] = useState<Wallet | null>(null);
   const [cashFlow, setCashFlow] = useState<number>(0);
+  const [insightData, setInsightData] = useState<{ comparisons: CategoryInsight[]; alerts: SpendingAlert[]; financialHealth: FinancialHealthScore | null; financialTips: FinancialTip[] }>({ comparisons: [], alerts: [], financialHealth: null, financialTips: [] });
 
   const loadData = useCallback(async () => {
     try {
@@ -88,6 +95,9 @@ export default function DashboardScreen() {
 
       const txs = await txQueries.getByDateRange(startDate, endDate);
       setRecentTransactions(txs.slice(0, 5));
+
+      const insights = await loadInsights(db);
+      setInsightData(insights);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -284,6 +294,22 @@ export default function DashboardScreen() {
         </Card>
       </View>
 
+      {/* Financial Literacy */}
+      {insightData.financialHealth && (
+        <View style={styles.chartSection}>
+          <Text style={styles.sectionTitle}>Kesehatan Finansial</Text>
+          <FinancialTipsCard health={insightData.financialHealth} tips={insightData.financialTips} />
+        </View>
+      )}
+
+      {/* Insights */}
+      {(insightData.comparisons.length > 0 || insightData.alerts.length > 0) && (
+        <View style={styles.chartSection}>
+          <Text style={styles.sectionTitle}>Wawasan Finansial</Text>
+          <SpendingInsightCard comparisons={insightData.comparisons} alerts={insightData.alerts} />
+        </View>
+      )}
+
       {/* Recent Transactions */}
       {searchedTransactions.length > 0 && (
         <View style={styles.recentSection}>
@@ -321,7 +347,7 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: theme.spacing.md, paddingTop: theme.spacing.lg },
   headerActions: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },

@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
-import { theme } from '@/constants/theme';
-import { TransactionType, Category, Wallet } from '@/types';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useTheme, type Theme } from '@/constants/theme';
+import { TransactionType, Category, Wallet, Tag, TransactionAttachment } from '@/types';
 import { NumericInput } from '../ui/NumericInput';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { TagInput, TagInputRef } from '../ui/TagInput';
 import { hapticLight, hapticSuccess } from '@/utils/haptic';
 
 interface TransactionFormProps {
@@ -19,6 +22,8 @@ interface TransactionFormProps {
     wallet_id: number;
     transaction_date: string;
     notes: string | null;
+    tags?: Tag[];
+    attachments?: TransactionAttachment[];
   };
   categories: Category[];
   wallets: Wallet[];
@@ -29,6 +34,8 @@ interface TransactionFormProps {
     wallet_id: number;
     transaction_date: string;
     notes: string;
+    tags: number[];
+    attachmentPaths: string[];
   }) => void;
   loading?: boolean;
 }
@@ -42,6 +49,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   loading = false,
 }) => {
   const isEditing = !!initialData;
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const defaultStyles = useDefaultStyles('light');
   const [type, setType] = useState<TransactionType>(initialData?.type || initialType);
   const [amount, setAmount] = useState<number>(initialData?.amount || 0);
@@ -50,6 +59,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [date, setDate] = useState(initialData ? dayjs(initialData.transaction_date) : dayjs());
   const [notes, setNotes] = useState(initialData?.notes || '');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>(initialData?.tags || []);
+  const [attachmentUris, setAttachmentUris] = useState<string[]>(
+    initialData?.attachments?.map(a => a.file_path) || []
+  );
+  const [savingAttachment, setSavingAttachment] = useState(false);
+  const tagInputRef = useRef<TagInputRef>(null);
 
   // Filter categories based on selected type
   const filteredCategories = categories.filter(c => c.type === type);
@@ -64,9 +79,52 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
-  const handleSubmit = () => {
+  const handlePickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const newUris = await Promise.all(
+        result.assets.map(async (asset) => {
+          const fileName = `attachment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+          const dest = FileSystem.documentDirectory + 'attachments/' + fileName;
+          await FileSystem.makeDirectoryAsync(FileSystem.documentDirectory + 'attachments/', { intermediates: true });
+          await FileSystem.copyAsync({ from: asset.uri, to: dest });
+          return dest;
+        })
+      );
+      setAttachmentUris(prev => [...prev, ...newUris]);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Izin diperlukan', 'Aplikasi membutuhkan izin kamera untuk mengambil foto');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const fileName = `attachment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+      const dest = FileSystem.documentDirectory + 'attachments/' + fileName;
+      await FileSystem.makeDirectoryAsync(FileSystem.documentDirectory + 'attachments/', { intermediates: true });
+      await FileSystem.copyAsync({ from: result.assets[0].uri, to: dest });
+      setAttachmentUris(prev => [...prev, dest]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachmentUris(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
     if (amount <= 0 || !categoryId || !walletId) return;
     hapticSuccess();
+    const tagIds = await tagInputRef.current?.commitPending() ?? selectedTags.map(t => t.id);
     onSubmit({
       type,
       amount,
@@ -74,6 +132,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       wallet_id: walletId,
       transaction_date: date.format('YYYY-MM-DD'),
       notes,
+      tags: tagIds,
+      attachmentPaths: attachmentUris,
     });
   };
 
@@ -223,6 +283,42 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             style={{ height: 80, paddingTop: 12 }}
           />
         </View>
+
+        {/* Tags */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tag</Text>
+          <TagInput ref={tagInputRef} selectedTags={selectedTags} onTagsChange={setSelectedTags} />
+        </View>
+
+        {/* Attachments */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Lampiran</Text>
+          {attachmentUris.length > 0 && (
+            <View style={styles.attachmentPreviewRow}>
+              {attachmentUris.map((uri, idx) => (
+                <View key={idx} style={styles.attachmentItem}>
+                  <Image source={{ uri }} style={styles.attachmentThumb} />
+                  <TouchableOpacity
+                    style={styles.attachmentRemove}
+                    onPress={() => removeAttachment(idx)}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+          <View style={styles.attachmentButtons}>
+            <TouchableOpacity style={styles.attachmentBtn} onPress={handlePickImage}>
+              <Ionicons name="images-outline" size={20} color={theme.colors.primary} />
+              <Text style={styles.attachmentBtnText}>Pilih dari Galeri</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.attachmentBtn} onPress={handleTakePhoto}>
+              <Ionicons name="camera-outline" size={20} color={theme.colors.primary} />
+              <Text style={styles.attachmentBtnText}>Ambil Foto</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         
         {/* Padding for bottom */}
         <View style={{ height: 40 }} />
@@ -288,7 +384,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -448,5 +544,49 @@ const styles = StyleSheet.create({
   },
   pickerContainer: {
     marginHorizontal: -theme.spacing.sm,
-  }
+  },
+  attachmentPreviewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  attachmentItem: {
+    position: 'relative',
+  },
+  attachmentThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  attachmentRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: theme.colors.background,
+    borderRadius: 10,
+  },
+  attachmentButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  attachmentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  attachmentBtnText: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
 });

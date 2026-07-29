@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 
 interface BadgeProps {
   label: string;
@@ -12,21 +12,24 @@ interface BadgeProps {
 
 export const Badge: React.FC<BadgeProps> = ({ 
   label, 
-  color = theme.colors.primary, 
+  color,
   icon,
   style 
 }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const badgeColor = color ?? theme.colors.primary;
   return (
-    <View style={[styles.container, { backgroundColor: `${color}20`, borderColor: `${color}40` }, style]}>
+    <View style={[styles.container, { backgroundColor: `${badgeColor}20`, borderColor: `${badgeColor}40` }, style]}>
       {icon && (
-        <Ionicons name={icon} size={12} color={color} style={styles.icon} />
+        <Ionicons name={icon} size={12} color={badgeColor} style={styles.icon} />
       )}
-      <Text style={[styles.label, { color }]}>{label}</Text>
+      <Text style={[styles.label, { color: badgeColor }]}>{label}</Text>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',

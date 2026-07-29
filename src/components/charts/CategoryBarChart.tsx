@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 import { ChartDataPoint } from '@/types';
 import { EmptyState } from '../ui/EmptyState';
 
@@ -10,6 +10,8 @@ interface CategoryBarChartProps {
 }
 
 export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({ data }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   if (!data || data.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -72,7 +74,7 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({ data }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     paddingVertical: theme.spacing.md,
     paddingRight: theme.spacing.md,

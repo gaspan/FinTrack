@@ -36,7 +36,14 @@
         }
       ],
       "expo-sqlite",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Izinkan $(PRODUCT_NAME) mengakses galeri untuk melampirkan foto transaksi",
+          "cameraPermission": "Izinkan $(PRODUCT_NAME) mengakses kamera untuk mengambil foto transaksi"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

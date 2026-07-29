@@ -18,6 +18,11 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 - **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tandai satu dompet sebagai **Dompet Utama** (primary), tambah dompet baru dengan pilihan ikon dan warna, serta hapus dengan konfirmasi.
 - **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi dengan *progress bar* visual dengan indikator warna (hijau <70%, kuning 70–90%, merah >90%).
 - **📝 Pencatatan Cepat**: Tambah transaksi pemasukan atau pengeluaran hanya dalam beberapa ketukan. Mendukung auto-format mata uang (Rupiah), pemilihan kategori, dompet, dan tanggal.
+- **🩺 Kesehatan Finansial (Financial Literacy)**: Skor kesehatan keuangan 0-100 di dashboard berdasarkan rasio tabungan, dana darurat, budget adherence, dan analisis 50/30/20. Dilengkapi tips personal otomatis dari data transaksi Anda.
+- **🖼️ Lampiran Foto/Resi**: Lampirkan foto bukti transaksi langsung dari kamera atau galeri. Arsip digital untuk setiap transaksi dengan preview thumbnail.
+- **🏷️ Tag/Label per Transaksi**: Tambahkan tag bebas ke transaksi untuk kategorisasi alternatif. Dilengkapi autocomplete, filter chips di riwayat, dan tampilan detail.
+- **📄 Riwayat dengan Infinite Scroll**: Daftar transaksi menggunakan pagination otomatis (infinite scroll) dengan 40 item per halaman untuk performa lancar.
+- **📊 Insight & Spending Pattern**: Analisis perbandingan pengeluaran bulan lalu vs bulan ini per kategori, deteksi anomali (lonjakan >100%), dan alert defisit anggaran.
 - **🔄 Transaksi Berulang (Recurring)**: Buat transaksi otomatis berulang harian, mingguan, bulanan, atau tahunan. Engine berjalan otomatis saat aplikasi dibuka dan menangani periode yang terlewat.
 - **📂 Ekspor Laporan**: Ekspor data transaksi ke format **Excel (`.xlsx`)** untuk analisis mendalam, atau **PDF** untuk laporan siap bagikan dengan desain gradient header dan bagan warna.
 - **🔍 Detail & Edit Transaksi**: Lihat detail lengkap transaksi, edit nominal/kategori/dompet, atau hapus transaksi (dengan pembalikan saldo otomatis).
@@ -148,6 +153,7 @@ FinTrack/
 │   ├── constants/              # Tema (dark mode), kategori default, dompet default
 │   ├── features/               # Modul fitur
 │   │   ├── recurring/          # Engine transaksi berulang
+│   │   ├── insights/           # Spending insights, financial literacy engine & card
 │   │   ├── export/             # Generator PDF, Excel, dan backup/restore JSON
 │   │   └── notifications/      # Kalender sync & budget reminder
 │   ├── lib/                    # SQLite schema, migration, seed, query classes
@@ -166,8 +172,6 @@ FinTrack/
 
 Berikut fitur-fitur yang sedang direncanakan untuk pengembangan selanjutnya:
 
-- 📸 **Lampiran Foto/Resi** — foto bukti transaksi sebagai arsip digital
-- 🏷️ **Tag/Label pada Transaksi** — tagging bebas untuk kategorisasi alternatif
 - 💱 **Multi Mata Uang** — dukung mata uang selain IDR dengan kurs dinamis
 - 💳 **Pencatatan Utang/Piutang (Debt Tracking)** — catat siapa yang berutang atau memberi utang
 - 📊 **Split Transaksi** — satu transaksi dibagi ke beberapa kategori
@@ -175,7 +179,6 @@ Berikut fitur-fitur yang sedang direncanakan untuk pengembangan selanjutnya:
 - ☁️ **Backup Cloud (iCloud/Google Drive)** — sinkronisasi cadangan otomatis
 - 📥 **Export CSV** — ekspor data transaksi ke format CSV
 - 📱 **Widget Home Screen** — ringkasan cepat di layar utama HP Android/iOS
-- 🤖 **Analisis Belanja (Spending Insights)** — insight otomatis pola pengeluaran bulanan
 
 Ada ide fitur lain? Silakan buka *issue* atau ajukan *Pull Request*!
 

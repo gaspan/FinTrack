@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { theme } from '@/constants/theme';
+import { useTheme, type Theme } from '@/constants/theme';
 
 interface ChartToggleProps {
   options: { label: string; value: string }[];
@@ -9,6 +9,8 @@ interface ChartToggleProps {
 }
 
 export const ChartToggle: React.FC<ChartToggleProps> = ({ options, value, onChange }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={styles.container}>
       {options.map((option) => {
@@ -40,7 +42,7 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({ options, value, onChan
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: theme.colors.surfaceElevated,
