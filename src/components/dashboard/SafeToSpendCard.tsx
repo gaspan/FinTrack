@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme, type Theme } from '@/constants/theme';
 import { Card } from '@/components/ui/Card';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 import { SafeToSpendData } from '@/types';
 import { formatRupiah } from '@/utils/format';
 
@@ -13,50 +14,68 @@ interface SafeToSpendCardProps {
 
 export const SafeToSpendCard: React.FC<SafeToSpendCardProps> = ({ data }) => {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const statusLabel = data.status === 'healthy' ? 'Aman' : data.status === 'caution' ? 'Hati-hati' : 'Terbatas';
+  const statusLabel =
+    data.status === 'healthy' ? 'Aman' : data.status === 'caution' ? 'Hati-hati' : 'Terbatas';
+  const accent =
+    data.status === 'healthy'
+      ? theme.colors.success
+      : data.status === 'caution'
+        ? theme.colors.warning
+        : theme.colors.danger;
+
+  const spentRatio =
+    data.totalBalance > 0
+      ? Math.min(100, ((data.upcomingBills + data.savingsTarget) / data.totalBalance) * 100)
+      : 0;
 
   return (
     <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/forecast' as any)}>
-      <Card style={[styles.card, { borderLeftColor: data.color, borderLeftWidth: 4 }]}>
+      <Card style={[styles.card, { borderLeftColor: accent, borderLeftWidth: 4 }]}>
         <View style={styles.header}>
-          <Text style={styles.title}>Sisa Hari Ini</Text>
-          <Text style={[styles.status, { color: data.color }]}>{statusLabel}</Text>
+          <Ionicons name="shield-checkmark-outline" size={16} color={accent} />
+          <Text style={styles.title}>Sisa Aman Hari Ini</Text>
+          <View style={[styles.pill, { backgroundColor: `${accent}22` }]}>
+            <Text style={[styles.status, { color: accent }]}>{statusLabel}</Text>
+          </View>
         </View>
-        <Text style={[styles.amount, { color: data.color }]}>{formatRupiah(Math.round(data.safeToSpendDaily))}</Text>
-        <Text style={styles.sub}>per hari (sisa {data.daysRemaining} hari)</Text>
-        <View style={styles.divider} />
-        <View style={styles.metrics}>
-          <Metric label="Saldo Total" value={formatRupiah(data.totalBalance)} />
-          <Metric label="Tagihan Mendatang" value={formatRupiah(data.upcomingBills)} color="#EF4444" />
-          <Metric label="Alokasi Tabungan" value={formatRupiah(data.savingsTarget)} color="#F59E0B" />
+
+        <View style={styles.amountRow}>
+          <Text style={[styles.amount, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit>
+            {formatRupiah(Math.round(data.safeToSpendDaily))}
+          </Text>
+          <Text style={styles.perDay}>/hari</Text>
+        </View>
+
+        <ProgressBar progress={spentRatio} color={accent} height={6} style={styles.bar} />
+        <View style={styles.footerRow}>
+          <Text style={styles.sub}>Sisa {data.daysRemaining} hari</Text>
+          <Text style={styles.sub}>
+            Tagihan {formatRupiah(data.upcomingBills)} · Tabungan {formatRupiah(data.savingsTarget)}
+          </Text>
         </View>
       </Card>
     </TouchableOpacity>
   );
 };
 
-const Metric = ({ label, value, color }: { label: string; value: string; color?: string }) => (
-  <View style={metricStyles.row}>
-    <Text style={metricStyles.label}>{label}</Text>
-    <Text style={[metricStyles.value, color ? { color } : undefined]}>{value}</Text>
-  </View>
-);
-
-const metricStyles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
-  label: { fontSize: 12, color: '#9CA3AF' },
-  value: { fontSize: 12, fontWeight: '600' },
-});
-
 const makeStyles = (theme: Theme) => StyleSheet.create({
-  card: { marginBottom: theme.spacing.md, padding: theme.spacing.md, backgroundColor: theme.colors.surfaceElevated },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  title: { ...theme.typography.subtitle },
-  status: { fontSize: 11, fontWeight: '700' },
-  amount: { fontSize: 26, fontWeight: '800' },
-  sub: { fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 },
-  divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 8 },
-  metrics: { gap: 2 },
+  card: { padding: theme.spacing.md, backgroundColor: theme.colors.surfaceElevated },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  title: { ...theme.typography.subtitle, flex: 1, color: theme.colors.textPrimary },
+  pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: theme.radius.round },
+  status: { ...theme.typography.caption, fontWeight: '700' },
+  amountRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  amount: { ...theme.typography.h2, fontSize: 26 },
+  perDay: { ...theme.typography.bodySmall },
+  bar: { marginTop: theme.spacing.sm },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: theme.spacing.sm,
+  },
+  sub: { ...theme.typography.caption, flexShrink: 1 },
 });

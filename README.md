@@ -7,16 +7,16 @@
 
 FinTrack adalah aplikasi pencatat keuangan pribadi modern dan kaya fitur yang dibangun menggunakan **React Native (Expo SDK 57)**. Aplikasi ini dirancang beroperasi secara *offline-first* dengan database lokal (SQLite) untuk memastikan privasi data, kecepatan, dan ketersediaan tanpa bergantung pada koneksi internet.
 
-Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan memanjakan mata, memberikan pengalaman pengguna kelas premium saat mengelola arus kas harian Anda.
+Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dilengkapi dukungan otomatis Mode Gelap & Terang. Dashboard baru menampilkan hero gradient full-bleed dengan saldo besar, aksi cepat, analitik 3-tab yang ringkas, widget anggaran & target menabung di satu layar, serta sparkline kekayaan bersih. Font Inter untuk tipografi premium.
 
 ---
 
 ## ✨ Fitur Utama
 
-- **📊 Dashboard Interaktif**: Pantau total saldo, arus kas masuk/keluar, dan tren keuangan Anda dalam satu layar. Dilengkapi pull-to-refresh, search cepat, dan filter rentang tanggal (Bulan Ini, Bulan Lalu, Tahun Ini, atau kustom).
-- **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan mudah melalui *Overview Donut Chart*, *Expense Category Donut Chart*, *Category Bar Chart*, dan *Monthly Trend Bar Chart* (6 bulan) yang cantik dan interaktif.
+- **📊 Dashboard Interaktif v2**: Pantau total saldo di **hero gradient full-bleed** dengan rangkuman pemasukan/pengeluaran, indikator tren, dan chip periode gaji. **4 aksi cepat** (Tambah, Transfer, Anggaran, Target) langsung dari dashboard. Analitik keuangan dalam **satu kartu bertab** (Ringkas/Kategori/Tren) — tidak perlu scroll 3 layar lagi. Dilengkapi **widget anggaran** (top-3 progress bar), **ring target menabung** (SVG progress ring horizontal), **sparkline kekayaan bersih** 12 bulan, dan wawasan finansial yang bisa dibuka/tutup.
+- **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan *Overview Donut Chart*, *Expense Category Donut Chart*, *Category Bar Chart*, dan *Grouped Monthly Trend Bar Chart* (6 bulan, menampilkan income & expense berdampingan — bukan hanya salah satu). Semua dalam satu kartu bertab yang menghemat ruang.
 - **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tandai satu dompet sebagai **Dompet Utama** (primary), tambah dompet baru dengan pilihan ikon dan warna, serta hapus dengan konfirmasi.
-- **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi dengan *progress bar* visual dengan indikator warna (hijau <70%, kuning 70–90%, merah >90%).
+- **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi *progress bar* visual dengan indikator warna (hijau <70%, kuning 70–90%, merah >90%). **Widget anggaran di dashboard** menampilkan 3 kategori teratas yang paling mendekati batas.
 - **📝 Pencatatan Cepat**: Tambah transaksi pemasukan atau pengeluaran hanya dalam beberapa ketukan. Mendukung auto-format mata uang (Rupiah), pemilihan kategori, dompet, dan tanggal.
 - **🩺 Kesehatan Finansial (Financial Literacy)**: Skor kesehatan keuangan 0-100 di dashboard berdasarkan rasio tabungan, dana darurat, budget adherence, dan analisis 50/30/20. Dilengkapi tips personal otomatis dari data transaksi Anda.
 - **🖼️ Lampiran Foto/Resi**: Lampirkan foto bukti transaksi langsung dari kamera atau galeri. Arsip digital untuk setiap transaksi dengan preview thumbnail.
@@ -39,17 +39,17 @@ Hadir dengan desain antarmuka (UI) gelap (Dark Mode) yang elegan, bersih, dan me
 - **📈 Trend Indicator**: Indikator persentase kenaikan/penurunan pemasukan vs pengeluaran dibandingkan bulan lalu.
 - **🔔 Pengingat Anggaran**: Notifikasi (Alert) otomatis saat pengeluaran kategori mencapai 90% atau lebih dari batas anggaran.
 - **🔒 Offline & Privat**: Seluruh data disimpan langsung di memori perangkat Anda menggunakan SQLite. Tidak ada data yang dikirim ke server eksternal. 100% offline.
-- **🎯 Target Menabung (Savings Goals)**: Tetapkan target tabungan dengan nominal dan deadline. Pantau progress secara visual dengan progress bar dan persentase. Tambah dana langsung dari halaman target.
+- **🎯 Target Menabung (Savings Goals)**: Tetapkan target tabungan dengan nominal dan deadline. Pantau progress secara visual dengan progress bar dan persentase. **Widget ring SVG di dashboard** menampilkan semua target aktif dalam strip horizontal yang bisa discroll. Tambah dana langsung dari halaman target.
 - **⏰ Pengingat Tagihan (Bill Reminders)**: Catat tagihan rutin (listrik, internet, dll) dengan frekuensi bulanan/tahunan. Dapatkan pengingat otomatis via **sinkronisasi ke Kalender Sistem** (Google Calendar / Apple Calendar) dengan alarm H-1.
 - **📄 Laporan Tahunan**: Lihat ringkasan finansial sepanjang tahun dengan bar chart perbandingan pemasukan vs pengeluaran per bulan. Navigasi antar tahun.
 - **🔐 Kunci Aplikasi (PIN/Biometric)**: Amankan aplikasi dengan PIN 4 digit atau biometrik (Face ID / Fingerprint). Aktifkan/nonaktifkan dari pengaturan.
-- **🌓 Pengaturan Tema (Dark/Light/Auto)**: Pilih tema tampilan sesuai preferensi Anda. Mode Auto mengikuti pengaturan sistem, atau pilih manual antara Tema Gelap atau Terang dari tab Pengaturan.
+- **🌓 Tema & Font Premium (Dark/Light/Auto)**: Pilih tema tampilan sesuai preferensi Anda. Mode Auto mengikuti pengaturan sistem **secara live** (tidak perlu restart). Font **Inter** di 4 weight (Regular/Medium/SemiBold/Bold) memberikan tipografi modern dan nyaman dibaca. Tema Gelap atau Terang bisa dipilih manual dari tab Pengaturan.
 - **📥 Impor CSV Rekening Koran**: Impor transaksi dari file CSV bank Indonesia (BCA, Mandiri, BRI, dll) secara otomatis dengan deteksi kolom dan cek duplikat.
 - **💳 Arus Kas (Cash Flow)**: Lihat net cash flow tahun berjalan dengan indikator positif/negatif di dashboard.
-- **📊 Kekayaan Bersih (Net Worth)**: Pantau total kekayaan bersih secara real-time (saldo wallet + aset manual — utang). Dilengkapi line chart tren 12 bulan dan snapshot otomatis setiap bulan. Card ringkas di dashboard.
+- **📊 Kekayaan Bersih (Net Worth)**: Pantau total kekayaan bersih secara real-time (saldo wallet + aset manual — utang). Dilengkapi **sparkline SVG tren 12 bulan** langsung di kartu ringkas dashboard, line chart di halaman detail, dan snapshot otomatis setiap bulan.
 - **📅 Kalender Transaksi**: Lihat transaksi harian dalam tampilan kalender grid 7×6 dengan dot indikator. Tap hari untuk melihat detail transaksi via bottom sheet. Navigasi bulan dengan swipe gesture.
 - **🔁 Manajemen Langganan (Subscriptions)**: Catat semua langganan (Netflix, Spotify, dll) dengan siklus bulanan/tahunan. Engine auto-create transaksi saat tagihan jatuh tempo + reminder H-1 via kalender. Total biaya bulanan otomatis dihitung.
-- **💰 Sisa Budget Harian (Safe to Spend)**: Proyeksi sisa saldo yang aman dibelanjakan per hari berdasarkan saldo, tagihan mendatang, dan target tabungan. Toggle on/off di pengaturan. Dilengkapi halaman forecast 30 hari dengan line chart.
+- **💰 Sisa Budget Harian (Safe to Spend)**: Proyeksi sisa saldo yang aman dibelanjakan per hari dalam **kartu ringkas** dengan progress bar visual. Berdasarkan saldo, tagihan mendatang, dan target tabungan. Toggle on/off di pengaturan. Dilengkapi halaman forecast 30 hari dengan line chart.
 
 ---
 

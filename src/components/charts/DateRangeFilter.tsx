@@ -13,9 +13,10 @@ interface DateRangeFilterProps {
   startDate: string;
   endDate: string;
   onChange: (start: string, end: string) => void;
+  payrollPeriod?: { startDate: string; endDate: string } | null;
 }
 
-export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, endDate, onChange }) => {
+export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, endDate, onChange, payrollPeriod }) => {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const defaultStyles = useDefaultStyles('light');
@@ -37,7 +38,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, end
     }
   };
 
-  const handleQuickSelect = (type: 'thisMonth' | 'lastMonth' | 'thisYear') => {
+  const handleQuickSelect = (type: 'thisMonth' | 'lastMonth' | 'thisYear' | 'payroll') => {
     let start, end;
     const now = dayjs();
     
@@ -47,6 +48,9 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, end
     } else if (type === 'lastMonth') {
       start = now.subtract(1, 'month').startOf('month');
       end = now.subtract(1, 'month').endOf('month');
+    } else if (type === 'payroll' && payrollPeriod) {
+      start = dayjs(payrollPeriod.startDate);
+      end = dayjs(payrollPeriod.endDate);
     } else {
       start = now.startOf('year');
       end = now.endOf('year');
@@ -98,6 +102,11 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, end
               <TouchableOpacity style={styles.quickChip} onPress={() => handleQuickSelect('lastMonth')}>
                 <Text style={styles.quickChipText}>Bulan Lalu</Text>
               </TouchableOpacity>
+              {payrollPeriod && (
+                <TouchableOpacity style={styles.quickChip} onPress={() => handleQuickSelect('payroll')}>
+                  <Text style={styles.quickChipText}>Periode Gaji</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.quickChip} onPress={() => handleQuickSelect('thisYear')}>
                 <Text style={styles.quickChipText}>Tahun Ini</Text>
               </TouchableOpacity>
@@ -111,20 +120,20 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, end
                 onChange={(params: any) => setRange(params)}
                 styles={{
                   ...defaultStyles,
-                  header: { backgroundColor: '#4A90D9', borderBottomWidth: 0 },
-                  month_selector_label: { color: '#FFFFFF', fontWeight: '600' },
-                  year_selector_label: { color: '#FFFFFF', fontWeight: '600' },
-                  button_prev_image: { tintColor: '#FFFFFF' },
-                  button_next_image: { tintColor: '#FFFFFF' },
-                  weekdays: { backgroundColor: '#F0F4FF' },
-                  weekday_label: { color: '#4A90D9', fontWeight: '600' },
-                  day: { backgroundColor: '#FFFFFF' },
-                  day_label: { color: '#1A1A2E' },
-                  selected: { backgroundColor: '#4A90D9', borderRadius: 8 },
-                  selected_label: { color: '#FFFFFF', fontWeight: '700' },
-                  today: { borderColor: '#4A90D9', borderWidth: 2, borderRadius: 8 },
-                  today_label: { color: '#4A90D9', fontWeight: '700' },
-                  days: { backgroundColor: '#F8FAFF' },
+                  header: { backgroundColor: theme.colors.primary, borderBottomWidth: 0 },
+                  month_selector_label: { color: theme.colors.textOnPrimary, fontWeight: '600' },
+                  year_selector_label: { color: theme.colors.textOnPrimary, fontWeight: '600' },
+                  button_prev_image: { tintColor: theme.colors.textOnPrimary },
+                  button_next_image: { tintColor: theme.colors.textOnPrimary },
+                  weekdays: { backgroundColor: theme.colors.surfaceElevated },
+                  weekday_label: { color: theme.colors.primary, fontWeight: '600' },
+                  day: { backgroundColor: theme.colors.surface },
+                  day_label: { color: theme.colors.textPrimary },
+                  selected: { backgroundColor: theme.colors.primary, borderRadius: 8 },
+                  selected_label: { color: theme.colors.textOnPrimary, fontWeight: '700' },
+                  today: { borderColor: theme.colors.primary, borderWidth: 2, borderRadius: 8 },
+                  today_label: { color: theme.colors.primary, fontWeight: '700' },
+                  days: { backgroundColor: theme.colors.surface },
                 }}
               />
             </View>

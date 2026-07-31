@@ -1,20 +1,28 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme, type Theme } from '@/constants/theme';
 import { Card } from '@/components/ui/Card';
+import { Sparkline } from '@/components/ui/Sparkline';
 
 interface NetWorthSummaryCardProps {
   totalAssets: number;
   totalLiabilities: number;
   netWorth: number;
+  history?: number[];
 }
 
-export const NetWorthSummaryCard: React.FC<NetWorthSummaryCardProps> = ({ totalAssets, totalLiabilities, netWorth }) => {
+export const NetWorthSummaryCard: React.FC<NetWorthSummaryCardProps> = ({
+  totalAssets,
+  totalLiabilities,
+  netWorth,
+  history = [],
+}) => {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const isPositive = netWorth >= 0;
+  const accent = isPositive ? theme.colors.success : theme.colors.danger;
 
   return (
     <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/net-worth' as any)}>
@@ -24,9 +32,18 @@ export const NetWorthSummaryCard: React.FC<NetWorthSummaryCardProps> = ({ totalA
           <Text style={styles.title}>Kekayaan Bersih</Text>
           <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
         </View>
-        <Text style={[styles.amount, { color: isPositive ? '#10B981' : '#EF4444' }]}>
-          {isPositive ? '' : '-'}Rp {Math.abs(netWorth).toLocaleString('id-ID')}
-        </Text>
+
+        <View style={styles.mainRow}>
+          <View style={styles.flex}>
+            <Text style={[styles.amount, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit>
+              {isPositive ? '' : '-'}Rp {Math.abs(netWorth).toLocaleString('id-ID')}
+            </Text>
+          </View>
+          {history.length > 1 && (
+            <Sparkline data={history} width={96} height={38} color={accent} />
+          )}
+        </View>
+
         <View style={styles.breakdown}>
           <View style={styles.breakdownItem}>
             <Text style={styles.breakdownLabel}>Aset</Text>
@@ -34,7 +51,9 @@ export const NetWorthSummaryCard: React.FC<NetWorthSummaryCardProps> = ({ totalA
           </View>
           <View style={styles.breakdownItem}>
             <Text style={styles.breakdownLabel}>Utang</Text>
-            <Text style={[styles.breakdownValue, { color: '#EF4444' }]}>-Rp {totalLiabilities.toLocaleString('id-ID')}</Text>
+            <Text style={[styles.breakdownValue, { color: theme.colors.danger }]}>
+              -Rp {totalLiabilities.toLocaleString('id-ID')}
+            </Text>
           </View>
         </View>
       </Card>
@@ -43,12 +62,14 @@ export const NetWorthSummaryCard: React.FC<NetWorthSummaryCardProps> = ({ totalA
 };
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
-  card: { marginBottom: theme.spacing.md, padding: theme.spacing.md, backgroundColor: theme.colors.surfaceElevated },
+  card: { padding: theme.spacing.md, backgroundColor: theme.colors.surfaceElevated },
   header: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   title: { ...theme.typography.subtitle, flex: 1 },
-  amount: { fontSize: 22, fontWeight: '800', marginBottom: 10 },
+  flex: { flex: 1 },
+  mainRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: 10 },
+  amount: { ...theme.typography.h2, fontSize: 22, color: theme.colors.textPrimary },
   breakdown: { gap: 4 },
   breakdownItem: { flexDirection: 'row', justifyContent: 'space-between' },
-  breakdownLabel: { fontSize: 12, color: theme.colors.textSecondary },
-  breakdownValue: { fontSize: 12, fontWeight: '600', color: '#10B981' },
+  breakdownLabel: { ...theme.typography.bodySmall },
+  breakdownValue: { ...theme.typography.bodySmall, fontWeight: '600', color: theme.colors.success },
 });

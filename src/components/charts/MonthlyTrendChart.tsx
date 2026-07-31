@@ -20,29 +20,36 @@ export const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ data }) =>
     );
   }
 
-  const barData = data.map(d => {
-    const total = Math.max(d.income, d.expense, 1);
-    return {
-      value: total,
+  const barData = data.flatMap(d => [
+    {
+      value: d.income,
       label: d.month.slice(0, 3),
-      frontColor: d.income >= d.expense ? theme.colors.income : theme.colors.expense,
-      topLabelComponent: () => (
-        <Text style={styles.barLabel}>{formatRupiahShort(total)}</Text>
-      ),
-    };
-  });
+      spacing: 2,
+      labelWidth: 34,
+      frontColor: theme.colors.income,
+    },
+    {
+      value: d.expense,
+      frontColor: theme.colors.expense,
+    },
+  ]);
 
   return (
     <View style={styles.container}>
       <BarChart
         data={barData}
         height={160}
-        barWidth={20}
-        spacing={12}
+        barWidth={11}
+        spacing={18}
+        initialSpacing={10}
+        barBorderTopLeftRadius={3}
+        barBorderTopRightRadius={3}
         hideRules
         xAxisThickness={0}
         yAxisThickness={0}
         yAxisTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
+        xAxisLabelTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
+        formatYLabel={(v: string) => formatRupiahShort(Number(v))}
         noOfSections={3}
         isAnimated
         animationDuration={400}
@@ -55,11 +62,11 @@ export const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ data }) =>
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: theme.colors.income }]} />
-          <Text style={styles.legendText}>Pemasukan {'>'} Pengeluaran</Text>
+          <Text style={styles.legendText}>Pemasukan</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: theme.colors.expense }]} />
-          <Text style={styles.legendText}>Pengeluaran {'>'} Pemasukan</Text>
+          <Text style={styles.legendText}>Pengeluaran</Text>
         </View>
       </View>
     </View>

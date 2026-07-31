@@ -38,7 +38,7 @@ export default function TabLayout() {
         }}>
         <Tabs.Screen
           name="index"
-          options={{ title: 'Dashboard', tabBarIcon: ({ color }) => <Ionicons name="pie-chart" size={24} color={color} /> }}
+          options={{ title: 'Dashboard', headerShown: false, tabBarIcon: ({ color }) => <Ionicons name="pie-chart" size={24} color={color} /> }}
         />
         <Tabs.Screen
           name="transactions"

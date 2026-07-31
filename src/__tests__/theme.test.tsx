@@ -10,9 +10,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 const mockGetColorScheme = jest.fn(() => 'light');
+const mockRemove = jest.fn();
+const mockAddChangeListener = jest.fn(() => ({ remove: mockRemove }));
 jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
   getColorScheme: mockGetColorScheme,
-  addChangeListener: jest.fn(),
+  addChangeListener: mockAddChangeListener,
   removeChangeListener: jest.fn(),
 }));
 
@@ -44,6 +46,7 @@ describe('ThemeProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetColorScheme.mockReturnValue('light');
+    mockAddChangeListener.mockReturnValue({ remove: mockRemove });
   });
 
   const renderWithTheme = () => render(
@@ -127,6 +130,27 @@ describe('ThemeProvider', () => {
     });
     await waitFor(() => {
       expect(screen.getByTestId('theme-name').props.children).toBe('auto');
+    });
+  });
+
+  it('follows live system theme changes while in auto mode', async () => {
+    mockGetColorScheme.mockReturnValue('light');
+    renderWithTheme();
+
+    await screen.findByTestId('bg-color');
+    expect(screen.getByTestId('bg-color').props.children).toBe(lightTheme.colors.background);
+
+    const handler = mockAddChangeListener.mock.calls[0][0] as unknown as (
+      p: { colorScheme: string }
+    ) => void;
+
+    await act(async () => {
+      handler({ colorScheme: 'dark' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bg-color').props.children).toBe(darkTheme.colors.background);
+      expect(screen.getByTestId('is-dark').props.children).toBe('true');
     });
   });
 

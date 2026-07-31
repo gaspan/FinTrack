@@ -6,10 +6,14 @@ import { useFocusEffect, router } from 'expo-router';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { exportBackup, importBackup } from '@/features/export/backupRestore';
-import { formatRupiah } from '@/utils/format';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CategoryQueries } from '@/lib/queries';
+import { Category, PayrollSettings } from '@/types';
 
 const SAFE_TO_SPEND_KEY = 'safe_to_spend_enabled';
+const PAYROLL_ENABLED_KEY = 'payroll_enabled';
+const PAYROLL_DAY_KEY = 'payroll_day';
+const PAYROLL_CATEGORY_KEY = 'payroll_category_id';
 
 export default function SettingsScreen() {
   const { theme, themeName, cycleTheme } = useTheme();
@@ -18,16 +22,53 @@ export default function SettingsScreen() {
   const [backingUp, setBackingUp] = useState(false);
   const [importing, setImporting] = useState(false);
   const [safeToSpendEnabled, setSafeToSpendEnabled] = useState(true);
+  const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({
+    enabled: false,
+    salaryDay: 25,
+    salaryCategoryId: null,
+  });
+  const [incomeCategories, setIncomeCategories] = useState<Category[]>([]);
 
   useFocusEffect(useCallback(() => {
     AsyncStorage.getItem(SAFE_TO_SPEND_KEY).then((val) => {
       setSafeToSpendEnabled(val !== 'false');
     });
-  }, []));
+
+    const categoryQueries = new CategoryQueries(db);
+    categoryQueries.getByType('income').then(setIncomeCategories);
+
+    Promise.all([
+      AsyncStorage.getItem(PAYROLL_ENABLED_KEY),
+      AsyncStorage.getItem(PAYROLL_DAY_KEY),
+      AsyncStorage.getItem(PAYROLL_CATEGORY_KEY),
+    ]).then(([enabled, day, categoryId]) => {
+      setPayrollSettings({
+        enabled: enabled !== 'false',
+        salaryDay: day ? parseInt(day, 10) : 25,
+        salaryCategoryId: categoryId ? parseInt(categoryId, 10) : null,
+      });
+    });
+  }, [db]));
 
   const handleThemeCycle = useCallback(() => {
     cycleTheme();
   }, [cycleTheme]);
+
+  const updatePayrollSetting = useCallback(<K extends keyof PayrollSettings>(key: K, value: PayrollSettings[K]) => {
+    setPayrollSettings(prev => {
+      const next = { ...prev, [key]: value };
+      if (key === 'enabled') AsyncStorage.setItem(PAYROLL_ENABLED_KEY, next.enabled ? 'true' : 'false');
+      if (key === 'salaryDay') AsyncStorage.setItem(PAYROLL_DAY_KEY, String(next.salaryDay));
+      if (key === 'salaryCategoryId') {
+        if (next.salaryCategoryId != null) {
+          AsyncStorage.setItem(PAYROLL_CATEGORY_KEY, String(next.salaryCategoryId));
+        } else {
+          AsyncStorage.removeItem(PAYROLL_CATEGORY_KEY);
+        }
+      }
+      return next;
+    });
+  }, []);
 
   useFocusEffect(useCallback(() => {}, []));
 
@@ -197,6 +238,78 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Payroll Period Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Periode Gaji</Text>
+
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => updatePayrollSetting('enabled', !payrollSettings.enabled)}
+        >
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#10B98120' }]}>
+              <Ionicons name="cash-outline" size={20} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.itemTitle}>Hitung Dashboard per Gaji</Text>
+              <Text style={styles.itemSub}>Periode dari gaji terakhir sampai sebelum gaji berikutnya</Text>
+            </View>
+          </View>
+          <Ionicons
+            name={payrollSettings.enabled ? 'checkbox' : 'square-outline'}
+            size={24}
+            color={theme.colors.primary}
+          />
+        </TouchableOpacity>
+
+        {payrollSettings.enabled && (
+          <View style={styles.payrollConfig}>
+            <View style={styles.payrollRow}>
+              <Text style={styles.payrollLabel}>Tanggal gaji setiap bulan</Text>
+              <View style={styles.dayStepper}>
+                <TouchableOpacity
+                  style={styles.dayButton}
+                  onPress={() => updatePayrollSetting('salaryDay', Math.max(1, payrollSettings.salaryDay - 1))}
+                >
+                  <Ionicons name="remove" size={18} color={theme.colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.dayValue}>{payrollSettings.salaryDay}</Text>
+                <TouchableOpacity
+                  style={styles.dayButton}
+                  onPress={() => updatePayrollSetting('salaryDay', Math.min(31, payrollSettings.salaryDay + 1))}
+                >
+                  <Ionicons name="add" size={18} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.payrollCategorySection}>
+              <Text style={styles.payrollLabel}>Kategori yang dianggap gaji</Text>
+              <View style={styles.categoryChips}>
+                {incomeCategories.map(cat => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.categoryChip,
+                      payrollSettings.salaryCategoryId === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color }
+                    ]}
+                    onPress={() => updatePayrollSetting('salaryCategoryId', cat.id)}
+                  >
+                    <Ionicons name={cat.icon as any} size={14} color={cat.color} />
+                    <Text style={[
+                      styles.categoryChipText,
+                      payrollSettings.salaryCategoryId === cat.id && { color: cat.color, fontWeight: '600' }
+                    ]}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+
       {/* Security Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Keamanan</Text>
@@ -306,5 +419,64 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   iconBg: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   itemTitle: { ...theme.typography.body, fontWeight: '500' },
   itemSub: { ...theme.typography.caption },
+  payrollConfig: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  payrollRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  payrollLabel: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
+  },
+  dayStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  dayButton: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  dayValue: {
+    ...theme.typography.body,
+    fontWeight: '600',
+    minWidth: 28,
+    textAlign: 'center',
+  },
+  payrollCategorySection: {
+    gap: theme.spacing.sm,
+  },
+  categoryChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.round,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  categoryChipText: {
+    ...theme.typography.caption,
+    color: theme.colors.textPrimary,
+  },
   versionText: { ...theme.typography.bodySmall },
 });

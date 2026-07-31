@@ -180,6 +180,12 @@ export interface FinancialTip {
   priority: 'high' | 'medium' | 'low';
 }
 
+export interface PayrollSettings {
+  enabled: boolean;
+  salaryDay: number;
+  salaryCategoryId: number | null;
+}
+
 export interface Asset {
   id: number;
   name: string;
