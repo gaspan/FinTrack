@@ -1,5 +1,3 @@
-import '@testing-library/jest-native';
-
 jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn().mockResolvedValue(undefined),
   getItem: jest.fn().mockResolvedValue(null),
@@ -84,12 +82,25 @@ jest.mock('expo-linear-gradient', () => ({
 
 jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn(),
+  isAvailableAsync: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('expo-file-system', () => ({
   readAsStringAsync: jest.fn().mockResolvedValue(''),
   writeAsStringAsync: jest.fn(),
   documentDirectory: '/mock/document/dir/',
+}));
+
+jest.mock('expo-file-system/legacy', () => ({
+  documentDirectory: '/mock/document/dir/',
+  readAsStringAsync: jest.fn().mockResolvedValue(''),
+  writeAsStringAsync: jest.fn().mockResolvedValue(undefined),
+  StorageAccessFramework: {
+    requestDirectoryPermissionsAsync: jest.fn(),
+    createFileAsync: jest.fn(),
+    writeAsStringAsync: jest.fn(),
+    readAsStringAsync: jest.fn(),
+  },
 }));
 
 jest.mock('expo-document-picker', () => ({

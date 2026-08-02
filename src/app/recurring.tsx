@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { formatRupiah } from '@/utils/format';
+import { getSalaryProjection, type SalaryProjection } from '@/utils/salary';
 
 const FREQ_LABELS: Record<string, string> = {
   daily: 'Harian', weekly: 'Mingguan', monthly: 'Bulanan', yearly: 'Tahunan',
@@ -51,17 +52,21 @@ export default function RecurringScreen() {
   const [formWallet, setFormWallet] = useState<number | null>(null);
   const [formFrequency, setFormFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [formNotes, setFormNotes] = useState('');
+  const [formNextDate, setFormNextDate] = useState(dayjs().format('YYYY-MM-DD'));
+  const [salaryProjection, setSalaryProjection] = useState<SalaryProjection | null>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [recs, cats, walls] = await Promise.all([
+      const [recs, cats, walls, salary] = await Promise.all([
         new RecurringQueries(db).getAll(),
         new CategoryQueries(db).getAll(),
         new WalletQueries(db).getAll(),
+        getSalaryProjection(db).catch(() => null),
       ]);
       setRecurrings(recs);
       setCategories(cats);
       setWallets(walls);
+      setSalaryProjection(salary);
     } catch (e) { console.error(e); }
   }, [db]);
 
@@ -90,6 +95,7 @@ export default function RecurringScreen() {
     setFormWallet(null);
     setFormFrequency('monthly');
     setFormNotes('');
+    setFormNextDate(dayjs().format('YYYY-MM-DD'));
   };
 
   const handleAdd = async () => {
@@ -105,7 +111,7 @@ export default function RecurringScreen() {
         await new RecurringQueries(db).create({
           type: formType, amount: formAmount, category_id: formCategory,
           wallet_id: formWallet, frequency: formFrequency,
-          next_date: dayjs().format('YYYY-MM-DD'),
+          next_date: formNextDate,
           notes: formNotes || null,
         });
       }
@@ -116,6 +122,20 @@ export default function RecurringScreen() {
     finally { setLoading(false); }
   };
 
+  const openSalarySetup = () => {
+    if (!salaryProjection) return;
+    setEditingId(null);
+    setFormType('income');
+    setFormAmount(salaryProjection.amount);
+    setFormCategory(salaryProjection.salaryCategoryId);
+    setFormWallet(wallets[0]?.id ?? null);
+    setFormFrequency('monthly');
+    setFormNotes('Gaji (Otomatis)');
+    setFormNextDate(salaryProjection.nextDate);
+    setShowForm(true);
+  };
+
+  const hasActiveIncome = recurrings.some(r => r.type === 'income' && r.is_active === 1);
   const filteredCategories = categories.filter(c => c.type === formType);
 
   return (
@@ -126,6 +146,21 @@ export default function RecurringScreen() {
           <Ionicons name="add-circle" size={28} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
+
+      {salaryProjection && !hasActiveIncome && (
+        <TouchableOpacity style={styles.salaryBanner} activeOpacity={0.8} onPress={openSalarySetup}>
+          <View style={styles.salaryIcon}>
+            <Ionicons name="cash-outline" size={20} color={theme.colors.primary} />
+          </View>
+          <View style={styles.salaryInfo}>
+            <Text style={styles.salaryTitle}>Atur gaji otomatis?</Text>
+            <Text style={styles.salarySub}>
+              +{formatRupiah(salaryProjection.amount)} setiap bulan, mulai {dayjs(salaryProjection.nextDate).format('DD MMM')}
+            </Text>
+          </View>
+          <Text style={styles.salaryCta}>Atur</Text>
+        </TouchableOpacity>
+      )}
 
       {recurrings.length === 0 ? (
         <View style={styles.empty}>
@@ -174,6 +209,7 @@ export default function RecurringScreen() {
                 setFormWallet(r.wallet_id);
                 setFormFrequency(r.frequency);
                 setFormNotes(r.notes || '');
+                setFormNextDate(r.next_date);
                 setShowForm(true);
               }}>
                 <Ionicons name="create-outline" size={16} color={theme.colors.textSecondary} />
@@ -273,6 +309,17 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   emptyText: { ...theme.typography.body, color: theme.colors.textSecondary, marginTop: theme.spacing.md },
   card: { backgroundColor: theme.colors.surface, margin: theme.spacing.md, marginBottom: 0, padding: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border },
   cardInactive: { opacity: 0.5 },
+  salaryBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md,
+    margin: theme.spacing.md, marginBottom: 0, padding: theme.spacing.md,
+    backgroundColor: theme.colors.surfaceElevated, borderRadius: theme.radius.md,
+    borderWidth: 1, borderColor: theme.colors.primary + '40',
+  },
+  salaryIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.primary + '20', justifyContent: 'center', alignItems: 'center' },
+  salaryInfo: { flex: 1 },
+  salaryTitle: { ...theme.typography.body, fontWeight: '600' },
+  salarySub: { ...theme.typography.caption, marginTop: 2 },
+  salaryCta: { ...theme.typography.body, color: theme.colors.primary, fontWeight: '700' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardInfo: {},
   cardAmount: { ...theme.typography.h3, marginBottom: 2 },

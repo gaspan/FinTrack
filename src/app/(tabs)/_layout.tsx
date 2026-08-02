@@ -7,6 +7,9 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useTheme } from '@/constants/theme';
 import { RecurringEngine } from '@/features/recurring/recurringEngine';
 import { checkBudgetAlerts } from '@/features/notifications/budgetReminder';
+import { RolloverEngine } from '@/features/rollover/rolloverEngine';
+import { checkAndBackup } from '@/features/cloud-backup/backupScheduler';
+import { checkBackupReminder } from '@/features/cloud-backup/backupReminder';
 import { SubscriptionQueries, NetWorthQueries } from '@/lib/queries';
 import { FAB } from '@/components/ui/FAB';
 
@@ -17,9 +20,12 @@ export default function TabLayout() {
   useEffect(() => {
     const engine = new RecurringEngine(db);
     engine.processRecurringTransactions()
+      .then(() => new RolloverEngine(db).process())
       .then(() => checkBudgetAlerts(db))
       .then(() => new SubscriptionQueries(db).processRenewals())
       .then(() => new NetWorthQueries(db).ensureMonthlySnapshot())
+      .then(() => checkAndBackup(db))
+      .then(() => checkBackupReminder())
       .catch(console.error);
   }, [db]);
 

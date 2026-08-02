@@ -1,15 +1,62 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useRouter, useFocusEffect } from 'expo-router';
 
 import { useTheme, type Theme } from '@/constants/theme';
-import { CategoryQueries, WalletQueries, TransactionQueries, TagQueries } from '@/lib/queries';
+import { CategoryQueries, WalletQueries, TransactionQueries, TagQueries, RecurringQueries } from '@/lib/queries';
 import { Category, Wallet, TransactionType } from '@/types';
 import { TransactionForm } from '@/components/forms/TransactionForm';
 import { checkBudgetAlerts } from '@/features/notifications/budgetReminder';
 import { hapticSuccess } from '@/utils/haptic';
 import { SuccessAnimation } from '@/components/ui/SuccessAnimation';
+import { findSalaryCategoryId } from '@/utils/payroll';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import dayjs from 'dayjs';
+
+const PAYROLL_ENABLED_KEY = 'payroll_enabled';
+
+async function suggestRecurringSalary(
+  db: SQLiteDatabase,
+  data: { type: TransactionType; amount: number; category_id: number; wallet_id: number; transaction_date: string; notes: string }
+) {
+  const enabled = await AsyncStorage.getItem(PAYROLL_ENABLED_KEY);
+  if (enabled === 'false' || !enabled) return;
+
+  const salaryCategoryId = await findSalaryCategoryId(db, null);
+  if (!salaryCategoryId || data.category_id !== salaryCategoryId) return;
+
+  const existing = await new RecurringQueries(db).getAll();
+  if (existing.some(r => r.type === 'income' && r.is_active === 1)) return;
+
+  Alert.alert(
+    'Gaji rutin?',
+    'Jadikan pemasukan ini sebagai transaksi berulang otomatis setiap bulan?',
+    [
+      { text: 'Tidak', style: 'cancel' },
+      {
+        text: 'Ya, Atur',
+        onPress: async () => {
+          try {
+            await new RecurringQueries(db).create({
+              type: 'income',
+              amount: data.amount,
+              category_id: data.category_id,
+              wallet_id: data.wallet_id,
+              frequency: 'monthly',
+              next_date: dayjs(data.transaction_date).add(1, 'month').format('YYYY-MM-DD'),
+              notes: `${data.notes || 'Gaji'} (Otomatis)`,
+            });
+            hapticSuccess();
+          } catch (e) {
+            console.error(e);
+            Alert.alert('Error', 'Gagal membuat transaksi berulang');
+          }
+        },
+      },
+    ]
+  );
+}
 
 export default function AddTransactionScreen() {
   const { theme } = useTheme();
@@ -89,6 +136,8 @@ export default function AddTransactionScreen() {
       
       if (data.type === 'expense') {
         checkBudgetAlerts(db).catch(console.error);
+      } else {
+        suggestRecurringSalary(db, data).catch(console.error);
       }
     } catch (error) {
       console.error(error);

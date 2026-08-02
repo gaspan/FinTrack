@@ -2,7 +2,10 @@ import { SQLiteDatabase } from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
+
+export const LAST_BACKUP_DATE_KEY = 'last_backup_date';
 
 interface BackupData {
   version: number;
@@ -20,7 +23,7 @@ interface BackupData {
   subscriptions?: any[];
 }
 
-export const exportBackup = async (db: SQLiteDatabase) => {
+export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> {
   const [wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs] = await Promise.all([
     db.getAllAsync('SELECT * FROM wallets'),
     db.getAllAsync('SELECT * FROM categories'),
@@ -35,7 +38,7 @@ export const exportBackup = async (db: SQLiteDatabase) => {
     db.getAllAsync('SELECT * FROM subscriptions'),
   ]);
 
-  const data: BackupData = {
+  return {
     version: 3,
     exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     wallets, categories, transactions, budgets,
@@ -46,12 +49,17 @@ export const exportBackup = async (db: SQLiteDatabase) => {
     net_worth_snapshots: snapshots,
     subscriptions: subs,
   };
+}
+
+export const exportBackup = async (db: SQLiteDatabase) => {
+  const data = await gatherBackupData(db);
 
   const json = JSON.stringify(data, null, 2);
   const fileName = `FinTrack_Backup_${dayjs().format('YYYYMMDD_HHmmss')}.json`;
   const filePath = FileSystem.documentDirectory + fileName;
 
   await FileSystem.writeAsStringAsync(filePath, json);
+  await AsyncStorage.setItem(LAST_BACKUP_DATE_KEY, dayjs().format('YYYY-MM-DD'));
 
   const isAvailable = await Sharing.isAvailableAsync();
   if (isAvailable) {
@@ -60,6 +68,19 @@ export const exportBackup = async (db: SQLiteDatabase) => {
       dialogTitle: 'Backup Data FinTrack',
     });
   }
+};
+
+export const performLocalBackup = async (db: SQLiteDatabase): Promise<string> => {
+  const data = await gatherBackupData(db);
+
+  const json = JSON.stringify(data);
+  const fileName = `FinTrack_AutoBackup_${dayjs().format('YYYYMMDD_HHmmss')}.json`;
+  const filePath = FileSystem.documentDirectory + fileName;
+
+  await FileSystem.writeAsStringAsync(filePath, json);
+  await AsyncStorage.setItem(LAST_BACKUP_DATE_KEY, dayjs().format('YYYY-MM-DD'));
+
+  return filePath;
 };
 
 export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
@@ -137,8 +158,8 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
     }
     for (const b of data.budgets || []) {
       await db.runAsync(
-        'INSERT INTO budgets (id, category_id, monthly_limit, month) VALUES (?, ?, ?, ?)',
-        [b.id, b.category_id, b.monthly_limit, b.month]
+        'INSERT INTO budgets (id, category_id, monthly_limit, month, rollover_amount, rollover_enabled) VALUES (?, ?, ?, ?, ?, ?)',
+        [b.id, b.category_id, b.monthly_limit, b.month, b.rollover_amount || 0, b.rollover_enabled || 0]
       );
     }
     for (const r of data.recurring_transactions || []) {

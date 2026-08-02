@@ -59,6 +59,8 @@ export interface Budget {
   category_id: number;
   monthly_limit: number;
   month: string;
+  rollover_amount: number;
+  rollover_enabled: number;
 }
 
 export interface RecurringFrequency {

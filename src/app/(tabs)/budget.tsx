@@ -10,6 +10,7 @@ import { useTheme, type Theme } from '@/constants/theme';
 import { BudgetQueries, CategoryQueries } from '@/lib/queries';
 import { Category } from '@/types';
 import { BudgetForm } from '@/components/forms/BudgetForm';
+import { RolloverEngine } from '@/features/rollover/rolloverEngine';
 import { formatRupiah } from '@/utils/format';
 import { hapticSuccess } from '@/utils/haptic';
 
@@ -26,6 +27,7 @@ export default function BudgetScreen() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [currentLimit, setCurrentLimit] = useState(0);
+  const [currentRollover, setCurrentRollover] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -48,20 +50,23 @@ export default function BudgetScreen() {
     let totalLimit = 0, totalSpent = 0;
     const mapped = categories.map(cat => {
       const b = budgets.find(b => b.category_id === cat.id);
-      const limit = b?.monthly_limit || 0;
+      const baseLimit = b?.monthly_limit || 0;
+      const rollover = b?.rollover_amount || 0;
+      const limit = baseLimit + rollover;
       const spent = b?.spent || 0;
       totalLimit += limit;
       totalSpent += spent;
-      return { category: cat, budget: b || { monthly_limit: 0, spent: 0 }, limit, spent };
+      return { category: cat, budget: b || { monthly_limit: 0, spent: 0, rollover_amount: 0 }, limit, baseLimit, rollover, spent };
     });
     const pct = totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0;
     return { items: mapped, totalLimit, totalSpent, pct };
   }, [categories, budgets]);
 
-  const handleSaveBudget = async (limit: number) => {
+  const handleSaveBudget = async (limit: number, rolloverEnabled: boolean) => {
     if (!selectedCategory) return;
     try {
-      await new BudgetQueries(db).setBudget(selectedCategory.id, limit, currentMonth);
+      await new BudgetQueries(db).setBudget(selectedCategory.id, limit, currentMonth, rolloverEnabled);
+      await new RolloverEngine(db).process();
       hapticSuccess();
       setShowForm(false);
       await loadData();
@@ -104,8 +109,9 @@ export default function BudgetScreen() {
       {/* Category Budgets */}
       <View style={styles.list}>
         {overall.items.map((item) => {
-          const { category, budget } = item;
-          const pct = budget.monthly_limit > 0 ? (budget.spent / budget.monthly_limit) * 100 : 0;
+          const { category, budget, rollover } = item;
+          const effectiveLimit = budget.monthly_limit + (budget.rollover_amount || 0);
+          const pct = effectiveLimit > 0 ? (budget.spent / effectiveLimit) * 100 : 0;
           let barColor = theme.colors.success;
           if (pct > 90) barColor = theme.colors.danger;
           else if (pct > 70) barColor = theme.colors.warning;
@@ -116,7 +122,7 @@ export default function BudgetScreen() {
               key={category.id} 
               style={styles.budgetItem}
               activeOpacity={0.7}
-              onPress={() => { setSelectedCategory(category); setCurrentLimit(budget.monthly_limit); setShowForm(true); }}
+              onPress={() => { setSelectedCategory(category); setCurrentLimit(budget.monthly_limit); setCurrentRollover(!!budget.rollover_enabled); setShowForm(true); }}
             >
               <View style={styles.budgetHeader}>
                 <View style={styles.categoryInfo}>
@@ -128,14 +134,21 @@ export default function BudgetScreen() {
                 <View style={styles.budgetAmountInfo}>
                   <Text style={styles.spentAmount}>{formatRp(budget.spent)}</Text>
                   <Text style={styles.limitAmount}>
-                    / {budget.monthly_limit > 0 ? formatRp(budget.monthly_limit) : 'Belum diatur'}
+                    / {effectiveLimit > 0 ? formatRp(effectiveLimit) : 'Belum diatur'}
                   </Text>
                 </View>
               </View>
-              {budget.monthly_limit > 0 && (
-                <View style={styles.progressBarContainer}>
-                  <View style={[styles.progressBar, { width: `${capped}%`, backgroundColor: barColor }]} />
-                </View>
+              {effectiveLimit > 0 && (
+                <>
+                  <View style={styles.progressBarContainer}>
+                    <View style={[styles.progressBar, { width: `${capped}%`, backgroundColor: barColor }]} />
+                  </View>
+                  {rollover > 0 && (
+                    <Text style={styles.rolloverText}>
+                      <Ionicons name="arrow-down-circle-outline" size={12} color={theme.colors.income} /> Sisa bulan lalu +{formatRp(rollover)}
+                    </Text>
+                  )}
+                </>
               )}
             </TouchableOpacity>
           );
@@ -149,6 +162,7 @@ export default function BudgetScreen() {
               <BudgetForm
                 category={selectedCategory}
                 initialLimit={currentLimit}
+                initialRolloverEnabled={currentRollover}
                 onSubmit={handleSaveBudget}
                 onCancel={() => setShowForm(false)}
               />
@@ -194,6 +208,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   limitAmount: { ...theme.typography.caption },
   progressBarContainer: { height: 8, backgroundColor: theme.colors.surface, borderRadius: 4, overflow: 'hidden', marginTop: theme.spacing.xs },
   progressBar: { height: '100%', borderRadius: 4 },
+  rolloverText: { ...theme.typography.caption, color: theme.colors.income, marginTop: theme.spacing.xs },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: theme.spacing.md },
   modalContent: { backgroundColor: theme.colors.surfaceElevated, borderRadius: theme.radius.lg, padding: theme.spacing.sm },
 });

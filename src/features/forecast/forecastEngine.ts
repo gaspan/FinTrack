@@ -2,6 +2,7 @@ import { SQLiteDatabase } from 'expo-sqlite';
 import dayjs from 'dayjs';
 import { SafeToSpendData, ForecastPoint } from '@/types';
 import { WalletQueries, TransactionQueries, RecurringQueries, SavingsGoalQueries, BillReminderQueries, SubscriptionQueries } from '@/lib/queries';
+import { getSalaryProjection } from '@/utils/salary';
 
 export async function calculateSafeToSpend(db: SQLiteDatabase): Promise<SafeToSpendData | null> {
   const today = dayjs();
@@ -18,17 +19,20 @@ export async function calculateSafeToSpend(db: SQLiteDatabase): Promise<SafeToSp
   const reminderQueries = new BillReminderQueries(db);
   const goalQueries = new SavingsGoalQueries(db);
 
-  const [upcomingSubs, allRecurring, allReminders, goals] = await Promise.all([
+  const [upcomingSubs, allRecurring, allReminders, goals, salary] = await Promise.all([
     subQueries.getUpcomingRenewals(daysRemaining),
     recurringQueries.getActive(),
     reminderQueries.getAll(),
     goalQueries.getAll(),
+    getSalaryProjection(db).catch(() => null),
   ]);
 
   const upcomingBills =
     allRecurring.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0) +
     upcomingSubs.reduce((s, r) => s + r.amount, 0) +
     allReminders.filter(r => !r.is_paid && r.due_date <= endOfMonth.format('YYYY-MM-DD')).reduce((s, r) => s + r.amount, 0);
+
+  const upcomingIncome = salary && salary.nextDate <= endOfMonth.format('YYYY-MM-DD') ? salary.amount : 0;
 
   const savingsTarget = goals
     .filter(g => !g.is_completed)
@@ -41,17 +45,18 @@ export async function calculateSafeToSpend(db: SQLiteDatabase): Promise<SafeToSp
       return sum + (remaining / daysToDeadline) * daysRemaining;
     }, 0);
 
-  const remainingBalance = Math.max(0, totalBalance - upcomingBills - savingsTarget);
+  const effectiveBalance = totalBalance + upcomingIncome;
+  const remainingBalance = Math.max(0, effectiveBalance - upcomingBills - savingsTarget);
   const safeToSpend = remainingBalance;
   const safeToSpendDaily = daysRemaining > 0 ? safeToSpend / daysRemaining : safeToSpend;
 
   let status: SafeToSpendData['status'] = 'healthy';
   let color = '#10B981';
-  if (totalBalance > 0) {
-    if (safeToSpend < totalBalance * 0.1) {
+  if (effectiveBalance > 0) {
+    if (safeToSpend < effectiveBalance * 0.1) {
       status = 'danger';
       color = '#EF4444';
-    } else if (safeToSpend < totalBalance * 0.3) {
+    } else if (safeToSpend < effectiveBalance * 0.3) {
       status = 'caution';
       color = '#F59E0B';
     }
@@ -73,7 +78,11 @@ export async function generateForecast(db: SQLiteDatabase, days: number = 30): P
   let currentBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
 
   const recurringQueries = new RecurringQueries(db);
-  const allRecurring = await recurringQueries.getActive();
+  const [allRecurring, salary] = await Promise.all([
+    recurringQueries.getActive(),
+    getSalaryProjection(db).catch(() => null),
+  ]);
+  const hasRecurringIncome = allRecurring.some(r => r.type === 'income' && r.is_active === 1);
 
   const txQueries = new TransactionQueries(db);
   const last30Days = await txQueries.getByDateRange(
@@ -90,6 +99,10 @@ export async function generateForecast(db: SQLiteDatabase, days: number = 30): P
 
     let income = 0;
     let expense = avgDailyExpense;
+
+    if (salary && !hasRecurringIncome && dateStr === salary.nextDate) {
+      income += salary.amount;
+    }
 
     for (const rec of allRecurring) {
       const start = dayjs(rec.next_date);

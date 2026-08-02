@@ -403,23 +403,34 @@ export class BudgetQueries {
     `, [`${month}%`, month]);
   }
 
-  async setBudget(categoryId: number, monthlyLimit: number, month: string) {
-    const existing = await this.db.getFirstAsync<Budget>(
+  async getByCategoryMonth(categoryId: number, month: string) {
+    return this.db.getFirstAsync<Budget>(
       'SELECT * FROM budgets WHERE category_id = ? AND month = ?',
       [categoryId, month]
     );
+  }
+
+  async setBudget(categoryId: number, monthlyLimit: number, month: string, rolloverEnabled?: boolean) {
+    const existing = await this.getByCategoryMonth(categoryId, month);
 
     if (existing) {
       await this.db.runAsync(
-        'UPDATE budgets SET monthly_limit = ? WHERE id = ?',
-        [monthlyLimit, existing.id]
+        'UPDATE budgets SET monthly_limit = ?, rollover_enabled = ? WHERE id = ?',
+        [monthlyLimit, rolloverEnabled !== undefined ? (rolloverEnabled ? 1 : 0) : existing.rollover_enabled, existing.id]
       );
     } else {
       await this.db.runAsync(
-        'INSERT INTO budgets (category_id, monthly_limit, month) VALUES (?, ?, ?)',
-        [categoryId, monthlyLimit, month]
+        'INSERT INTO budgets (category_id, monthly_limit, month, rollover_amount, rollover_enabled) VALUES (?, ?, ?, 0, ?)',
+        [categoryId, monthlyLimit, month, rolloverEnabled ? 1 : 0]
       );
     }
+  }
+
+  async toggleRollover(id: number, enabled: boolean) {
+    await this.db.runAsync(
+      'UPDATE budgets SET rollover_enabled = ? WHERE id = ?',
+      [enabled ? 1 : 0, id]
+    );
   }
 }
 
@@ -754,7 +765,7 @@ export class InsightQueries {
 
     const overBudget = await this.db.getFirstAsync<{ count: number }>(`
       SELECT COUNT(*) as count FROM budgets b
-      WHERE b.month = ? AND b.monthly_limit < (
+      WHERE b.month = ? AND (b.monthly_limit + b.rollover_amount) < (
         SELECT COALESCE(SUM(t.amount), 0) FROM transactions t
         WHERE t.category_id = b.category_id AND t.type = 'expense'
         AND strftime('%Y-%m', t.transaction_date) = b.month

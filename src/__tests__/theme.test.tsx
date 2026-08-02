@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, Button } from 'react-native';
-import { render, act, fireEvent, waitFor, screen } from '@testing-library/react-native';
+import { render, act, fireEvent, waitFor } from '@testing-library/react-native';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn().mockResolvedValue(undefined),
@@ -11,7 +11,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 const mockGetColorScheme = jest.fn(() => 'light');
 const mockRemove = jest.fn();
-const mockAddChangeListener = jest.fn(() => ({ remove: mockRemove }));
+const mockAddChangeListener = jest.fn((_: { colorScheme: string }) => ({ remove: mockRemove }));
 jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
   getColorScheme: mockGetColorScheme,
   addChangeListener: mockAddChangeListener,
@@ -21,7 +21,7 @@ jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => ({}),
-  Stack: { Screen: ({ children }) => children },
+  Stack: { Screen: ({ children }: { children: React.ReactNode }) => children },
 }));
 
 import { ThemeProvider, useTheme, darkTheme, lightTheme } from '@/constants/theme';
@@ -57,100 +57,90 @@ describe('ThemeProvider', () => {
 
   it('provides dark theme by default when system is dark', async () => {
     mockGetColorScheme.mockReturnValue('dark');
-    renderWithTheme();
+    const r = await renderWithTheme();
 
-    const themeName = await screen.findByTestId('theme-name');
+    const themeName = await r.findByTestId('theme-name');
     expect(themeName.props.children).toBe('auto');
 
-    const bgColor = await screen.findByTestId('bg-color');
+    const bgColor = await r.findByTestId('bg-color');
     expect(bgColor.props.children).toBe(darkTheme.colors.background);
 
-    const textColor = await screen.findByTestId('text-color');
+    const textColor = await r.findByTestId('text-color');
     expect(textColor.props.children).toBe(darkTheme.colors.textPrimary);
 
-    const isDark = await screen.findByTestId('is-dark');
+    const isDark = await r.findByTestId('is-dark');
     expect(isDark.props.children).toBe('true');
   });
 
   it('provides light theme when system is light', async () => {
-    renderWithTheme();
+    const r = await renderWithTheme();
 
-    const bgColor = await screen.findByTestId('bg-color');
+    const bgColor = await r.findByTestId('bg-color');
     expect(bgColor.props.children).toBe(lightTheme.colors.background);
 
-    const textColor = await screen.findByTestId('text-color');
+    const textColor = await r.findByTestId('text-color');
     expect(textColor.props.children).toBe(lightTheme.colors.textPrimary);
 
-    const isDark = await screen.findByTestId('is-dark');
+    const isDark = await r.findByTestId('is-dark');
     expect(isDark.props.children).toBe('false');
   });
 
   it('toggles between dark and light theme', async () => {
-    renderWithTheme();
+    const r = await renderWithTheme();
 
-    await screen.findByTestId('bg-color');
+    await r.findByTestId('bg-color');
 
-    const initialBg = screen.getByTestId('bg-color').props.children;
-    const initialIsDark = screen.getByTestId('is-dark').props.children;
+    const initialBg = r.getByTestId('bg-color').props.children;
+    const initialIsDark = r.getByTestId('is-dark').props.children;
 
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('toggle-btn'));
-    });
+    await act(() => fireEvent.press(r.getByTestId('toggle-btn')));
 
     await waitFor(() => {
-      const newBg = screen.getByTestId('bg-color').props.children;
-      const newIsDark = screen.getByTestId('is-dark').props.children;
+      const newBg = r.getByTestId('bg-color').props.children;
+      const newIsDark = r.getByTestId('is-dark').props.children;
       expect(newBg).not.toBe(initialBg);
       expect(newIsDark).not.toBe(initialIsDark);
     });
   });
 
   it('cycles through auto -> dark -> light -> auto', async () => {
-    renderWithTheme();
+    const r = await renderWithTheme();
 
-    const themeName = await screen.findByTestId('theme-name');
+    const themeName = await r.findByTestId('theme-name');
     expect(themeName.props.children).toBe('auto');
 
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('cycle-btn'));
-    });
+    await act(() => fireEvent.press(r.getByTestId('cycle-btn')));
     await waitFor(() => {
-      expect(screen.getByTestId('theme-name').props.children).toBe('dark');
+      expect(r.getByTestId('theme-name').props.children).toBe('dark');
     });
 
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('cycle-btn'));
-    });
+    await act(() => fireEvent.press(r.getByTestId('cycle-btn')));
     await waitFor(() => {
-      expect(screen.getByTestId('theme-name').props.children).toBe('light');
+      expect(r.getByTestId('theme-name').props.children).toBe('light');
     });
 
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('cycle-btn'));
-    });
+    await act(() => fireEvent.press(r.getByTestId('cycle-btn')));
     await waitFor(() => {
-      expect(screen.getByTestId('theme-name').props.children).toBe('auto');
+      expect(r.getByTestId('theme-name').props.children).toBe('auto');
     });
   });
 
   it('follows live system theme changes while in auto mode', async () => {
     mockGetColorScheme.mockReturnValue('light');
-    renderWithTheme();
+    const r = await renderWithTheme();
 
-    await screen.findByTestId('bg-color');
-    expect(screen.getByTestId('bg-color').props.children).toBe(lightTheme.colors.background);
+    await r.findByTestId('bg-color');
+    expect(r.getByTestId('bg-color').props.children).toBe(lightTheme.colors.background);
 
     const handler = mockAddChangeListener.mock.calls[0][0] as unknown as (
       p: { colorScheme: string }
     ) => void;
 
-    await act(async () => {
-      handler({ colorScheme: 'dark' });
-    });
+    await act(() => handler({ colorScheme: 'dark' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('bg-color').props.children).toBe(darkTheme.colors.background);
-      expect(screen.getByTestId('is-dark').props.children).toBe('true');
+      expect(r.getByTestId('bg-color').props.children).toBe(darkTheme.colors.background);
+      expect(r.getByTestId('is-dark').props.children).toBe('true');
     });
   });
 
@@ -162,7 +152,7 @@ describe('ThemeProvider', () => {
       return null;
     };
 
-    expect(() => render(<OutsideComponent />)).toThrow(
+    await expect(render(<OutsideComponent />)).rejects.toThrow(
       'useTheme must be used within a ThemeProvider'
     );
 

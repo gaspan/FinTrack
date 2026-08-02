@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
+import dayjs from 'dayjs';
 import { useTheme, type Theme } from '@/constants/theme';
 import { formatRupiahShort } from '@/utils/format';
 import { EmptyState } from '../ui/EmptyState';
@@ -20,19 +21,22 @@ export const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ data }) =>
     );
   }
 
-  const barData = data.flatMap(d => [
-    {
-      value: d.income,
-      label: d.month.slice(0, 3),
-      spacing: 2,
-      labelWidth: 34,
-      frontColor: theme.colors.income,
-    },
-    {
-      value: d.expense,
-      frontColor: theme.colors.expense,
-    },
-  ]);
+  const barData = data.flatMap(d => {
+    const label = dayjs(d.month).format('MMM YY');
+    return [
+      {
+        value: d.income,
+        label,
+        spacing: 2,
+        labelWidth: 46,
+        frontColor: theme.colors.income,
+      },
+      {
+        value: d.expense,
+        frontColor: theme.colors.expense,
+      },
+    ];
+  });
 
   return (
     <View style={styles.container}>

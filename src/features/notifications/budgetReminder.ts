@@ -12,12 +12,13 @@ export async function checkBudgetAlerts(db: SQLiteDatabase) {
 
     for (const b of budgets) {
       if (!b.monthly_limit) continue;
-      const pct = (b.spent / b.monthly_limit) * 100;
+      const effectiveLimit = b.monthly_limit + (b.rollover_amount || 0);
+      const pct = (b.spent / effectiveLimit) * 100;
 
       if (pct >= 100) {
-        alerts.push(`⛔ "${b.category_name}" sudah melebihi batas (${formatRupiah(b.spent)} / ${formatRupiah(b.monthly_limit)})`);
+        alerts.push(`⛔ "${b.category_name}" sudah melebihi batas (${formatRupiah(b.spent)} / ${formatRupiah(effectiveLimit)})`);
       } else if (pct >= 90) {
-        alerts.push(`⚠️ "${b.category_name}" hampir habis (${pct.toFixed(0)}% terpakai, sisa ${formatRupiah(b.monthly_limit - b.spent)})`);
+        alerts.push(`⚠️ "${b.category_name}" hampir habis (${pct.toFixed(0)}% terpakai, sisa ${formatRupiah(effectiveLimit - b.spent)})`);
       }
     }
 

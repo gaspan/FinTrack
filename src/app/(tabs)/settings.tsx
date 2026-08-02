@@ -5,10 +5,13 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 
 import { useTheme, type Theme } from '@/constants/theme';
-import { exportBackup, importBackup } from '@/features/export/backupRestore';
+import { exportBackup, importBackup, LAST_BACKUP_DATE_KEY } from '@/features/export/backupRestore';
+import { AUTO_BACKUP_ENABLED_KEY, BACKUP_INTERVAL_KEY, LAST_AUTO_BACKUP_KEY, BACKUP_INTERVALS } from '@/features/cloud-backup/backupScheduler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CategoryQueries } from '@/lib/queries';
 import { Category, PayrollSettings } from '@/types';
+import dayjs from 'dayjs';
+import 'dayjs/locale/id';
 
 const SAFE_TO_SPEND_KEY = 'safe_to_spend_enabled';
 const PAYROLL_ENABLED_KEY = 'payroll_enabled';
@@ -28,6 +31,9 @@ export default function SettingsScreen() {
     salaryCategoryId: null,
   });
   const [incomeCategories, setIncomeCategories] = useState<Category[]>([]);
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
+  const [backupInterval, setBackupInterval] = useState(7);
+  const [lastBackupDate, setLastBackupDate] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => {
     AsyncStorage.getItem(SAFE_TO_SPEND_KEY).then((val) => {
@@ -47,6 +53,17 @@ export default function SettingsScreen() {
         salaryDay: day ? parseInt(day, 10) : 25,
         salaryCategoryId: categoryId ? parseInt(categoryId, 10) : null,
       });
+    });
+
+    Promise.all([
+      AsyncStorage.getItem(AUTO_BACKUP_ENABLED_KEY),
+      AsyncStorage.getItem(BACKUP_INTERVAL_KEY),
+      AsyncStorage.getItem(LAST_BACKUP_DATE_KEY),
+      AsyncStorage.getItem(LAST_AUTO_BACKUP_KEY),
+    ]).then(([autoEnabled, interval, lastManual, lastAuto]) => {
+      setAutoBackupEnabled(autoEnabled === 'true');
+      setBackupInterval(interval ? parseInt(interval, 10) : 7);
+      setLastBackupDate(lastAuto || lastManual);
     });
   }, [db]));
 
@@ -387,6 +404,70 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.itemSub}>{importing ? 'Memproses...' : ''}</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Auto Backup Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Backup Otomatis</Text>
+
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => {
+            const newVal = !autoBackupEnabled;
+            setAutoBackupEnabled(newVal);
+            AsyncStorage.setItem(AUTO_BACKUP_ENABLED_KEY, newVal ? 'true' : 'false');
+          }}
+        >
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#38BDF820' }]}>
+              <Ionicons name="refresh-circle-outline" size={20} color="#38BDF8" />
+            </View>
+            <View>
+              <Text style={styles.itemTitle}>Backup Otomatis</Text>
+              <Text style={styles.itemSub}>
+                {lastBackupDate
+                  ? `Backup terakhir: ${dayjs(lastBackupDate).locale('id').format('DD MMM YYYY')}`
+                  : 'Belum pernah backup otomatis'}
+              </Text>
+            </View>
+          </View>
+          <Ionicons
+            name={autoBackupEnabled ? 'checkbox' : 'square-outline'}
+            size={24}
+            color={theme.colors.primary}
+          />
+        </TouchableOpacity>
+
+        {autoBackupEnabled && (
+          <View style={styles.payrollConfig}>
+            <Text style={styles.payrollLabel}>Frekuensi backup</Text>
+            <View style={styles.categoryChips}>
+              {BACKUP_INTERVALS.map(opt => (
+                <TouchableOpacity
+                  key={opt.days}
+                  style={[
+                    styles.categoryChip,
+                    backupInterval === opt.days && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
+                  ]}
+                  onPress={() => {
+                    setBackupInterval(opt.days);
+                    AsyncStorage.setItem(BACKUP_INTERVAL_KEY, String(opt.days));
+                  }}
+                >
+                  <Text style={[
+                    styles.categoryChipText,
+                    backupInterval === opt.days && { color: theme.colors.primary, fontWeight: '600' }
+                  ]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.itemSub}>
+              Backup disimpan ke penyimpanan aplikasi (iOS: otomatis ke iCloud + Files; Android: pilih folder Google Drive sekali saat pertama kali)
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* About */}

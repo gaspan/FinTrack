@@ -17,19 +17,22 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 - **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan *Overview Donut Chart*, *Expense Category Donut Chart*, *Category Bar Chart*, dan *Grouped Monthly Trend Bar Chart* (6 bulan, menampilkan income & expense berdampingan — bukan hanya salah satu). Semua dalam satu kartu bertab yang menghemat ruang.
 - **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tandai satu dompet sebagai **Dompet Utama** (primary), tambah dompet baru dengan pilihan ikon dan warna, serta hapus dengan konfirmasi.
 - **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi *progress bar* visual dengan indikator warna (hijau <70%, kuning 70–90%, merah >90%). **Widget anggaran di dashboard** menampilkan 3 kategori teratas yang paling mendekati batas.
+- **🔄 Budget Rollover**: Aktifkan toggle **"Teruskan sisa ke bulan depan"** per kategori anggaran — sisa yang tidak terpakai otomatis ditambahkan ke limit bulan berikutnya (envelope budgeting). Engine berjalan otomatis saat app dibuka & setelah simpan budget, dengan indikator "Sisa bulan lalu +Rp X" di layar Anggaran dan dashboard. Alert 90%/100% dihitung terhadap *effective limit* (limit + rollover).
 - **📝 Pencatatan Cepat**: Tambah transaksi pemasukan atau pengeluaran hanya dalam beberapa ketukan. Mendukung auto-format mata uang (Rupiah), pemilihan kategori, dompet, dan tanggal.
 - **🩺 Kesehatan Finansial (Financial Literacy)**: Skor kesehatan keuangan 0-100 di dashboard berdasarkan rasio tabungan, dana darurat, budget adherence, dan analisis 50/30/20. Dilengkapi tips personal otomatis dari data transaksi Anda.
 - **🖼️ Lampiran Foto/Resi**: Lampirkan foto bukti transaksi langsung dari kamera atau galeri. Arsip digital untuk setiap transaksi dengan preview thumbnail.
 - **🏷️ Tag/Label per Transaksi**: Tambahkan tag bebas ke transaksi untuk kategorisasi alternatif. Dilengkapi autocomplete, filter chips di riwayat, dan tampilan detail.
 - **📄 Riwayat dengan Infinite Scroll**: Daftar transaksi menggunakan pagination otomatis (infinite scroll) dengan 40 item per halaman untuk performa lancar.
 - **📊 Insight & Spending Pattern**: Analisis perbandingan pengeluaran bulan lalu vs bulan ini per kategori, deteksi anomali (lonjakan >100%), dan alert defisit anggaran.
-- **🔄 Transaksi Berulang (Recurring)**: Buat transaksi otomatis berulang harian, mingguan, bulanan, atau tahunan. Engine berjalan otomatis saat aplikasi dibuka dan menangani periode yang terlewat.
+- **🔄 Transaksi Berulang (Recurring)**: Buat transaksi otomatis berulang harian, mingguan, bulanan, atau tahunan — mendukung tipe **pemasukan** (gaji) maupun pengeluaran. Engine berjalan otomatis saat aplikasi dibuka dan menangani periode yang terlewat.
+- **💰 Gaji Otomatis (Auto-Salary)**: Terintegrasi dengan **Periode Gaji** di Pengaturan. Banner **"Atur gaji otomatis?"** muncul di layar Transaksi Berulang (nominal rata-rata 3 bulan terakhir + tanggal gaji berikutnya di-pre-fill otomatis). Setelah menambah pemasukan kategori gaji, aplikasi menawarkan menjadikannya transaksi berulang. **Forecast 30 hari & Safe to Spend** kini memperhitungkan gaji yang akan datang (tanpa double-counting jika recurring income sudah aktif).
 - **📂 Ekspor Laporan**: Ekspor data transaksi ke format **Excel (`.xlsx`)** untuk analisis mendalam, atau **PDF** untuk laporan siap bagikan dengan desain gradient header dan bagan warna.
 - **🔍 Detail & Edit Transaksi**: Lihat detail lengkap transaksi, edit nominal/kategori/dompet, atau hapus transaksi (dengan pembalikan saldo otomatis).
 - **💰 Transfer antar Dompet**: Pindahkan dana dari satu dompet ke dompet lain dengan mudah. Saldo otomatis terupdate di kedua dompet.
 - **🔍 Pencarian & Filter**: Cari transaksi berdasarkan catatan/ nama kategori, filter berdasarkan kategori, dompet, tipe, atau **rentang tanggal multi-bulan**.
 - **📂 Kustomisasi Kategori**: Tambah, edit, atau hapus kategori transaksi sendiri dengan pilihan ikon dan warna.
-- **💾 Backup & Restore**: Ekspor seluruh data ke JSON untuk cadangan, atau impor dari file JSON untuk memulihkan data. Support tabel baru (goals, reminders).
+- **💾 Backup & Restore**: Ekspor seluruh data ke JSON untuk cadangan, atau impor dari file JSON untuk memulihkan data. Support tabel baru (goals, reminders, rollover budget).
+- **☁️ Backup Otomatis (Cloud)**: Section **"Backup Otomatis"** baru di Pengaturan — jadwal **Harian/Mingguan/Bulanan** otomatis setiap app dibuka. Di iOS file backup tampil di **Files & iCloud** (via konfigurasi `expo-file-system`), di Android bisa disimpan langsung ke **Google Drive** (izin folder sekali, URI tersimpan). Pengingat otomatis muncul jika >7 hari tanpa backup & auto-backup nonaktif.
 - **📱 Onboarding**: Panduan 3 langkah untuk pengguna baru saat pertama kali membuka aplikasi.
 - **✏️ Edit Cepat**: Long-press pada item transaksi di daftar untuk langsung Edit atau Hapus tanpa perlu masuk ke halaman detail.
 - **🎉 Animasi Sukses**: Checkmark animasi memuaskan setelah berhasil menyimpan transaksi baru.
@@ -49,7 +52,7 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 - **📊 Kekayaan Bersih (Net Worth)**: Pantau total kekayaan bersih secara real-time (saldo wallet + aset manual — utang). Dilengkapi **sparkline SVG tren 12 bulan** langsung di kartu ringkas dashboard, line chart di halaman detail, dan snapshot otomatis setiap bulan.
 - **📅 Kalender Transaksi**: Lihat transaksi harian dalam tampilan kalender grid 7×6 dengan dot indikator. Tap hari untuk melihat detail transaksi via bottom sheet. Navigasi bulan dengan swipe gesture.
 - **🔁 Manajemen Langganan (Subscriptions)**: Catat semua langganan (Netflix, Spotify, dll) dengan siklus bulanan/tahunan. Engine auto-create transaksi saat tagihan jatuh tempo + reminder H-1 via kalender. Total biaya bulanan otomatis dihitung.
-- **💰 Sisa Budget Harian (Safe to Spend)**: Proyeksi sisa saldo yang aman dibelanjakan per hari dalam **kartu ringkas** dengan progress bar visual. Berdasarkan saldo, tagihan mendatang, dan target tabungan. Toggle on/off di pengaturan. Dilengkapi halaman forecast 30 hari dengan line chart.
+- **💰 Sisa Budget Harian (Safe to Spend)**: Proyeksi sisa saldo yang aman dibelanjakan per hari dalam **kartu ringkas** dengan progress bar visual. Berdasarkan saldo, tagihan mendatang, target tabungan, **dan gaji yang akan datang dalam bulan berjalan**. Toggle on/off di pengaturan. Dilengkapi halaman forecast 30 hari dengan line chart.
 
 ---
 
@@ -73,10 +76,10 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 
 ## 🛠️ Teknologi yang Digunakan
 
-* **Framework**: React Native 0.86 & Expo SDK ~57
+* **Framework**: React Native 0.86 & Expo SDK ~57 (React 19.2.4)
 * **Routing**: Expo Router (File-based routing)
 * **Bahasa**: TypeScript
-* **Database**: `expo-sqlite` (Lokal Database)
+* **Database**: `expo-sqlite` (SQLite lokal, migrasi v5 — kolom rollover pada `budgets`; `PRAGMA journal_mode=WAL` + `busy_timeout` untuk mencegah lock saat akses konkuren)
 * **Visualisasi Data**: `react-native-gifted-charts`
 * **Date Picker**: `react-native-ui-datepicker`
 * **Manajemen Tanggal**: `dayjs`
@@ -92,6 +95,7 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 * **Pemilih Berkas**: `expo-document-picker` (Impor CSV)
 * **Parsing CSV**: `papaparse`
 * **Penyimpanan Lokal**: `@react-native-async-storage/async-storage`
+* **Unit Testing**: `jest` + `jest-expo` + `@testing-library/react-native` + `test-renderer`
 * **Path Alias**: `@/` → `./src/`
 
 ---
@@ -127,6 +131,28 @@ Pastikan Anda sudah menginstal:
    - Tekan `a` untuk membuka di Android Emulator.
    - Tekan `i` untuk membuka di iOS Simulator.
    - Scan **QR Code** yang muncul di terminal menggunakan aplikasi Expo Go di HP Anda.
+
+---
+
+## 🧪 Testing
+
+Jalankan seluruh unit test (engine + query + UI theme):
+
+```bash
+npm test
+```
+
+| File Test | Cakupan |
+|-----------|---------|
+| `src/__tests__/rollover.test.ts` | RolloverEngine — carryover sisa, tanpa carryover negatif, mempertahankan limit bulan berjalan, toggle off, tanpa budget bulan lalu |
+| `src/__tests__/salary.test.ts` | Proyeksi gaji — payroll off, tanpa kategori/transaksi gaji, rata-rata 3 bulan, filter kategori |
+| `src/__tests__/forecast.test.ts` | Forecast 30 hari & Safe to Spend — injeksi gaji, anti double-counting, recurring expense, batas bulan |
+| `src/__tests__/backup.test.ts` | Backup — gather data, backup lokal, share sheet, scheduler (interval), Google Drive SAF |
+| `src/__tests__/theme.test.tsx` | ThemeProvider — dark/light/auto, live system theme, cycle, error outside provider |
+
+Skenario **test manual** lengkap (28 kasus) tersedia di [`MANUAL_TEST_CASES.md`](./MANUAL_TEST_CASES.md) — mencakup Budget Rollover, Recurring Income (Auto-Salary), dan Cloud Backup.
+
+> Catatan: dependensi testing memakai `overrides` `@react-native/jest-preset` di `package.json` dan React `19.2.4` agar `npm ci` (dipakai EAS Build) dapat resolve peer dependency secara ketat.
 
 ---
 
@@ -167,16 +193,20 @@ FinTrack/
 │   ├── constants/              # Tema (dark mode), kategori default, dompet default
 │   ├── features/               # Modul fitur
 │   │   ├── recurring/          # Engine transaksi berulang
+│   │   ├── rollover/           # Engine budget rollover
+│   │   ├── cloud-backup/       # Scheduler backup otomatis, reminder, cloud storage (Google Drive/iCloud)
 │   │   ├── insights/           # Spending insights, financial literacy engine & card
 │   │   ├── export/             # Generator PDF, Excel, dan backup/restore JSON
-│   │   ├── forecast/           # Safe to spend & forecast engine
+│   │   ├── forecast/           # Safe to spend & forecast engine (aware gaji)
 │   │   └── notifications/      # Kalender sync & budget reminder
-│   ├── lib/                    # SQLite schema, migration, seed, query classes
+│   ├── lib/                    # SQLite schema, migration (v1–v5), seed, query classes
 │   ├── types/                  # Definisi tipe TypeScript global
-│   └── utils/                  # Format Rupiah, haptic feedback, utilitas lainnya
+│   ├── utils/                  # Format Rupiah, haptic, payroll period, proyeksi gaji (salary.ts)
+│   └── __tests__/              # Unit test (Jest + Testing Library)
 ├── assets/                     # Gambar, icon, dan font statis
-├── app.json                    # Konfigurasi Expo aplikasi
+├── app.json                    # Konfigurasi Expo aplikasi (termasuk plugin expo-file-system)
 ├── eas.json                    # Konfigurasi EAS Build
+├── MANUAL_TEST_CASES.md        # Skenario test manual
 ├── package.json                # Dependensi dan script NPM
 └── tsconfig.json               # Konfigurasi TypeScript
 ```
@@ -190,8 +220,6 @@ Berikut fitur-fitur yang sedang direncanakan untuk pengembangan selanjutnya:
 - 💱 **Multi Mata Uang** — dukung mata uang selain IDR dengan kurs dinamis
 - 💳 **Pencatatan Utang/Piutang (Debt Tracking)** — catat siapa yang berutang atau memberi utang
 - 📊 **Split Transaksi** — satu transaksi dibagi ke beberapa kategori
-- 🔄 **Budget Rollover** — sisa anggaran bulan lalu otomatis ditambahkan ke bulan ini
-- ☁️ **Backup Cloud (iCloud/Google Drive)** — sinkronisasi cadangan otomatis
 - 📥 **Export CSV** — ekspor data transaksi ke format CSV
 - 📱 **Widget Home Screen** — ringkasan cepat di layar utama HP Android/iOS
 

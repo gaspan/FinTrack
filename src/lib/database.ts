@@ -3,7 +3,13 @@ import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { DEFAULT_WALLETS } from '../constants/wallets';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 4;
+  const DATABASE_VERSION = 5;
+
+  // Wait for locks instead of aborting with "database is locked" when
+  // concurrent queries race with a write transaction (expo-sqlite on Android).
+  await db.execAsync('PRAGMA busy_timeout = 5000');
+  // WAL allows reads to proceed while a writer holds the lock.
+  await db.getFirstAsync('PRAGMA journal_mode = WAL');
 
   let { user_version: currentDbVersion } = await db.getFirstAsync<{ user_version: number }>(
     'PRAGMA user_version'
@@ -270,6 +276,15 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     });
 
     currentDbVersion = 4;
+  }
+
+  if (currentDbVersion === 4) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`ALTER TABLE budgets ADD COLUMN rollover_amount REAL DEFAULT 0;`);
+      await db.execAsync(`ALTER TABLE budgets ADD COLUMN rollover_enabled INTEGER DEFAULT 0;`);
+    });
+
+    currentDbVersion = 5;
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

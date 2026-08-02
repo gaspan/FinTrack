@@ -15,6 +15,7 @@ export interface BudgetRow {
   color: string;
   monthly_limit: number;
   spent: number;
+  rollover_amount?: number;
 }
 
 interface BudgetProgressCardProps {
@@ -35,7 +36,11 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
   };
 
   const top = [...budgets]
-    .sort((a, b) => b.spent / (b.monthly_limit || 1) - a.spent / (a.monthly_limit || 1))
+    .sort((a, b) => {
+      const la = a.monthly_limit + (a.rollover_amount || 0);
+      const lb = b.monthly_limit + (b.rollover_amount || 0);
+      return b.spent / (la || 1) - a.spent / (lb || 1);
+    })
     .slice(0, 3);
 
   return (
@@ -47,7 +52,8 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
       />
       <Card>
         {top.map((b, i) => {
-          const pct = b.monthly_limit > 0 ? (b.spent / b.monthly_limit) * 100 : 0;
+          const effectiveLimit = b.monthly_limit + (b.rollover_amount || 0);
+          const pct = effectiveLimit > 0 ? (b.spent / effectiveLimit) * 100 : 0;
           const color = statusColor(pct);
           return (
             <View key={b.id} style={i > 0 ? styles.rowSpaced : undefined}>
@@ -66,7 +72,7 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
               </View>
               <ProgressBar progress={pct} color={color} height={7} />
               <Text style={styles.amount}>
-                {formatRupiah(b.spent)} / {formatRupiah(b.monthly_limit)}
+                {formatRupiah(b.spent)} / {formatRupiah(effectiveLimit)}
               </Text>
             </View>
           );
