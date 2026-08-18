@@ -10,6 +10,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { migrateDbIfNeeded } from '@/lib/database';
 import { ThemeProvider, useTheme } from '@/constants/theme';
+import { getStoredPin } from '@/lib/lockStorage';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { bootCheckpoint, getLastBootStep } from '@/lib/bootLog';
+import { Alert } from 'react-native';
+
+bootCheckpoint('module_eval');
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,8 +37,18 @@ function RootContent() {
     async function init() {
       try {
         if (!loaded) return;
+
+        const lastStep = await getLastBootStep();
+        if (lastStep && lastStep !== 'ok' && lastStep !== 'module_eval') {
+          Alert.alert('Diagnostik boot', `Boot terakhir berhenti di langkah:\n${lastStep}`);
+        }
+
+        await bootCheckpoint('fonts_loaded');
         const done = await AsyncStorage.getItem('onboarding_done');
-        const pin = await AsyncStorage.getItem('app_pin_hash');
+        await bootCheckpoint('onboarding_read');
+        let pin: string | null = null;
+        try { pin = await getStoredPin(); } catch { pin = null; }
+        await bootCheckpoint('pin_read');
         if (!isMounted) return;
 
         SplashScreen.hideAsync();
@@ -45,6 +61,7 @@ function RootContent() {
         }
       } catch (e) {
         console.error('Init error:', e);
+        bootCheckpoint('init_error: ' + (e as Error).message);
         if (isMounted) {
           setInitError(e as Error);
           SplashScreen.hideAsync();
@@ -65,8 +82,10 @@ function RootContent() {
   return (
     <NavThemeProvider value={navTheme}>
       {initError ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
-          <Text style={{ color: theme.colors.textPrimary }}>Gagal memuat aplikasi. Silakan restart.</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background, padding: 24 }}>
+          <Text style={{ color: theme.colors.textPrimary, textAlign: 'center' }}>
+            Gagal memuat aplikasi.{'\n\n'}{initError.message}
+          </Text>
         </View>
       ) : (
         <>
@@ -75,7 +94,15 @@ function RootContent() {
               <ActivityIndicator size="large" color={theme.colors.primary} />
             </View>
           }>
-            <SQLiteProvider databaseName="fintrack.db" onInit={migrateDbIfNeeded} useSuspense>
+            <SQLiteProvider
+              databaseName="fintrack.db"
+              useSuspense
+              onInit={async (db) => {
+                await bootCheckpoint('db_init_start');
+                await migrateDbIfNeeded(db);
+                await bootCheckpoint('db_init_done');
+              }}
+            >
               <Stack screenOptions={{
                 headerStyle: { backgroundColor: theme.colors.surfaceElevated },
                 headerTintColor: theme.colors.textPrimary,
@@ -109,8 +136,10 @@ function RootContent() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <RootContent />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <RootContent />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

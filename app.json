@@ -50,7 +50,9 @@
           "photosPermission": "Izinkan $(PRODUCT_NAME) mengakses galeri untuk melampirkan foto transaksi",
           "cameraPermission": "Izinkan $(PRODUCT_NAME) mengakses kamera untuk mengambil foto transaksi"
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true

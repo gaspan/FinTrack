@@ -45,24 +45,44 @@ export default function TransferScreen() {
 
     try {
       setLoading(true);
-      const expenseCat = await db.getFirstAsync<{ id: number }>(
+      let expenseCat = await db.getFirstAsync<{ id: number }>(
         "SELECT id FROM categories WHERE type = 'expense' AND name = 'Lainnya' LIMIT 1"
       );
-      const incomeCat = await db.getFirstAsync<{ id: number }>(
+      if (!expenseCat) {
+        await db.runAsync(
+          "INSERT INTO categories (name, type, icon, color, sort_order) VALUES ('Lainnya', 'expense', 'swap-horizontal-outline', '#94A3B8', 999)"
+        );
+        expenseCat = await db.getFirstAsync<{ id: number }>(
+          "SELECT id FROM categories WHERE type = 'expense' AND name = 'Lainnya' LIMIT 1"
+        );
+      }
+      let incomeCat = await db.getFirstAsync<{ id: number }>(
         "SELECT id FROM categories WHERE type = 'income' AND name = 'Lainnya' LIMIT 1"
       );
+      if (!incomeCat) {
+        await db.runAsync(
+          "INSERT INTO categories (name, type, icon, color, sort_order) VALUES ('Lainnya', 'income', 'swap-horizontal-outline', '#94A3B8', 999)"
+        );
+        incomeCat = await db.getFirstAsync<{ id: number }>(
+          "SELECT id FROM categories WHERE type = 'income' AND name = 'Lainnya' LIMIT 1"
+        );
+      }
       if (!expenseCat || !incomeCat) throw new Error('Kategori tidak ditemukan');
+
+      const transferId = Date.now();
+      const txNote = notes ? `Transfer: ${notes}` : 'Transfer antar dompet';
+      const txDate = dayjs().format('YYYY-MM-DD');
 
       await db.withTransactionAsync(async () => {
         await db.runAsync('UPDATE wallets SET balance = balance - ? WHERE id = ?', [amount, sourceId]);
         await db.runAsync('UPDATE wallets SET balance = balance + ? WHERE id = ?', [amount, targetId]);
         await db.runAsync(
-          'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes) VALUES (?, ?, ?, ?, ?, ?)',
-          ['expense', amount, expenseCat.id, sourceId, dayjs().format('YYYY-MM-DD'), notes ? `Transfer: ${notes}` : 'Transfer antar dompet']
+          'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes, transfer_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          ['expense', amount, expenseCat.id, sourceId, txDate, txNote, transferId]
         );
         await db.runAsync(
-          'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes) VALUES (?, ?, ?, ?, ?, ?)',
-          ['income', amount, incomeCat.id, targetId, dayjs().format('YYYY-MM-DD'), notes ? `Transfer: ${notes}` : 'Transfer antar dompet']
+          'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes, transfer_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          ['income', amount, incomeCat.id, targetId, txDate, txNote, transferId]
         );
       });
       Alert.alert('Berhasil', 'Transfer berhasil dilakukan.', [{ text: 'OK', onPress: () => router.back() }]);

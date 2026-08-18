@@ -2,6 +2,7 @@ import { SQLiteDatabase } from 'expo-sqlite';
 import { Alert } from 'react-native';
 import { BudgetQueries } from '@/lib/queries';
 import { formatRupiah } from '@/utils/format';
+import { scheduleBudgetAlert } from './localNotifications';
 
 export async function checkBudgetAlerts(db: SQLiteDatabase) {
   try {
@@ -16,9 +17,13 @@ export async function checkBudgetAlerts(db: SQLiteDatabase) {
       const pct = (b.spent / effectiveLimit) * 100;
 
       if (pct >= 100) {
-        alerts.push(`⛔ "${b.category_name}" sudah melebihi batas (${formatRupiah(b.spent)} / ${formatRupiah(effectiveLimit)})`);
+        const msg = `⛔ "${b.category_name}" sudah melebihi batas (${formatRupiah(b.spent)} / ${formatRupiah(effectiveLimit)})`;
+        alerts.push(msg);
+        scheduleBudgetAlert(b.category_name, b.spent, effectiveLimit, pct).catch(() => {});
       } else if (pct >= 90) {
-        alerts.push(`⚠️ "${b.category_name}" hampir habis (${pct.toFixed(0)}% terpakai, sisa ${formatRupiah(effectiveLimit - b.spent)})`);
+        const msg = `⚠️ "${b.category_name}" hampir habis (${pct.toFixed(0)}% terpakai, sisa ${formatRupiah(effectiveLimit - b.spent)})`;
+        alerts.push(msg);
+        scheduleBudgetAlert(b.category_name, b.spent, effectiveLimit, pct).catch(() => {});
       }
     }
 

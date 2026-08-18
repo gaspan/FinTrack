@@ -27,6 +27,7 @@ export interface Transaction {
   transaction_date: string;
   notes: string | null;
   recurring_id: number | null;
+  transfer_id?: number | null;
   created_at: string;
 }
 

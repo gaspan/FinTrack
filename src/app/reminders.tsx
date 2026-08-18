@@ -11,6 +11,7 @@ import { useTheme, type Theme } from '@/constants/theme';
 import { BillReminderQueries, CategoryQueries, WalletQueries } from '@/lib/queries';
 import { BillReminder, Category, Wallet } from '@/types';
 import { syncBillToCalendar, deleteEventFromCalendar, updateEventInCalendar } from '@/features/notifications/calendarSync';
+import { scheduleBillReminder, cancelBillReminder } from '@/features/notifications/localNotifications';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { NumericInput } from '@/components/ui/NumericInput';
@@ -105,6 +106,7 @@ export default function RemindersScreen() {
           if (newBill) {
             const eventId = await syncBillToCalendar(newBill);
             if (eventId) await q.updateCalendarEventId(newId, eventId);
+            scheduleBillReminder(newId, newBill.name, newBill.due_date).catch(() => {});
           }
         } catch {}
       }
@@ -126,6 +128,7 @@ export default function RemindersScreen() {
         if (bill?.calendar_event_id) {
           try { await deleteEventFromCalendar(bill.calendar_event_id); } catch {}
         }
+        cancelBillReminder(id).catch(() => {});
         loadData();
       }},
     ]);

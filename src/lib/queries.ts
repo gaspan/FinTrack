@@ -84,7 +84,7 @@ export class TransactionQueries {
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
       JOIN wallets w ON t.wallet_id = w.id
-      WHERE t.transaction_date >= ? AND t.transaction_date <= ?
+      WHERE t.transaction_date >= ? AND t.transaction_date <= ? AND t.transfer_id IS NULL
       ORDER BY t.transaction_date DESC, t.created_at DESC
     `, [startDate, endDate]);
   }
@@ -362,7 +362,7 @@ export class ChartQueries {
         c.color 
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
-      WHERE t.type = ? AND t.transaction_date >= ? AND t.transaction_date <= ?
+      WHERE t.type = ? AND t.transaction_date >= ? AND t.transaction_date <= ? AND t.transfer_id IS NULL
       GROUP BY c.id
       ORDER BY total DESC
     `, [type, startDate, endDate]);
@@ -370,10 +370,10 @@ export class ChartQueries {
 
   async getSummary(startDate: string, endDate: string) {
     const income = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT SUM(amount) as total FROM transactions WHERE type = 'income' AND transaction_date >= ? AND transaction_date <= ?
+      SELECT SUM(amount) as total FROM transactions WHERE type = 'income' AND transaction_date >= ? AND transaction_date <= ? AND transfer_id IS NULL
     `, [startDate, endDate]);
     const expense = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT SUM(amount) as total FROM transactions WHERE type = 'expense' AND transaction_date >= ? AND transaction_date <= ?
+      SELECT SUM(amount) as total FROM transactions WHERE type = 'expense' AND transaction_date >= ? AND transaction_date <= ? AND transfer_id IS NULL
     `, [startDate, endDate]);
 
     return {
@@ -395,9 +395,10 @@ export class BudgetQueries {
         COALESCE(SUM(t.amount), 0) as spent
       FROM budgets b
       JOIN categories c ON b.category_id = c.id
-      LEFT JOIN transactions t ON t.category_id = c.id 
+        LEFT JOIN transactions t ON t.category_id = c.id 
         AND t.transaction_date LIKE ? 
         AND t.type = 'expense'
+        AND t.transfer_id IS NULL
       WHERE b.month = ?
       GROUP BY b.id
     `, [`${month}%`, month]);
@@ -657,6 +658,7 @@ export class InsightQueries {
         COALESCE(SUM(CASE WHEN strftime('%Y-%m', t.transaction_date) = ? THEN t.amount ELSE 0 END), 0) as prev_total
       FROM categories c
       LEFT JOIN transactions t ON c.id = t.category_id AND t.type = 'expense'
+        AND t.transfer_id IS NULL
         AND (strftime('%Y-%m', t.transaction_date) = ? OR strftime('%Y-%m', t.transaction_date) = ?)
       WHERE c.type = 'expense'
       GROUP BY c.id
@@ -690,6 +692,7 @@ export class InsightQueries {
         COALESCE(SUM(CASE WHEN strftime('%Y-%m', t.transaction_date) = ? THEN t.amount ELSE 0 END), 0) as current_amount
       FROM categories c
       LEFT JOIN transactions t ON c.id = t.category_id AND t.type = 'expense'
+        AND t.transfer_id IS NULL
       WHERE c.type = 'expense'
       GROUP BY c.id
       HAVING current_amount > avg_amount * 2 AND avg_amount > 0
@@ -711,7 +714,7 @@ export class InsightQueries {
         strftime('%Y-%m', transaction_date) as month,
         SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as flow
       FROM transactions
-      WHERE transaction_date >= date('now', '-5 months')
+      WHERE transaction_date >= date('now', '-5 months') AND transfer_id IS NULL
       GROUP BY strftime('%Y-%m', transaction_date)
       ORDER BY month ASC
     `);
@@ -746,17 +749,17 @@ export class InsightQueries {
 
     const income = await this.db.getFirstAsync<{ total: number }>(`
       SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE type = 'income' AND strftime('%Y-%m', transaction_date) = ?
+      WHERE type = 'income' AND strftime('%Y-%m', transaction_date) = ? AND transfer_id IS NULL
     `, [currentMonth]);
 
     const expense = await this.db.getFirstAsync<{ total: number }>(`
       SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE type = 'expense' AND strftime('%Y-%m', transaction_date) = ?
+      WHERE type = 'expense' AND strftime('%Y-%m', transaction_date) = ? AND transfer_id IS NULL
     `, [currentMonth]);
 
     const avgExpense = await this.db.getFirstAsync<{ avg: number; total: number }>(`
       SELECT COALESCE(SUM(amount), 0) / 3.0 as avg, COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE type = 'expense' AND strftime('%Y-%m', transaction_date) >= ?
+      WHERE type = 'expense' AND strftime('%Y-%m', transaction_date) >= ? AND transfer_id IS NULL
     `, [threeMosAgo]);
 
     const balance = await this.db.getFirstAsync<{ total: number }>(`
@@ -769,6 +772,7 @@ export class InsightQueries {
         SELECT COALESCE(SUM(t.amount), 0) FROM transactions t
         WHERE t.category_id = b.category_id AND t.type = 'expense'
         AND strftime('%Y-%m', t.transaction_date) = b.month
+        AND t.transfer_id IS NULL
       )
     `, [currentMonth]);
 
@@ -780,7 +784,7 @@ export class InsightQueries {
       SELECT c.name, COALESCE(SUM(t.amount), 0) as total
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
-      WHERE t.type = 'expense' AND strftime('%Y-%m', t.transaction_date) = ?
+      WHERE t.type = 'expense' AND strftime('%Y-%m', t.transaction_date) = ? AND t.transfer_id IS NULL
       GROUP BY c.id
       ORDER BY total DESC
     `, [currentMonth]);
@@ -814,7 +818,7 @@ export class TrendQueries {
         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
         SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
       FROM transactions
-      WHERE transaction_date >= date('now', ?||' months')
+      WHERE transaction_date >= date('now', ?||' months') AND transfer_id IS NULL
       GROUP BY strftime('%Y-%m', transaction_date)
       ORDER BY month ASC
     `, [`-${months}`]);
@@ -832,7 +836,7 @@ export class TrendQueries {
         strftime('%Y-%m', transaction_date) as month,
         SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as flow
       FROM transactions
-      WHERE transaction_date >= date('now', '-12 months') ${whereClause}
+      WHERE transaction_date >= date('now', '-12 months') AND transfer_id IS NULL ${whereClause}
       GROUP BY strftime('%Y-%m', transaction_date)
       ORDER BY month ASC
     `, params);

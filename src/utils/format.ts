@@ -3,6 +3,7 @@ import { TransactionWithDetails } from '@/types';
 export const calculateTransactionTotals = (transactions: TransactionWithDetails[]) => {
   const result = transactions.reduce(
     (acc, tx) => {
+      if (tx.transfer_id) return acc;
       if (tx.type === 'income') {
         acc.totalIncome += tx.amount;
       } else {

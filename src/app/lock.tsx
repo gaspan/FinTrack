@@ -1,41 +1,17 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { getStoredPin, isBiometricEnabled, clearPinLock, hashPin } from '@/lib/lockStorage';
+import { BIOMETRIC_KEY, PIN_SECURE_KEY } from '@/lib/lockStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
-const PIN_STORAGE_KEY = 'app_pin_hash';
-const BIOMETRIC_KEY = 'app_biometric_enabled';
-
-function hashPin(pin: string): string {
-  let hash = 0;
-  for (let i = 0; i < pin.length; i++) {
-    const char = pin.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0;
-  }
-  return 'pin_' + Math.abs(hash).toString(36);
-}
-
-export async function getStoredPin(): Promise<string | null> {
-  try { return await AsyncStorage.getItem(PIN_STORAGE_KEY); }
-  catch { return null; }
-}
-
-export async function isBiometricEnabled(): Promise<boolean> {
-  try { return (await AsyncStorage.getItem(BIOMETRIC_KEY)) === 'true'; }
-  catch { return false; }
-}
-
-export async function clearPinLock() {
-  try {
-    await AsyncStorage.multiRemove([PIN_STORAGE_KEY, BIOMETRIC_KEY]);
-  } catch {}
-}
+export { getStoredPin, isBiometricEnabled, clearPinLock };
 
 export default function LockSettingsScreen() {
   const { theme } = useTheme();
@@ -62,12 +38,14 @@ export default function LockSettingsScreen() {
 
     if (hasPin) {
       const stored = await getStoredPin();
-      if (hashPin(currentPin) !== stored) { Alert.alert('Error', 'PIN saat ini salah'); return; }
+      const currentHash = await hashPin(currentPin);
+      if (currentHash !== stored) { Alert.alert('Error', 'PIN saat ini salah'); return; }
     }
 
     try {
       setLoading(true);
-      await AsyncStorage.setItem(PIN_STORAGE_KEY, hashPin(newPin));
+      const newHash = await hashPin(newPin);
+      await SecureStore.setItemAsync(PIN_SECURE_KEY, newHash);
       await AsyncStorage.setItem(BIOMETRIC_KEY, biometric ? 'true' : 'false');
       Alert.alert('Berhasil', 'PIN berhasil disimpan.');
       setHasPin(true);

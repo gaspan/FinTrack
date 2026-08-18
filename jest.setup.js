@@ -49,6 +49,12 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
   requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
   setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(),
+  getAllScheduledNotificationsAsync: jest.fn().mockResolvedValue([]),
+  cancelAllScheduledNotificationsAsync: jest.fn(),
+  cancelScheduledNotificationAsync: jest.fn(),
+  AndroidImportance: { HIGH: 4 },
+  SchedulableTriggerInputTypes: { DATE: 'DATE', DAILY: 'DAILY', TIME_INTERVAL: 'TIME_INTERVAL' },
 }));
 
 jest.mock('expo-calendar', () => ({
@@ -105,6 +111,17 @@ jest.mock('expo-file-system/legacy', () => ({
 
 jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn().mockResolvedValue({ cancelled: false, assets: [] }),
+}));
+
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn().mockResolvedValue(null),
+  setItemAsync: jest.fn().mockResolvedValue(undefined),
+  deleteItemAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('expo-crypto', () => ({
+  digestStringAsync: jest.fn().mockResolvedValue('mock_hash'),
+  CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
 }));
 
 jest.mock('xlsx', () => ({

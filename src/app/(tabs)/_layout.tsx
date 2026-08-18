@@ -10,6 +10,14 @@ import { checkBudgetAlerts } from '@/features/notifications/budgetReminder';
 import { RolloverEngine } from '@/features/rollover/rolloverEngine';
 import { checkAndBackup } from '@/features/cloud-backup/backupScheduler';
 import { checkBackupReminder } from '@/features/cloud-backup/backupReminder';
+import { reconcileWalletBalances } from '@/features/wallets/reconcile';
+import {
+  configureNotificationHandler,
+  setupNotificationChannels,
+  requestNotificationPermission,
+  rescheduleAllReminders,
+} from '@/features/notifications/localNotifications';
+import { bootCheckpoint, markBootOk } from '@/lib/bootLog';
 import { SubscriptionQueries, NetWorthQueries } from '@/lib/queries';
 import { FAB } from '@/components/ui/FAB';
 
@@ -18,15 +26,26 @@ export default function TabLayout() {
   const db = useSQLiteContext();
 
   useEffect(() => {
+    bootCheckpoint('tabs_mounted');
+    configureNotificationHandler();
+    setupNotificationChannels();
+    requestNotificationPermission();
+
     const engine = new RecurringEngine(db);
     engine.processRecurringTransactions()
       .then(() => new RolloverEngine(db).process())
       .then(() => checkBudgetAlerts(db))
       .then(() => new SubscriptionQueries(db).processRenewals())
       .then(() => new NetWorthQueries(db).ensureMonthlySnapshot())
+      .then(() => reconcileWalletBalances(db))
+      .then(() => rescheduleAllReminders(db))
       .then(() => checkAndBackup(db))
       .then(() => checkBackupReminder())
-      .catch(console.error);
+      .then(() => markBootOk())
+      .catch((e) => {
+        console.error(e);
+        bootCheckpoint('engine_error: ' + (e as Error).message);
+      });
   }, [db]);
 
   return (

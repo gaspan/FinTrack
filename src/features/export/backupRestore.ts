@@ -7,6 +7,12 @@ import dayjs from 'dayjs';
 
 export const LAST_BACKUP_DATE_KEY = 'last_backup_date';
 
+const SETTINGS_KEYS = [
+  'safe_to_spend_enabled', 'payroll_enabled', 'payroll_day', 'payroll_category_id',
+  'app_pin_hash', 'app_biometric_enabled', 'auto_backup_enabled', 'backup_interval',
+  'last_backup_date', 'last_auto_backup_date', 'onboarding_done',
+];
+
 interface BackupData {
   version: number;
   exportedAt: string;
@@ -21,10 +27,14 @@ interface BackupData {
   liabilities?: any[];
   net_worth_snapshots?: any[];
   subscriptions?: any[];
+  tags?: any[];
+  transaction_tags?: any[];
+  transaction_attachments?: any[];
+  settings?: Record<string, string | null>;
 }
 
 export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> {
-  const [wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs] = await Promise.all([
+  const [wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs, tags, tagLinks, attachments] = await Promise.all([
     db.getAllAsync('SELECT * FROM wallets'),
     db.getAllAsync('SELECT * FROM categories'),
     db.getAllAsync('SELECT * FROM transactions'),
@@ -36,10 +46,18 @@ export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> 
     db.getAllAsync('SELECT * FROM liabilities'),
     db.getAllAsync('SELECT * FROM net_worth_snapshots'),
     db.getAllAsync('SELECT * FROM subscriptions'),
+    db.getAllAsync('SELECT * FROM tags'),
+    db.getAllAsync('SELECT * FROM transaction_tags'),
+    db.getAllAsync('SELECT * FROM transaction_attachments'),
   ]);
 
+  const settings: Record<string, string | null> = {};
+  for (const key of SETTINGS_KEYS) {
+    settings[key] = await AsyncStorage.getItem(key);
+  }
+
   return {
-    version: 3,
+    version: 4,
     exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     wallets, categories, transactions, budgets,
     recurring_transactions: recurring,
@@ -48,6 +66,8 @@ export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> 
     assets, liabilities,
     net_worth_snapshots: snapshots,
     subscriptions: subs,
+    tags, transaction_tags: tagLinks, transaction_attachments: attachments,
+    settings,
   };
 }
 
@@ -102,6 +122,9 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
   }
 
   await db.withTransactionAsync(async () => {
+    await db.execAsync('DELETE FROM transaction_tags');
+    await db.execAsync('DELETE FROM tags');
+    await db.execAsync('DELETE FROM transaction_attachments');
     await db.execAsync('DELETE FROM subscriptions');
     await db.execAsync('DELETE FROM net_worth_snapshots');
     await db.execAsync('DELETE FROM bill_reminders');
@@ -122,8 +145,8 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
     }
     for (const w of data.wallets) {
       await db.runAsync(
-        'INSERT INTO wallets (id, name, balance, icon, color, is_primary) VALUES (?, ?, ?, ?, ?, ?)',
-        [w.id, w.name, w.balance, w.icon, w.color, w.is_primary || 0]
+        'INSERT INTO wallets (id, name, balance, icon, color, is_primary, initial_balance) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [w.id, w.name, w.balance, w.icon, w.color, w.is_primary || 0, w.initial_balance || 0]
       );
     }
     for (const a of data.assets || []) {
@@ -152,8 +175,8 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
     }
     for (const tx of data.transactions) {
       await db.runAsync(
-        'INSERT INTO transactions (id, type, amount, category_id, wallet_id, transaction_date, notes, recurring_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [tx.id, tx.type, tx.amount, tx.category_id, tx.wallet_id, tx.transaction_date, tx.notes, tx.recurring_id, tx.created_at]
+        'INSERT INTO transactions (id, type, amount, category_id, wallet_id, transaction_date, notes, recurring_id, transfer_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [tx.id, tx.type, tx.amount, tx.category_id, tx.wallet_id, tx.transaction_date, tx.notes, tx.recurring_id, tx.transfer_id || null, tx.created_at]
       );
     }
     for (const b of data.budgets || []) {
@@ -180,7 +203,31 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
         [r.id, r.name, r.amount, r.due_date, r.frequency, r.is_paid, r.category_id, r.wallet_id, r.notes, r.calendar_event_id, r.created_at]
       );
     }
+    for (const t of data.tags || []) {
+      await db.runAsync(
+        'INSERT INTO tags (id, name, color, created_at) VALUES (?, ?, ?, ?)',
+        [t.id, t.name, t.color, t.created_at]
+      );
+    }
+    for (const tt of data.transaction_tags || []) {
+      await db.runAsync(
+        'INSERT INTO transaction_tags (id, transaction_id, tag_id) VALUES (?, ?, ?)',
+        [tt.id, tt.transaction_id, tt.tag_id]
+      );
+    }
+    for (const att of data.transaction_attachments || []) {
+      await db.runAsync(
+        'INSERT INTO transaction_attachments (id, transaction_id, file_path, file_type, created_at) VALUES (?, ?, ?, ?, ?)',
+        [att.id, att.transaction_id, att.file_path, att.file_type, att.created_at]
+      );
+    }
   });
+
+  if (data.settings) {
+    for (const [key, value] of Object.entries(data.settings)) {
+      if (value !== null) await AsyncStorage.setItem(key, value);
+    }
+  }
 
   const count = data.transactions.length;
   return `Berhasil mengembalikan ${count} transaksi, ${data.categories.length} kategori, ${data.wallets.length} dompet.`;

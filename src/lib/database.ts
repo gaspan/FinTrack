@@ -3,7 +3,7 @@ import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { DEFAULT_WALLETS } from '../constants/wallets';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 5;
+  const DATABASE_VERSION = 6;
 
   // Wait for locks instead of aborting with "database is locked" when
   // concurrent queries race with a write transaction (expo-sqlite on Android).
@@ -14,6 +14,8 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
   let { user_version: currentDbVersion } = await db.getFirstAsync<{ user_version: number }>(
     'PRAGMA user_version'
   ) ?? { user_version: 0 };
+
+  await db.execAsync(`PRAGMA foreign_keys = ON`);
 
   if (currentDbVersion >= DATABASE_VERSION) {
     return;
@@ -287,6 +289,50 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     currentDbVersion = 5;
   }
 
+  if (currentDbVersion === 5) {
+    const hasColumn = async (table: string, column: string) => {
+      const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+      return cols.some(c => c.name === column);
+    };
+
+    await db.withTransactionAsync(async () => {
+      if (!(await hasColumn('wallets', 'initial_balance'))) {
+        await db.execAsync(`ALTER TABLE wallets ADD COLUMN initial_balance REAL DEFAULT 0;`);
+      }
+
+      const wallets = await db.getAllAsync<{ id: number; balance: number }>('SELECT id, balance FROM wallets');
+      for (const w of wallets) {
+        const { total } = await db.getFirstAsync<{ total: number }>(
+          `SELECT COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END) - SUM(CASE WHEN type='expense' THEN amount ELSE 0 END), 0) as total FROM transactions WHERE wallet_id = ?`,
+          [w.id]
+        ) ?? { total: 0 };
+        const initialBalance = Math.round((w.balance - total) * 100) / 100;
+        await db.runAsync('UPDATE wallets SET initial_balance = ? WHERE id = ?', [initialBalance, w.id]);
+      }
+
+      if (!(await hasColumn('transactions', 'transfer_id'))) {
+        await db.execAsync(`ALTER TABLE transactions ADD COLUMN transfer_id INTEGER;`);
+      }
+
+      const idxs = [
+        ['idx_tx_date', 'transactions', 'transaction_date'],
+        ['idx_tx_category', 'transactions', 'category_id'],
+        ['idx_tx_wallet', 'transactions', 'wallet_id'],
+        ['idx_tx_type', 'transactions', 'type'],
+        ['idx_tx_transfer', 'transactions', 'transfer_id'],
+        ['idx_tx_tags_tx', 'transaction_tags', 'transaction_id'],
+        ['idx_tx_att_tx', 'transaction_attachments', 'transaction_id'],
+        ['idx_budget_cat_mo', 'budgets', 'category_id, month'],
+        ['idx_reminder_due', 'bill_reminders', 'due_date'],
+        ['idx_recurring_act', 'recurring_transactions', 'is_active, next_date'],
+      ] as const;
+      for (const [name, table, cols] of idxs) {
+        await db.execAsync(`CREATE INDEX IF NOT EXISTS ${name} ON ${table}(${cols});`);
+      }
+    });
+
+    currentDbVersion = 6;
+  }
+
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
-  await db.execAsync(`PRAGMA foreign_keys = ON`);
 }

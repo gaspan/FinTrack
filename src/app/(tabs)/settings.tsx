@@ -7,6 +7,15 @@ import { useFocusEffect, router } from 'expo-router';
 import { useTheme, type Theme } from '@/constants/theme';
 import { exportBackup, importBackup, LAST_BACKUP_DATE_KEY } from '@/features/export/backupRestore';
 import { AUTO_BACKUP_ENABLED_KEY, BACKUP_INTERVAL_KEY, LAST_AUTO_BACKUP_KEY, BACKUP_INTERVALS } from '@/features/cloud-backup/backupScheduler';
+import {
+  NOTIF_ENABLED_KEY,
+  DAILY_REMINDER_KEY,
+  DAILY_REMINDER_TIME_KEY,
+  isNotifEnabled,
+  isDailyReminderEnabled,
+  getDailyReminderTime,
+  rescheduleAllReminders,
+} from '@/features/notifications/localNotifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CategoryQueries } from '@/lib/queries';
 import { Category, PayrollSettings } from '@/types';
@@ -34,6 +43,9 @@ export default function SettingsScreen() {
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [backupInterval, setBackupInterval] = useState(7);
   const [lastBackupDate, setLastBackupDate] = useState<string | null>(null);
+  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [dailyReminder, setDailyReminder] = useState(false);
+  const [dailyReminderTime, setDailyReminderTime] = useState('20:00');
 
   useFocusEffect(useCallback(() => {
     AsyncStorage.getItem(SAFE_TO_SPEND_KEY).then((val) => {
@@ -64,6 +76,16 @@ export default function SettingsScreen() {
       setAutoBackupEnabled(autoEnabled === 'true');
       setBackupInterval(interval ? parseInt(interval, 10) : 7);
       setLastBackupDate(lastAuto || lastManual);
+    });
+
+    Promise.all([
+      isNotifEnabled(),
+      isDailyReminderEnabled(),
+      getDailyReminderTime(),
+    ]).then(([notif, daily, time]) => {
+      setNotifEnabled(notif);
+      setDailyReminder(daily);
+      setDailyReminderTime(`${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`);
     });
   }, [db]));
 
@@ -324,6 +346,53 @@ export default function SettingsScreen() {
               </View>
             </View>
           </View>
+        )}
+      </View>
+
+      {/* Notification Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notifikasi</Text>
+
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => {
+            const newVal = !notifEnabled;
+            setNotifEnabled(newVal);
+            AsyncStorage.setItem(NOTIF_ENABLED_KEY, newVal ? 'true' : 'false');
+            if (!newVal) {
+              setDailyReminder(false);
+              AsyncStorage.removeItem(DAILY_REMINDER_KEY);
+            }
+          }}
+        >
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#F59E0B20' }]}>
+              <Ionicons name={notifEnabled ? 'notifications' : 'notifications-off-outline'} size={20} color="#F59E0B" />
+            </View>
+            <Text style={styles.itemTitle}>Notifikasi</Text>
+          </View>
+          <Text style={styles.itemSub}>{notifEnabled ? 'Aktif' : 'Nonaktif'}</Text>
+        </TouchableOpacity>
+
+        {notifEnabled && (
+          <>
+            <TouchableOpacity
+              style={styles.item}
+              onPress={() => {
+                const newVal = !dailyReminder;
+                setDailyReminder(newVal);
+                AsyncStorage.setItem(DAILY_REMINDER_KEY, newVal ? 'true' : 'false');
+              }}
+            >
+              <View style={styles.itemLeft}>
+                <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
+                  <Ionicons name={dailyReminder ? 'checkbox' : 'square-outline'} size={20} color="#8B5CF6" />
+                </View>
+                <Text style={styles.itemTitle}>Pengingat Harian</Text>
+              </View>
+              <Text style={styles.itemSub}>{dailyReminder ? 'Aktif' : 'Nonaktif'}</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
 
