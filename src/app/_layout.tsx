@@ -12,7 +12,7 @@ import { migrateDbIfNeeded } from '@/lib/database';
 import { ThemeProvider, useTheme } from '@/constants/theme';
 import { getStoredPin } from '@/lib/lockStorage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { bootCheckpoint, getLastBootStep } from '@/lib/bootLog';
+import { bootCheckpoint, shouldShowBootDiagnostic, ackBootDiagnostic } from '@/lib/bootLog';
 import { Alert } from 'react-native';
 
 bootCheckpoint('module_eval');
@@ -38,9 +38,10 @@ function RootContent() {
       try {
         if (!loaded) return;
 
-        const lastStep = await getLastBootStep();
-        if (lastStep && lastStep !== 'ok' && lastStep !== 'module_eval') {
-          Alert.alert('Diagnostik boot', `Boot terakhir berhenti di langkah:\n${lastStep}`);
+        const diag = await shouldShowBootDiagnostic();
+        if (diag) {
+          Alert.alert('Diagnostik boot', `Boot terakhir berhenti di langkah:\n${diag}`);
+          ackBootDiagnostic(diag);
         }
 
         await bootCheckpoint('fonts_loaded');
@@ -98,9 +99,14 @@ function RootContent() {
               databaseName="fintrack.db"
               useSuspense
               onInit={async (db) => {
-                await bootCheckpoint('db_init_start');
-                await migrateDbIfNeeded(db);
-                await bootCheckpoint('db_init_done');
+                try {
+                  await bootCheckpoint('db_init_start');
+                  await migrateDbIfNeeded(db);
+                  await bootCheckpoint('db_init_done');
+                } catch (e) {
+                  await bootCheckpoint('db_init_error: ' + (e as Error).message);
+                  throw e;
+                }
               }}
             >
               <Stack screenOptions={{

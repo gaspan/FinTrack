@@ -1,11 +1,11 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
-import { supabase, BACKUP_BUCKET, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabase, BACKUP_BUCKET, isSupabaseConfigured } from '@/lib/supabase';
 import { gatherBackupData, applyBackupData, LAST_BACKUP_DATE_KEY } from '@/features/export/backupRestore';
+import { CLOUD_BACKUP_ENABLED_KEY, LAST_CLOUD_BACKUP_KEY } from '@/features/cloud-backup/constants';
 
-export const CLOUD_BACKUP_ENABLED_KEY = 'cloud_backup_enabled';
-export const LAST_CLOUD_BACKUP_KEY = 'last_cloud_backup_date';
+export { CLOUD_BACKUP_ENABLED_KEY, LAST_CLOUD_BACKUP_KEY };
 const MAX_KEPT = 10;
 
 export interface CloudBackupItem {
@@ -17,7 +17,7 @@ export interface CloudBackupItem {
 
 async function requireUserId(): Promise<string> {
   if (!isSupabaseConfigured) throw new Error('Supabase belum dikonfigurasi');
-  const { data, error } = await supabase.auth.getUser();
+  const { data, error } = await getSupabase().auth.getUser();
   if (error || !data.user) throw new Error('Kamu belum masuk. Silakan masuk terlebih dahulu.');
   return data.user.id;
 }
@@ -27,7 +27,7 @@ export async function uploadBackup(db: SQLiteDatabase): Promise<string> {
   const json = JSON.stringify(await gatherBackupData(db));
   const path = `${userId}/FinTrack_Backup_${dayjs().format('YYYYMMDD_HHmmss')}.json`;
 
-  const { error } = await supabase.storage
+  const { error } = await getSupabase().storage
     .from(BACKUP_BUCKET)
     .upload(path, json, { contentType: 'application/json', upsert: false });
 
@@ -44,18 +44,25 @@ export async function uploadBackup(db: SQLiteDatabase): Promise<string> {
 export async function listBackups(): Promise<CloudBackupItem[]> {
   const userId = await requireUserId();
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await getSupabase().storage
     .from(BACKUP_BUCKET)
     .list(userId, { limit: 100, sortBy: { column: 'name', order: 'desc' } });
 
   if (error) throw new Error(`Gagal memuat daftar backup: ${error.message}`);
 
-  return (data ?? [])
+  type StorageEntry = {
+    id: string | null;
+    name: string;
+    created_at?: string | null;
+    metadata?: { size?: number } | null;
+  };
+
+  return ((data ?? []) as StorageEntry[])
     .filter(f => f.id !== null && f.name.endsWith('.json'))
     .map(f => ({
       name: f.name,
       path: `${userId}/${f.name}`,
-      size: (f.metadata as { size?: number } | null)?.size ?? 0,
+      size: f.metadata?.size ?? 0,
       createdAt: f.created_at ?? null,
     }));
 }
@@ -65,7 +72,7 @@ export async function restoreBackup(db: SQLiteDatabase, path: string): Promise<s
 
   // Use a signed URL + fetch instead of storage.download(): download() returns a
   // Blob, and React Native's Blob has no .text()/.arrayBuffer() implementation.
-  const { data, error } = await supabase.storage
+  const { data, error } = await getSupabase().storage
     .from(BACKUP_BUCKET)
     .createSignedUrl(path, 60);
 
@@ -81,12 +88,12 @@ export async function restoreBackup(db: SQLiteDatabase, path: string): Promise<s
 
 export async function deleteBackup(path: string): Promise<void> {
   if (!isSupabaseConfigured) throw new Error('Supabase belum dikonfigurasi');
-  const { error } = await supabase.storage.from(BACKUP_BUCKET).remove([path]);
+  const { error } = await getSupabase().storage.from(BACKUP_BUCKET).remove([path]);
   if (error) throw new Error(`Gagal menghapus backup: ${error.message}`);
 }
 
 async function pruneOldBackups(): Promise<void> {
   const items = await listBackups();
   const stale = items.slice(MAX_KEPT).map(i => i.path);
-  if (stale.length) await supabase.storage.from(BACKUP_BUCKET).remove(stale);
+  if (stale.length) await getSupabase().storage.from(BACKUP_BUCKET).remove(stale);
 }

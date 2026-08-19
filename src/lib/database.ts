@@ -1,6 +1,7 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { DEFAULT_WALLETS } from '../constants/wallets';
+import { bootCheckpoint } from '../lib/bootLog';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
   const DATABASE_VERSION = 6;
@@ -20,6 +21,8 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
   if (currentDbVersion >= DATABASE_VERSION) {
     return;
   }
+
+  await bootCheckpoint(`db_migrate_v${currentDbVersion}_start`);
 
   if (currentDbVersion === 0) {
     await db.withTransactionAsync(async () => {
@@ -335,4 +338,5 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+  await bootCheckpoint('db_migrate_done');
 }

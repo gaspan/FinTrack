@@ -129,17 +129,4 @@ jest.mock('xlsx', () => ({
   utils: { sheet_to_json: jest.fn().mockReturnValue([]) },
 }));
 
-// The Supabase client installs expo-sqlite's localStorage adapter, which calls
-// openDatabaseSync at import time. Stub it out and provide a localStorage global.
-jest.mock('expo-sqlite/localStorage/install', () => ({}));
-
-global.localStorage = {
-  getItem: jest.fn(() => null),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-  key: jest.fn(() => null),
-  length: 0,
-};
-
 global.__DEV__ = true;

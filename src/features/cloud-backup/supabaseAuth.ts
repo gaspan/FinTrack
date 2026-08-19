@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const EMAIL_DOMAIN = process.env.EXPO_PUBLIC_BACKUP_EMAIL_DOMAIN || 'fintrack.app';
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
@@ -54,7 +54,7 @@ export async function signUp(username: string, password: string): Promise<Sessio
   const uname = validateUsername(username);
   if (password.length < 6) throw new AuthError('Password minimal 6 karakter');
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await getSupabase().auth.signUp({
     email: toEmail(uname),
     password,
     options: { data: { username: uname } },
@@ -67,7 +67,7 @@ export async function signIn(username: string, password: string): Promise<Sessio
   assertConfigured();
   if (!password) throw new AuthError('Password wajib diisi');
 
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await getSupabase().auth.signInWithPassword({
     email: toEmail(username),
     password,
   });
@@ -76,11 +76,11 @@ export async function signIn(username: string, password: string): Promise<Sessio
 }
 
 export async function signOut(): Promise<void> {
-  await supabase.auth.signOut();
+  await getSupabase().auth.signOut();
 }
 
 export async function getSession(): Promise<Session | null> {
   if (!isSupabaseConfigured) return null;
-  const { data } = await supabase.auth.getSession();
+  const { data } = await getSupabase().auth.getSession();
   return data.session;
 }

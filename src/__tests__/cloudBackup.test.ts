@@ -16,12 +16,12 @@ const mockBucket = {
 };
 
 jest.mock('@/lib/supabase', () => ({
-  // Lazy getters: jest.mock is hoisted above the const declarations above, so
+  // Lazy getter: jest.mock is hoisted above the const declarations above, so
   // referencing mockAuth eagerly here would capture undefined.
-  supabase: {
+  getSupabase: () => ({
     get auth() { return mockAuth; },
     storage: { from: () => mockBucket },
-  },
+  }),
   BACKUP_BUCKET: 'backups',
   isSupabaseConfigured: true,
 }));

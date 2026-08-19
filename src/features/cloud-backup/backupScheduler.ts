@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { performLocalBackup } from '@/features/export/backupRestore';
 import { saveToCloudStorage } from '@/features/cloud-backup/cloudStorage';
-import { uploadBackup, CLOUD_BACKUP_ENABLED_KEY } from '@/features/cloud-backup/supabaseBackup';
+import { CLOUD_BACKUP_ENABLED_KEY } from '@/features/cloud-backup/constants';
 
 export const AUTO_BACKUP_ENABLED_KEY = 'auto_backup_enabled';
 export const BACKUP_INTERVAL_KEY = 'backup_interval_days';
@@ -28,6 +28,10 @@ export async function checkAndBackup(db: SQLiteDatabase): Promise<void> {
     await saveToCloudStorage(filePath).catch(() => {});
 
     if ((await AsyncStorage.getItem(CLOUD_BACKUP_ENABLED_KEY)) === 'true') {
+      // Required lazily so the Supabase client is never pulled into the boot
+      // path for users who have cloud backup disabled.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { uploadBackup } = require('@/features/cloud-backup/supabaseBackup');
       await uploadBackup(db).catch(() => {});
     }
 
