@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { performLocalBackup } from '@/features/export/backupRestore';
 import { saveToCloudStorage } from '@/features/cloud-backup/cloudStorage';
+import { uploadBackup, CLOUD_BACKUP_ENABLED_KEY } from '@/features/cloud-backup/supabaseBackup';
 
 export const AUTO_BACKUP_ENABLED_KEY = 'auto_backup_enabled';
 export const BACKUP_INTERVAL_KEY = 'backup_interval_days';
@@ -25,6 +26,11 @@ export async function checkAndBackup(db: SQLiteDatabase): Promise<void> {
 
     const filePath = await performLocalBackup(db);
     await saveToCloudStorage(filePath).catch(() => {});
+
+    if ((await AsyncStorage.getItem(CLOUD_BACKUP_ENABLED_KEY)) === 'true') {
+      await uploadBackup(db).catch(() => {});
+    }
+
     await AsyncStorage.setItem(LAST_AUTO_BACKUP_KEY, dayjs().format('YYYY-MM-DD'));
   } catch (e) {
     console.error('Auto backup failed:', e);

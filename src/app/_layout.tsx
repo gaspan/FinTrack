@@ -123,6 +123,7 @@ function RootContent() {
                 <Stack.Screen name="transfer" options={{ presentation: 'modal', headerShown: true, title: 'Transfer Dompet' }} />
                 <Stack.Screen name="wallets" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Dompet' }} />
                 <Stack.Screen name="categories" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Kategori' }} />
+                <Stack.Screen name="cloud-backup" options={{ presentation: 'modal', headerShown: true, title: 'Backup Cloud' }} />
                 <Stack.Screen name="onboarding" options={{ headerShown: false }} />
               </Stack>
             </SQLiteProvider>

@@ -473,6 +473,19 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.itemSub}>{importing ? 'Memproses...' : ''}</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/cloud-backup' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.info + '20' }]}>
+              <Ionicons name="cloud-outline" size={20} color={theme.colors.info} />
+            </View>
+            <View>
+              <Text style={styles.itemTitle}>Backup Cloud</Text>
+              <Text style={styles.itemSub}>Simpan ke cloud via username & password</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
       </View>
 
       {/* Auto Backup Section */}

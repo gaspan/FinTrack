@@ -9,11 +9,11 @@ export const LAST_BACKUP_DATE_KEY = 'last_backup_date';
 
 const SETTINGS_KEYS = [
   'safe_to_spend_enabled', 'payroll_enabled', 'payroll_day', 'payroll_category_id',
-  'app_pin_hash', 'app_biometric_enabled', 'auto_backup_enabled', 'backup_interval',
+  'app_pin_hash', 'app_biometric_enabled', 'auto_backup_enabled', 'backup_interval_days',
   'last_backup_date', 'last_auto_backup_date', 'onboarding_done',
 ];
 
-interface BackupData {
+export interface BackupData {
   version: number;
   exportedAt: string;
   wallets: any[];
@@ -115,9 +115,22 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
 
   const fileUri = result.assets[0].uri;
   const content = await FileSystem.readAsStringAsync(fileUri);
-  const data: BackupData = JSON.parse(content);
 
-  if (!data.version || !data.transactions) {
+  return applyBackupData(db, content);
+};
+
+export const applyBackupData = async (
+  db: SQLiteDatabase,
+  source: string | BackupData
+): Promise<string> => {
+  let data: BackupData;
+  try {
+    data = typeof source === 'string' ? JSON.parse(source) : source;
+  } catch {
+    throw new Error('Format file backup tidak valid');
+  }
+
+  if (!data?.version || !data.transactions || !data.categories || !data.wallets) {
     throw new Error('Format file backup tidak valid');
   }
 
