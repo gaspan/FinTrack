@@ -1,5 +1,5 @@
 import { useFonts } from 'expo-font';
-import { Stack, ThemeProvider as NavThemeProvider, DarkTheme, DefaultTheme, router } from 'expo-router';
+import { Stack, ThemeProvider as NavThemeProvider, DarkTheme, DefaultTheme, router, useRootNavigationState } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -14,14 +14,81 @@ import { getStoredPin } from '@/lib/lockStorage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { bootCheckpoint, markBootOk, shouldShowBootDiagnostic, ackBootDiagnostic } from '@/lib/bootLog';
 
-// Fire-and-forget: mark that the JS module was evaluated.
-// This is intentionally NOT awaited — it's a best-effort timestamp.
 bootCheckpoint('module_eval');
-
 SplashScreen.preventAutoHideAsync();
 
+// ─── AppBootstrapper ──────────────────────────────────────────────────
+// This component mounts INSIDE SQLiteProvider, meaning the DB is 100% ready.
+// It handles the boot logic (pin check, onboarding check) and safe navigation.
+function AppBootstrapper() {
+  const rootNavigationState = useRootNavigationState();
+  const [bootState, setBootState] = useState<'loading' | 'onboarding' | 'lock' | 'tabs'>('loading');
+
+  useEffect(() => {
+    let isMounted = true;
+    async function boot() {
+      try {
+        const diag = await shouldShowBootDiagnostic();
+        if (diag) {
+          Alert.alert('Diagnostik boot', `Boot terakhir berhenti di langkah:\n${diag}`);
+          ackBootDiagnostic(diag);
+        }
+
+        await bootCheckpoint('fonts_loaded');
+        const done = await AsyncStorage.getItem('onboarding_done');
+        await bootCheckpoint('onboarding_read');
+
+        let pin: string | null = null;
+        try { pin = await getStoredPin(); } catch { pin = null; }
+        await bootCheckpoint('pin_read');
+
+        if (!isMounted) return;
+
+        await markBootOk();
+
+        if (done !== 'true') setBootState('onboarding');
+        else if (pin) setBootState('lock');
+        else setBootState('tabs');
+      } catch (e) {
+        console.error('Boot error:', e);
+        bootCheckpoint('init_error: ' + (e as Error).message);
+        // Fallback to tabs on error so the user isn't stuck on splash forever
+        if (isMounted) setBootState('tabs');
+      }
+    }
+    boot();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Effect to handle routing ONLY when both boot logic and navigation state are ready
+  useEffect(() => {
+    if (bootState === 'loading' || !rootNavigationState?.key) return;
+
+    if (bootState === 'onboarding') {
+      router.replace('/onboarding');
+    } else if (bootState === 'lock') {
+      router.replace('/lock-screen');
+    }
+    
+    // For 'tabs', it's the default route, so no need to redirect.
+    // Finally, hide the splash screen.
+    setTimeout(() => {
+      SplashScreen.hideAsync();
+    }, 100);
+  }, [bootState, rootNavigationState?.key]);
+
+  if (bootState === 'loading' || !rootNavigationState?.key) {
+    return (
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e', zIndex: 999 }}>
+        <ActivityIndicator size="large" color="#4ADE80" />
+      </View>
+    );
+  }
+
+  return null;
+}
+
 // ─── Navigation tree ──────────────────────────────────────────────────
-// Pure render component — no side-effects.
 function NavigationStack() {
   const { theme, isDark } = useTheme();
   const navTheme = isDark ? DarkTheme : DefaultTheme;
@@ -52,14 +119,12 @@ function NavigationStack() {
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      <AppBootstrapper />
     </NavThemeProvider>
   );
 }
 
 // ─── Root content ─────────────────────────────────────────────────────
-// Manages fonts, DB init, onboarding/pin check, and splash hiding.
-// Uses SQLiteProvider WITHOUT useSuspense to avoid Suspense
-// unmount/remount cycles that were causing the init loop.
 function RootContent() {
   const { theme } = useTheme();
   const [loaded] = useFonts({
@@ -70,11 +135,8 @@ function RootContent() {
     Inter_700Bold: require('@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf'),
   });
 
-  const [dbReady, setDbReady] = useState(false);
-  const [bootDone, setBootDone] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
 
-  // Guard: only run DB init once even if SQLiteProvider re-triggers onInit.
   const dbInitDone = useRef(false);
   const handleDbInit = useCallback(async (db: SQLiteDatabase) => {
     if (dbInitDone.current) return;
@@ -83,7 +145,6 @@ function RootContent() {
       await bootCheckpoint('db_init_start');
       await migrateDbIfNeeded(db);
       await bootCheckpoint('db_init_done');
-      setDbReady(true);
     } catch (e) {
       dbInitDone.current = false;
       await bootCheckpoint('db_init_error: ' + (e as Error).message);
@@ -91,7 +152,6 @@ function RootContent() {
     }
   }, []);
 
-  // Handle SQLiteProvider errors (non-suspense mode)
   const handleDbError = useCallback((error: Error) => {
     console.error('DB init error:', error);
     bootCheckpoint('db_error: ' + error.message);
@@ -99,64 +159,10 @@ function RootContent() {
     SplashScreen.hideAsync();
   }, []);
 
-  // Boot sequence: runs once after BOTH fonts and DB are ready.
-  // This runs outside any Suspense boundary so it cannot be torn down.
-  useEffect(() => {
-    if (!loaded || !dbReady) return;
-    let isMounted = true;
-
-    async function boot() {
-      try {
-        // Show boot diagnostic if previous boot crashed
-        const diag = await shouldShowBootDiagnostic();
-        if (diag) {
-          Alert.alert('Diagnostik boot', `Boot terakhir berhenti di langkah:\n${diag}`);
-          ackBootDiagnostic(diag);
-        }
-
-        await bootCheckpoint('fonts_loaded');
-        const done = await AsyncStorage.getItem('onboarding_done');
-        await bootCheckpoint('onboarding_read');
-
-        let pin: string | null = null;
-        try { pin = await getStoredPin(); } catch { pin = null; }
-        await bootCheckpoint('pin_read');
-
-        if (!isMounted) return;
-
-        // Mark boot as OK here — previously this only happened in tabs,
-        // which was never reached when the lock screen was shown.
-        await markBootOk();
-
-        SplashScreen.hideAsync();
-        setBootDone(true);
-
-        if (done !== 'true') {
-          router.replace('/onboarding');
-        } else if (pin) {
-          router.replace('/lock-screen');
-        }
-      } catch (e) {
-        console.error('Boot error:', e);
-        bootCheckpoint('init_error: ' + (e as Error).message);
-        if (isMounted) {
-          setInitError(e as Error);
-          SplashScreen.hideAsync();
-          setBootDone(true);
-        }
-      }
-    }
-
-    boot();
-    return () => { isMounted = false; };
-  }, [loaded, dbReady]);
-
-  // Phase 1: waiting for fonts
   if (!loaded) {
     return null;
   }
 
-  // Phase 2: error state
   if (initError) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background, padding: 24 }}>
@@ -167,22 +173,13 @@ function RootContent() {
     );
   }
 
-  // Phase 3: SQLiteProvider (non-suspense) opens the DB and calls onInit.
-  // Once onInit completes successfully, dbReady becomes true and the boot
-  // effect runs. Until bootDone is true we show a loading indicator.
   return (
     <SQLiteProvider
       databaseName="fintrack.db"
       onInit={handleDbInit}
       onError={handleDbError}
     >
-      {bootDone ? (
-        <NavigationStack />
-      ) : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      )}
+      <NavigationStack />
     </SQLiteProvider>
   );
 }
