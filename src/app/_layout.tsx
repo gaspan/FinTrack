@@ -3,7 +3,7 @@ import { Stack, ThemeProvider as NavThemeProvider, DarkTheme, DefaultTheme, rout
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, Suspense, useState, useCallback, useRef } from 'react';
-import { SQLiteProvider } from 'expo-sqlite';
+import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import 'react-native-reanimated';
 import { View, ActivityIndicator, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,6 +31,21 @@ function RootContent() {
 
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
+
+  // Stable identity is required: SQLiteProvider memoizes on the onInit
+  // reference. An inline function re-creates it on every re-render (theme
+  // load, setReady), which makes expo-sqlite close and reopen the database
+  // mid-boot, racing the in-flight migration on Android.
+  const handleDbInit = useCallback(async (db: SQLiteDatabase) => {
+    try {
+      await bootCheckpoint('db_init_start');
+      await migrateDbIfNeeded(db);
+      await bootCheckpoint('db_init_done');
+    } catch (e) {
+      await bootCheckpoint('db_init_error: ' + (e as Error).message);
+      throw e;
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -98,16 +113,7 @@ function RootContent() {
             <SQLiteProvider
               databaseName="fintrack.db"
               useSuspense
-              onInit={async (db) => {
-                try {
-                  await bootCheckpoint('db_init_start');
-                  await migrateDbIfNeeded(db);
-                  await bootCheckpoint('db_init_done');
-                } catch (e) {
-                  await bootCheckpoint('db_init_error: ' + (e as Error).message);
-                  throw e;
-                }
-              }}
+              onInit={handleDbInit}
             >
               <Stack screenOptions={{
                 headerStyle: { backgroundColor: theme.colors.surfaceElevated },
