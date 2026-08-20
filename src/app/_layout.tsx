@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider as NavThemeProvider, DarkTheme, DefaultTheme, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, Suspense, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import 'react-native-reanimated';
 import { View, ActivityIndicator, Text, Alert } from 'react-native';
@@ -12,17 +12,17 @@ import { migrateDbIfNeeded } from '@/lib/database';
 import { ThemeProvider, useTheme } from '@/constants/theme';
 import { getStoredPin } from '@/lib/lockStorage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { bootCheckpoint, shouldShowBootDiagnostic, ackBootDiagnostic } from '@/lib/bootLog';
+import { bootCheckpoint, markBootOk, shouldShowBootDiagnostic, ackBootDiagnostic } from '@/lib/bootLog';
 
+// Fire-and-forget: mark that the JS module was evaluated.
+// This is intentionally NOT awaited — it's a best-effort timestamp.
 bootCheckpoint('module_eval');
 
 SplashScreen.preventAutoHideAsync();
 
-// ─── Inner navigation tree (lives INSIDE Suspense + SQLiteProvider) ───
-// This component MUST NOT contain boot init side-effects because
-// SQLiteProvider's useSuspense will unmount/remount it while the DB opens,
-// which would re-trigger any useEffect here.
-function InnerApp() {
+// ─── Navigation tree ──────────────────────────────────────────────────
+// Pure render component — no side-effects.
+function NavigationStack() {
   const { theme, isDark } = useTheme();
   const navTheme = isDark ? DarkTheme : DefaultTheme;
 
@@ -56,10 +56,11 @@ function InnerApp() {
   );
 }
 
-// ─── Outer shell (lives OUTSIDE Suspense) ─────────────────────────────
-// Boot-init side-effects run here so they are NOT affected by
-// SQLiteProvider's Suspense unmount/remount cycle.
-function AppShell() {
+// ─── Root content ─────────────────────────────────────────────────────
+// Manages fonts, DB init, onboarding/pin check, and splash hiding.
+// Uses SQLiteProvider WITHOUT useSuspense to avoid Suspense
+// unmount/remount cycles that were causing the init loop.
+function RootContent() {
   const { theme } = useTheme();
   const [loaded] = useFonts({
     SpaceMono: require('../../assets/fonts/SpaceMono-Regular.ttf'),
@@ -69,7 +70,8 @@ function AppShell() {
     Inter_700Bold: require('@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf'),
   });
 
-  const [ready, setReady] = useState(false);
+  const [dbReady, setDbReady] = useState(false);
+  const [bootDone, setBootDone] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
 
   // Guard: only run DB init once even if SQLiteProvider re-triggers onInit.
@@ -81,22 +83,31 @@ function AppShell() {
       await bootCheckpoint('db_init_start');
       await migrateDbIfNeeded(db);
       await bootCheckpoint('db_init_done');
+      setDbReady(true);
     } catch (e) {
-      dbInitDone.current = false; // allow retry on next mount
+      dbInitDone.current = false;
       await bootCheckpoint('db_init_error: ' + (e as Error).message);
       throw e;
     }
   }, []);
 
-  // Boot-init: runs once after fonts load. Because this effect is OUTSIDE
-  // the Suspense boundary, it won't be torn down and re-run when
-  // SQLiteProvider suspends.
-  useEffect(() => {
-    let isMounted = true;
-    async function init() {
-      try {
-        if (!loaded) return;
+  // Handle SQLiteProvider errors (non-suspense mode)
+  const handleDbError = useCallback((error: Error) => {
+    console.error('DB init error:', error);
+    bootCheckpoint('db_error: ' + error.message);
+    setInitError(error);
+    SplashScreen.hideAsync();
+  }, []);
 
+  // Boot sequence: runs once after BOTH fonts and DB are ready.
+  // This runs outside any Suspense boundary so it cannot be torn down.
+  useEffect(() => {
+    if (!loaded || !dbReady) return;
+    let isMounted = true;
+
+    async function boot() {
+      try {
+        // Show boot diagnostic if previous boot crashed
         const diag = await shouldShowBootDiagnostic();
         if (diag) {
           Alert.alert('Diagnostik boot', `Boot terakhir berhenti di langkah:\n${diag}`);
@@ -106,13 +117,19 @@ function AppShell() {
         await bootCheckpoint('fonts_loaded');
         const done = await AsyncStorage.getItem('onboarding_done');
         await bootCheckpoint('onboarding_read');
+
         let pin: string | null = null;
         try { pin = await getStoredPin(); } catch { pin = null; }
         await bootCheckpoint('pin_read');
+
         if (!isMounted) return;
 
+        // Mark boot as OK here — previously this only happened in tabs,
+        // which was never reached when the lock screen was shown.
+        await markBootOk();
+
         SplashScreen.hideAsync();
-        setReady(true);
+        setBootDone(true);
 
         if (done !== 'true') {
           router.replace('/onboarding');
@@ -120,23 +137,26 @@ function AppShell() {
           router.replace('/lock-screen');
         }
       } catch (e) {
-        console.error('Init error:', e);
+        console.error('Boot error:', e);
         bootCheckpoint('init_error: ' + (e as Error).message);
         if (isMounted) {
           setInitError(e as Error);
           SplashScreen.hideAsync();
-          setReady(true);
+          setBootDone(true);
         }
       }
     }
-    init();
-    return () => { isMounted = false; };
-  }, [loaded]);
 
-  if (!loaded || !ready) {
+    boot();
+    return () => { isMounted = false; };
+  }, [loaded, dbReady]);
+
+  // Phase 1: waiting for fonts
+  if (!loaded) {
     return null;
   }
 
+  // Phase 2: error state
   if (initError) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background, padding: 24 }}>
@@ -147,20 +167,23 @@ function AppShell() {
     );
   }
 
+  // Phase 3: SQLiteProvider (non-suspense) opens the DB and calls onInit.
+  // Once onInit completes successfully, dbReady becomes true and the boot
+  // effect runs. Until bootDone is true we show a loading indicator.
   return (
-    <Suspense fallback={
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    }>
-      <SQLiteProvider
-        databaseName="fintrack.db"
-        useSuspense
-        onInit={handleDbInit}
-      >
-        <InnerApp />
-      </SQLiteProvider>
-    </Suspense>
+    <SQLiteProvider
+      databaseName="fintrack.db"
+      onInit={handleDbInit}
+      onError={handleDbError}
+    >
+      {bootDone ? (
+        <NavigationStack />
+      ) : (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      )}
+    </SQLiteProvider>
   );
 }
 
@@ -168,7 +191,7 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <AppShell />
+        <RootContent />
       </ThemeProvider>
     </ErrorBoundary>
   );
