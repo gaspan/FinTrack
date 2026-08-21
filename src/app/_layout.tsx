@@ -5,14 +5,15 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import 'react-native-reanimated';
-import { View, ActivityIndicator, Text, Alert } from 'react-native';
+import { View, ActivityIndicator, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { migrateDbIfNeeded } from '@/lib/database';
 import { ThemeProvider, useTheme } from '@/constants/theme';
 import { getStoredPin } from '@/lib/lockStorage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { bootCheckpoint, markBootOk, shouldShowBootDiagnostic, ackBootDiagnostic } from '@/lib/bootLog';
+import { bootCheckpoint, markBootOk } from '@/lib/bootLog';
+import { markUnlocked } from '@/lib/unlockGate';
 
 bootCheckpoint('module_eval');
 SplashScreen.preventAutoHideAsync();
@@ -28,12 +29,6 @@ function AppBootstrapper() {
     let isMounted = true;
     async function boot() {
       try {
-        const diag = await shouldShowBootDiagnostic();
-        if (diag) {
-          Alert.alert('Diagnostik boot', `Boot terakhir berhenti di langkah:\n${diag}`);
-          ackBootDiagnostic(diag);
-        }
-
         await bootCheckpoint('fonts_loaded');
         const done = await AsyncStorage.getItem('onboarding_done');
         await bootCheckpoint('onboarding_read');
@@ -68,6 +63,8 @@ function AppBootstrapper() {
       router.replace('/onboarding');
     } else if (bootState === 'lock') {
       router.replace('/lock-screen');
+    } else if (bootState === 'tabs') {
+      markUnlocked();
     }
     
     // For 'tabs', it's the default route, so no need to redirect.

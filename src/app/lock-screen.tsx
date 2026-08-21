@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
-import { getStoredPin, isBiometricEnabled } from './lock';
+import { getStoredPin, isBiometricEnabled, hashPin } from '@/lib/lockStorage';
+import { markUnlocked } from '@/lib/unlockGate';
 
 const PIN_LENGTH = 4;
 
@@ -42,17 +43,10 @@ export default function LockEntryScreen() {
   };
 
   const verifyPin = async (entered: string) => {
-    function hashPin(pin: string): string {
-      let hash = 0;
-      for (let i = 0; i < pin.length; i++) {
-        const char = pin.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash |= 0;
-      }
-      return 'pin_' + Math.abs(hash).toString(36);
-    }
+    const enteredHash = await hashPin(entered);
 
-    if (hashPin(entered) === correctHash) {
+    if (enteredHash === correctHash) {
+      markUnlocked();
       router.replace('/(tabs)');
     } else {
       shakeRef.current = true;
@@ -89,7 +83,10 @@ export default function LockEntryScreen() {
             try {
               const { authenticateAsync } = await import('expo-local-authentication');
               const result = await authenticateAsync({ promptMessage: 'Buka FinTrack' });
-              if (result.success) router.replace('/(tabs)');
+               if (result.success) {
+                 markUnlocked();
+                 router.replace('/(tabs)');
+               }
             } catch {}
           }
         }}>

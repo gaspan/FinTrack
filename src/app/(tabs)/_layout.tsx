@@ -1,6 +1,6 @@
 import { Tabs, router } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Platform, View } from 'react-native';
+import { Alert, Platform, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -17,35 +17,51 @@ import {
   requestNotificationPermission,
   rescheduleAllReminders,
 } from '@/features/notifications/localNotifications';
-import { bootCheckpoint, markBootOk } from '@/lib/bootLog';
+import { bootCheckpoint, markBootOk, shouldShowBootDiagnostic, ackBootDiagnostic } from '@/lib/bootLog';
 import { SubscriptionQueries, NetWorthQueries } from '@/lib/queries';
 import { FAB } from '@/components/ui/FAB';
+import { waitForUnlock } from '@/lib/unlockGate';
 
 export default function TabLayout() {
   const { theme } = useTheme();
   const db = useSQLiteContext();
 
   useEffect(() => {
+    let cancelled = false;
     bootCheckpoint('tabs_mounted');
     configureNotificationHandler();
     setupNotificationChannels();
-    requestNotificationPermission();
 
-    const engine = new RecurringEngine(db);
-    engine.processRecurringTransactions()
-      .then(() => new RolloverEngine(db).process())
-      .then(() => checkBudgetAlerts(db))
-      .then(() => new SubscriptionQueries(db).processRenewals())
-      .then(() => new NetWorthQueries(db).ensureMonthlySnapshot())
-      .then(() => reconcileWalletBalances(db))
-      .then(() => rescheduleAllReminders(db))
-      .then(() => checkAndBackup(db))
-      .then(() => checkBackupReminder())
-      .then(() => markBootOk())
-      .catch((e) => {
-        console.error(e);
-        bootCheckpoint('engine_error: ' + (e as Error).message);
-      });
+    (async () => {
+      await waitForUnlock();
+      if (cancelled) return;
+
+      const diag = await shouldShowBootDiagnostic();
+      if (diag) {
+        Alert.alert('Diagnostik boot', `Boot terakhir berhenti di langkah:\n${diag}`);
+        ackBootDiagnostic(diag);
+      }
+
+      requestNotificationPermission();
+
+      const engine = new RecurringEngine(db);
+      engine.processRecurringTransactions()
+        .then(() => new RolloverEngine(db).process())
+        .then(() => checkBudgetAlerts(db))
+        .then(() => new SubscriptionQueries(db).processRenewals())
+        .then(() => new NetWorthQueries(db).ensureMonthlySnapshot())
+        .then(() => reconcileWalletBalances(db))
+        .then(() => rescheduleAllReminders(db))
+        .then(() => checkAndBackup(db))
+        .then(() => checkBackupReminder())
+        .then(() => markBootOk())
+        .catch((e) => {
+          console.error(e);
+          bootCheckpoint('engine_error: ' + (e as Error).message);
+        });
+    })();
+
+    return () => { cancelled = true; };
   }, [db]);
 
   return (

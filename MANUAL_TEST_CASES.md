@@ -328,10 +328,10 @@ Cara pakai: ikuti langkah tiap test case, centang checkbox sesuai hasil. Tulis h
 ### CB-09: Alert pengingat backup
 **Prasyarat:** Backup Otomatis **nonaktif**, dan tidak ada backup dalam 7 hari terakhir (kosongkan data app atau ubah tanggal device maju >7 hari dari `last_backup_date`).
 
-1. Buka app.
+1. Buka app (masukkan PIN jika kunci aktif).
 
 **Ekspektasi:**
-- [ ] Muncul alert: **"💾 Backup Data — Sudah lebih dari 7 hari..."**
+- [ ] Muncul alert: **"💾 Backup Data — Sudah lebih dari 7 hari..."** setelah unlock (PIN/biometrik).
 - [ ] Tap "Buka Pengaturan" → berpindah ke tab Pengaturan.
 - [ ] Jika Auto Backup aktif → alert **tidak** muncul.
 

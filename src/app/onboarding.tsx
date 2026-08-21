@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme, type Theme } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
+import { markUnlocked } from '@/lib/unlockGate';
 
 const { width } = Dimensions.get('window');
 
@@ -39,6 +40,7 @@ export default function OnboardingScreen() {
 
   const onDone = async () => {
     await AsyncStorage.setItem('onboarding_done', 'true');
+    markUnlocked();
     router.replace('/(tabs)' as any);
   };
 
