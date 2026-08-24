@@ -53,6 +53,9 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 - **📅 Kalender Transaksi**: Lihat transaksi harian dalam tampilan kalender grid 7×6 dengan dot indikator. Tap hari untuk melihat detail transaksi via bottom sheet. Navigasi bulan dengan swipe gesture.
 - **🔁 Manajemen Langganan (Subscriptions)**: Catat semua langganan (Netflix, Spotify, dll) dengan siklus bulanan/tahunan. Engine auto-create transaksi saat tagihan jatuh tempo + reminder H-1 via kalender. Total biaya bulanan otomatis dihitung.
 - **💰 Sisa Budget Harian (Safe to Spend)**: Proyeksi sisa saldo yang aman dibelanjakan per hari dalam **kartu ringkas** dengan progress bar visual. Berdasarkan saldo, tagihan mendatang, target tabungan, **dan gaji yang akan datang dalam bulan berjalan**. Toggle on/off di pengaturan. Dilengkapi halaman forecast 30 hari dengan line chart.
+- **🔔 Notifikasi Push Lokal**: Notifikasi sistem sungguhan (bukan sekadar Alert) via `expo-notifications`. Mencakup **Pengingat Harian** ("Catat pengeluaran hari ini", toggle di Pengaturan), peringatan anggaran 90%/100%, pengingat tagihan H-1 (pukul 09.00), dan pengingat perpanjangan langganan H-1. Android memakai *notification channels* terpisah (Peringatan Anggaran, Pengingat Tagihan, Pengingat Harian, Langganan) dan semua reminder di-reschedule otomatis setiap aplikasi dibuka.
+- **☁️ Backup Cloud Akun (Supabase)**: Layar **"Backup Cloud"** untuk menyimpan data ke Supabase Storage dengan **akun username & password** (tanpa email). Fitur: daftar/masuk akun, backup manual, daftar backup tersimpan (tanggal + ukuran file), restore dengan konfirmasi, hapus backup, dan toggle **"Unggah Otomatis"** yang mengikuti jadwal Backup Otomatis. Maksimal 10 backup terbaru disimpan — backup lama otomatis dihapus. Konfigurasi via `.env` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`) dengan panduan setup SQL di [`supabase-setup.sql`](./supabase-setup.sql).
+- **🧾 Rekonsiliasi Saldo Dompet Otomatis**: Setiap kali aplikasi dibuka, saldo semua dompet diverifikasi ulang dari `initial_balance + jumlah transaksi` dan dikoreksi otomatis jika selisih (mencegah drift saldo akibat data tidak konsisten).
 
 ---
 
@@ -92,6 +95,10 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 * **Haptic Feedback**: `expo-haptics`
 * **Autentikasi Biometrik**: `expo-local-authentication`
 * **Sinkronisasi Kalender**: `expo-calendar`
+* **Notifikasi Push**: `expo-notifications`
+* **Backup Cloud**: `@supabase/supabase-js` (Supabase Auth + Storage)
+* **Penyimpanan Aman (PIN)**: `expo-secure-store`
+* **Pemilih Foto/Galeri**: `expo-image-picker` (Lampiran Resi)
 * **Pemilih Berkas**: `expo-document-picker` (Impor CSV)
 * **Parsing CSV**: `papaparse`
 * **Penyimpanan Lokal**: `@react-native-async-storage/async-storage`
@@ -148,6 +155,9 @@ npm test
 | `src/__tests__/salary.test.ts` | Proyeksi gaji — payroll off, tanpa kategori/transaksi gaji, rata-rata 3 bulan, filter kategori |
 | `src/__tests__/forecast.test.ts` | Forecast 30 hari & Safe to Spend — injeksi gaji, anti double-counting, recurring expense, batas bulan |
 | `src/__tests__/backup.test.ts` | Backup — gather data, backup lokal, share sheet, scheduler (interval), Google Drive SAF |
+| `src/__tests__/cloudBackup.test.ts` | Supabase Cloud Backup — auth (sign up/in/out), upload, list, restore, delete, auto-upload toggle |
+| `src/__tests__/reconcile.test.ts` | Rekonsiliasi saldo dompet — koreksi drift, saldo sudah akurat tetap utuh |
+| `src/__tests__/bootPath.test.ts` | Boot path isolation — lazy Supabase client tidak membuka SQLite kedua saat startup |
 | `src/__tests__/theme.test.tsx` | ThemeProvider — dark/light/auto, live system theme, cycle, error outside provider |
 
 Skenario **test manual** lengkap (28 kasus) tersedia di [`MANUAL_TEST_CASES.md`](./MANUAL_TEST_CASES.md) — mencakup Budget Rollover, Recurring Income (Auto-Salary), dan Cloud Backup.
@@ -172,6 +182,7 @@ FinTrack/
 │   │   ├── lock-screen.tsx     # Layar masuk PIN/biometric
 │   │   ├── subscriptions.tsx   # Manajemen langganan (subscriptions)
 │   │   ├── subscription/       # Form langganan [id].tsx
+│   │   ├── cloud-backup.tsx    # Backup Cloud Supabase (akun username/password)
 │   │   ├── net-worth.tsx       # Kekayaan bersih (Net Worth Tracker)
 │   │   ├── asset/              # Form aset [id].tsx
 │   │   ├── liability/          # Form utang [id].tsx
@@ -194,11 +205,12 @@ FinTrack/
 │   ├── features/               # Modul fitur
 │   │   ├── recurring/          # Engine transaksi berulang
 │   │   ├── rollover/           # Engine budget rollover
-│   │   ├── cloud-backup/       # Scheduler backup otomatis, reminder, cloud storage (Google Drive/iCloud)
+│   │   ├── cloud-backup/       # Scheduler backup otomatis, reminder, cloud storage (Google Drive/iCloud), Supabase auth & backup
 │   │   ├── insights/           # Spending insights, financial literacy engine & card
 │   │   ├── export/             # Generator PDF, Excel, dan backup/restore JSON
 │   │   ├── forecast/           # Safe to spend & forecast engine (aware gaji)
-│   │   └── notifications/      # Kalender sync & budget reminder
+│   │   ├── wallets/            # Rekonsiliasi saldo dompet otomatis (reconcile.ts)
+│   │   └── notifications/      # Kalender sync, budget reminder & notifikasi push lokal (expo-notifications)
 │   ├── lib/                    # SQLite schema, migration (v1–v5), seed, query classes
 │   ├── types/                  # Definisi tipe TypeScript global
 │   ├── utils/                  # Format Rupiah, haptic, payroll period, proyeksi gaji (salary.ts)
