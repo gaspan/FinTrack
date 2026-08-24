@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/Input';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Button } from '@/components/ui/Button';
 import { IconPicker, ColorPicker } from '@/components/ui/IconPicker';
+import { scheduleSubscriptionReminder, cancelSubscriptionReminder } from '@/features/notifications/localNotifications';
+import { syncEventToCalendar, deleteEventFromCalendar } from '@/features/notifications/calendarSync';
 
 const SUB_CATEGORIES = [
   { key: 'streaming' as const, label: 'Streaming', icon: 'play-outline' },
@@ -48,6 +50,7 @@ export default function SubscriptionFormPage() {
   const [notes, setNotes] = useState('');
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [existingEventId, setExistingEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
@@ -75,6 +78,7 @@ export default function SubscriptionFormPage() {
           setAutoCreate(!!sub.auto_create);
           setRemind(!!sub.remind);
           setNotes(sub.notes ?? '');
+          setExistingEventId(sub.calendar_event_id ?? null);
         }
       } else {
         // Default to the primary wallet so auto-create works without extra taps.
@@ -102,11 +106,33 @@ export default function SubscriptionFormPage() {
         remind: remind ? 1 : 0,
         notes: notes.trim() || undefined,
       };
-      if (isNew) {
-        await queries.add(data);
-      } else {
-        await queries.update(Number(id), data);
+      const subId = isNew ? await queries.add(data) : Number(id);
+      if (!isNew) await queries.update(subId, data);
+
+      // Notification: cancel first, reschedule only when remind is on so the
+      // toggle takes effect immediately instead of on next app launch.
+      await cancelSubscriptionReminder(subId).catch(() => {});
+      if (remind) {
+        scheduleSubscriptionReminder(subId, data.name, data.next_billing_date).catch(() => {});
       }
+
+      // Calendar: replace the stale event; keep it out of the DB when remind is
+      // off or when the Calendar API is unavailable (no permission).
+      try {
+        if (existingEventId) await deleteEventFromCalendar(existingEventId);
+        if (remind) {
+          const eventId = await syncEventToCalendar({
+            title: `💳 ${data.name}`,
+            date: data.next_billing_date,
+            notes: `Langganan ${data.name} - ${data.amount}`,
+          });
+          if (eventId) await queries.update(subId, { calendar_event_id: eventId });
+          else await queries.clearCalendarEvent(subId);
+        } else {
+          await queries.clearCalendarEvent(subId);
+        }
+      } catch {}
+
       router.back();
     } catch {
       Alert.alert('Error', 'Gagal menyimpan');

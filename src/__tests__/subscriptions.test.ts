@@ -1,5 +1,8 @@
 import dayjs from 'dayjs';
+import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SubscriptionQueries } from '@/lib/queries';
+import { rescheduleAllReminders } from '@/features/notifications/localNotifications';
 
 type Sub = Record<string, any>;
 
@@ -86,5 +89,47 @@ describe('SubscriptionQueries.processRenewals', () => {
     await new SubscriptionQueries(db).processRenewals();
 
     expect(updated[0][0]).toBe(dayjs(due).add(3, 'month').format('YYYY-MM-DD'));
+  });
+});
+
+describe('SubscriptionQueries.processRenewals — kalender', () => {
+  it('menandai calendar_event_id basi (NULL) saat tanggal bergeser', async () => {
+    const { db, updated } = makeDb([baseSub({ calendar_event_id: 'evt-1' })]);
+    await new SubscriptionQueries(db).processRenewals();
+
+    expect(updated).toHaveLength(1);
+    const updateSql = db.runAsync.mock.calls.find((c: any[]) => String(c[0]).includes('UPDATE subscriptions'))[0];
+    expect(updateSql).toContain('calendar_event_id = NULL');
+  });
+});
+
+describe('rescheduleAllReminders — flag remind', () => {
+  it('hanya menjadwalkan notifikasi untuk langganan dengan remind = 1', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+      Promise.resolve(key === 'notif_enabled' ? 'true' : null)
+    );
+
+    const db: any = {
+      getAllAsync: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('FROM bill_reminders')) return Promise.resolve([]);
+        if (sql.includes('FROM subscriptions')) {
+          // Engine-side filter: only remind = 1 rows reach the scheduler.
+          expect(sql).toContain('remind = 1');
+          return Promise.resolve([
+            { id: 1, name: 'Netflix', next_billing_date: dayjs().add(7, 'day').format('YYYY-MM-DD') },
+          ]);
+        }
+        return Promise.resolve([]);
+      }),
+    };
+
+    const scheduleMock = Notifications.scheduleNotificationAsync as unknown as jest.Mock;
+    scheduleMock.mockClear();
+    await rescheduleAllReminders(db);
+
+    const subCalls = scheduleMock.mock.calls.filter(
+      (c: any[]) => c[0]?.content?.data?.subId !== undefined
+    );
+    expect(subCalls).toHaveLength(1);
   });
 });

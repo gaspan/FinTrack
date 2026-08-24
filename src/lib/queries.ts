@@ -670,10 +670,6 @@ export class BillReminderQueries {
     await this.db.runAsync('DELETE FROM bill_reminders WHERE id = ?', [id]);
   }
 
-  async togglePaid(id: number, isPaid: boolean) {
-    await this.db.runAsync('UPDATE bill_reminders SET is_paid = ? WHERE id = ?', [isPaid ? 1 : 0, id]);
-  }
-
   /**
    * Marks a bill paid and books the matching expense, then rolls a recurring bill
    * forward to its next due date (so a monthly bill does not stay "paid" forever).
@@ -1187,6 +1183,13 @@ export class SubscriptionQueries {
     );
   }
 
+  async clearCalendarEvent(id: number): Promise<void> {
+    await this.db.runAsync(
+      "UPDATE subscriptions SET calendar_event_id = NULL, updated_at = datetime('now') WHERE id = ?",
+      [id]
+    );
+  }
+
   async processRenewals(): Promise<void> {
     const today = dayjs().format('YYYY-MM-DD');
     const dueSubs = await this.db.getAllAsync<Subscription>(
@@ -1223,8 +1226,11 @@ export class SubscriptionQueries {
         guard++;
       }
 
+      // The old calendar event points at a past date; mark it stale instead of
+      // touching the Calendar API here (boot must not trigger permission
+      // dialogs). The subscriptions screen lazily re-syncs on open.
       await this.db.runAsync(
-        "UPDATE subscriptions SET next_billing_date = ?, updated_at = datetime('now') WHERE id = ?",
+        "UPDATE subscriptions SET next_billing_date = ?, calendar_event_id = NULL, updated_at = datetime('now') WHERE id = ?",
         [due.format('YYYY-MM-DD'), sub.id]
       );
     }

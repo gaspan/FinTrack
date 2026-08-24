@@ -236,8 +236,8 @@ export async function rescheduleAllReminders(db: SQLiteDatabase) {
     await scheduleBillReminder(b.id, b.name, b.due_date);
   }
 
-  const subs = await db.getAllAsync<{ id: number; name: string; next_billing_date: string; is_active: number }>(
-    'SELECT id, name, next_billing_date, is_active FROM subscriptions WHERE is_active = 1'
+  const subs = await db.getAllAsync<{ id: number; name: string; next_billing_date: string }>(
+    'SELECT id, name, next_billing_date FROM subscriptions WHERE is_active = 1 AND remind = 1'
   );
   for (const s of subs) {
     await scheduleSubscriptionReminder(s.id, s.name, s.next_billing_date);

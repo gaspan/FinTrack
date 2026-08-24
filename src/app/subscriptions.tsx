@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
@@ -8,6 +8,8 @@ import { SubscriptionQueries } from '@/lib/queries';
 import { Subscription } from '@/types';
 import { formatRupiah } from '@/utils/format';
 import { Card } from '@/components/ui/Card';
+import { cancelSubscriptionReminder } from '@/features/notifications/localNotifications';
+import { syncEventToCalendar, deleteEventFromCalendar } from '@/features/notifications/calendarSync';
 
 export default function SubscriptionsPage() {
   const db = useSQLiteContext();
@@ -19,6 +21,27 @@ export default function SubscriptionsPage() {
   const [totalMonthly, setTotalMonthly] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'active' | 'all'>('active');
+  const resyncedRef = useRef(false);
+
+  // Lazy calendar sync: processRenewals NULLs calendar_event_id when a billing
+  // date rolls (boot must not trigger permission prompts), so recreate the event
+  // here. Guarded to once per mount so a denied permission is not re-prompted.
+  const resyncCalendar = useCallback(async (rows: Subscription[]) => {
+    if (resyncedRef.current) return;
+    const stale = rows.filter(s => s.is_active && s.remind && !s.calendar_event_id);
+    if (stale.length === 0) return;
+    resyncedRef.current = true;
+    for (const s of stale) {
+      try {
+        const eventId = await syncEventToCalendar({
+          title: `💳 ${s.name}`,
+          date: s.next_billing_date,
+          notes: `Langganan ${s.name} - ${s.amount}`,
+        });
+        if (eventId) await queries.update(s.id, { calendar_event_id: eventId });
+      } catch {}
+    }
+  }, [db]);
 
   const loadData = useCallback(async () => {
     const [data, total] = await Promise.all([
@@ -27,7 +50,8 @@ export default function SubscriptionsPage() {
     ]);
     setSubs(data);
     setTotalMonthly(total);
-  }, [db, filter]);
+    resyncCalendar(data);
+  }, [db, filter, resyncCalendar]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -40,7 +64,15 @@ export default function SubscriptionsPage() {
   const handleCancel = (sub: Subscription) => {
     Alert.alert('Batalkan Langganan', `Berhenti berlangganan "${sub.name}"?`, [
       { text: 'Batal', style: 'cancel' },
-      { text: 'Batalkan', style: 'destructive', onPress: () => queries.cancel(sub.id).then(loadData) },
+      {
+        text: 'Batalkan', style: 'destructive',
+        onPress: async () => {
+          await queries.cancel(sub.id);
+          cancelSubscriptionReminder(sub.id).catch(() => {});
+          if (sub.calendar_event_id) deleteEventFromCalendar(sub.calendar_event_id).catch(() => {});
+          loadData();
+        },
+      },
     ]);
   };
 

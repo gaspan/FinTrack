@@ -8,7 +8,7 @@ import 'dayjs/locale/id';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { DebtQueries, WalletQueries } from '@/lib/queries';
-import { Debt, DebtDirection, DebtSummary, Wallet } from '@/types';
+import { Debt, DebtDirection, DebtSummary, DebtPayment, Wallet } from '@/types';
 import { formatRupiah } from '@/utils/format';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -46,6 +46,9 @@ export default function DebtsScreen() {
   const [payTarget, setPayTarget] = useState<DebtRow | null>(null);
   const [payAmount, setPayAmount] = useState(0);
 
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [payments, setPayments] = useState<Record<number, DebtPayment[]>>({});
+
   const loadData = useCallback(async () => {
     try {
       const q = new DebtQueries(db);
@@ -57,12 +60,26 @@ export default function DebtsScreen() {
       setDebts(rows);
       setSummary(sum);
       setWallets(ws);
+      // Drop the history cache so a fresh payment shows up immediately.
+      setPayments({});
+      setExpandedId(null);
     } catch (e) { console.error(e); }
   }, [db, filter]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const onRefresh = async () => { setRefreshing(true); await loadData(); setRefreshing(false); };
+
+  const toggleHistory = async (debtId: number) => {
+    if (expandedId === debtId) { setExpandedId(null); return; }
+    setExpandedId(debtId);
+    if (!payments[debtId]) {
+      try {
+        const rows = await new DebtQueries(db).getPayments(debtId);
+        setPayments(prev => ({ ...prev, [debtId]: rows }));
+      } catch (e) { console.error(e); }
+    }
+  };
 
   const resetForm = (dir: DebtDirection = 'receivable') => {
     setEditing(null);
@@ -294,6 +311,28 @@ export default function DebtsScreen() {
 
                 {d.notes ? <Text style={styles.notes}>{d.notes}</Text> : null}
 
+                {d.paid_amount > 0 && (
+                  <>
+                    <TouchableOpacity style={styles.historyToggle} onPress={() => toggleHistory(d.id)}>
+                      <Text style={styles.historyToggleText}>
+                        Riwayat pembayaran{payments[d.id] ? ` (${payments[d.id].length})` : ''}
+                      </Text>
+                      <Ionicons
+                        name={expandedId === d.id ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color={theme.colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+
+                    {expandedId === d.id && (payments[d.id] ?? []).map(p => (
+                      <View key={p.id} style={styles.historyRow}>
+                        <Text style={styles.historyDate}>{dayjs(p.payment_date).format('DD MMM YYYY')}</Text>
+                        <Text style={[styles.historyAmount, { color: accent }]}>{formatRupiah(p.amount)}</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+
                 {!d.is_settled && (
                   <TouchableOpacity style={[styles.payBtn, { backgroundColor: accent + '15' }]} onPress={() => openPayment(d)}>
                     <Ionicons name="cash-outline" size={16} color={accent} />
@@ -469,6 +508,17 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   remaining: { ...theme.typography.h3 },
   ofTotal: { ...theme.typography.caption },
   notes: { ...theme.typography.caption, marginTop: 6 },
+  historyToggle: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: theme.spacing.sm, paddingVertical: 4,
+  },
+  historyToggleText: { ...theme.typography.caption, fontWeight: '600' },
+  historyRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 3,
+  },
+  historyDate: { ...theme.typography.caption },
+  historyAmount: { ...theme.typography.caption, fontWeight: '600' },
   payBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     marginTop: theme.spacing.sm, paddingVertical: theme.spacing.sm, borderRadius: theme.radius.sm,

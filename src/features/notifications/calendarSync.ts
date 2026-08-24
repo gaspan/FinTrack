@@ -36,24 +36,34 @@ export async function getOrCreateCalendar(): Promise<string | null> {
   return newCalendar;
 }
 
-export async function syncBillToCalendar(bill: BillReminder): Promise<string | null> {
+export async function syncEventToCalendar(
+  input: { title: string; date: string; notes?: string | null }
+): Promise<string | null> {
   const calendarId = await getOrCreateCalendar();
   if (!calendarId) return null;
 
-  const startDate = new Date(bill.due_date);
-  const endDate = new Date(bill.due_date);
+  const startDate = new Date(input.date);
+  const endDate = new Date(input.date);
   endDate.setHours(endDate.getHours() + 1);
 
   const eventId = await Calendar.createEventAsync(calendarId, {
-    title: `📅 ${bill.name}`,
+    title: input.title,
     startDate,
     endDate,
     allDay: true,
-    notes: bill.notes || `Tagihan ${bill.name} - ${bill.amount}`,
+    notes: input.notes || undefined,
     alarms: [{ relativeOffset: -1440 }],
   });
 
   return eventId;
+}
+
+export async function syncBillToCalendar(bill: BillReminder): Promise<string | null> {
+  return syncEventToCalendar({
+    title: `📅 ${bill.name}`,
+    date: bill.due_date,
+    notes: bill.notes || `Tagihan ${bill.name} - ${bill.amount}`,
+  });
 }
 
 export async function deleteEventFromCalendar(eventId: string): Promise<void> {

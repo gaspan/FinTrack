@@ -1,4 +1,3 @@
-import dayjs from 'dayjs';
 import { DebtQueries, NetWorthQueries } from '@/lib/queries';
 
 function makeDb(debt: Record<string, any> | null = null, sums: Record<string, any> = {}) {
@@ -152,5 +151,17 @@ describe('NetWorthQueries.getCurrentNetWorth', () => {
     expect(res.totalAssets).toBe(3_300_000);
     expect(res.totalLiabilities).toBe(700_000);
     expect(res.netWorth).toBe(2_600_000);
+  });
+});
+
+describe('DebtQueries.getPayments', () => {
+  it('mengambil riwayat pembayaran terurut dari yang terbaru', async () => {
+    const { db } = makeDb(baseDebt());
+    await new DebtQueries(db).getPayments(1);
+
+    const [sql, params] = db.getAllAsync.mock.calls[0];
+    expect(sql).toContain('FROM debt_payments');
+    expect(sql).toContain('ORDER BY payment_date DESC');
+    expect(params).toEqual([1]);
   });
 });
