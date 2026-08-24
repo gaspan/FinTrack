@@ -20,6 +20,10 @@ import {
   Liability,
   NetWorthSnapshot,
   Subscription,
+  Debt,
+  DebtPayment,
+  DebtSummary,
+  DebtDirection,
 } from '@/types';
 import { CATEGORY_CLASSIFICATION } from '@/constants/categories';
 
@@ -349,6 +353,103 @@ export class WalletQueries {
       await this.db.runAsync('UPDATE wallets SET is_primary = 1 WHERE id = ?', [id]);
     });
   }
+
+  async create(data: { name: string; balance: number; icon: string; color: string }): Promise<number> {
+    // initial_balance must mirror the opening balance: reconcileWalletBalances
+    // recomputes balance as initial_balance + sum(transactions), so leaving it at
+    // 0 would silently wipe the saldo on the next app launch.
+    const res = await this.db.runAsync(
+      'INSERT INTO wallets (name, balance, initial_balance, icon, color) VALUES (?, ?, ?, ?, ?)',
+      [data.name, data.balance, data.balance, data.icon, data.color]
+    );
+    return res.lastInsertRowId;
+  }
+
+  async update(id: number, data: { name: string; balance: number; icon: string; color: string }) {
+    // Editing the opening balance shifts the current balance by the same delta so
+    // recorded transactions stay intact.
+    const current = await this.db.getFirstAsync<{ balance: number; initial_balance: number }>(
+      'SELECT balance, COALESCE(initial_balance, 0) as initial_balance FROM wallets WHERE id = ?',
+      [id]
+    );
+    if (!current) return;
+
+    const delta = data.balance - current.initial_balance;
+    await this.db.runAsync(
+      'UPDATE wallets SET name = ?, icon = ?, color = ?, initial_balance = ?, balance = ? WHERE id = ?',
+      [data.name, data.icon, data.color, data.balance, Math.round((current.balance + delta) * 100) / 100, id]
+    );
+  }
+
+  async countTransactions(id: number): Promise<number> {
+    const row = await this.db.getFirstAsync<{ c: number }>(
+      'SELECT COUNT(*) as c FROM transactions WHERE wallet_id = ?',
+      [id]
+    );
+    return row?.c ?? 0;
+  }
+
+  async delete(id: number) {
+    await this.db.withTransactionAsync(async () => {
+      const wasPrimary = await this.db.getFirstAsync<{ is_primary: number }>(
+        'SELECT is_primary FROM wallets WHERE id = ?',
+        [id]
+      );
+      await this.db.runAsync('DELETE FROM wallets WHERE id = ?', [id]);
+      if (wasPrimary?.is_primary) {
+        const next = await this.db.getFirstAsync<{ id: number }>('SELECT id FROM wallets ORDER BY id ASC LIMIT 1');
+        if (next) await this.db.runAsync('UPDATE wallets SET is_primary = 1 WHERE id = ?', [next.id]);
+      }
+    });
+  }
+}
+
+/**
+ * Resolves the wallet/category a background engine should book against when the
+ * source record has none (legacy subscriptions, bills without a wallet, ...).
+ * Mirrors the "Lainnya" fallback already used by transfer.tsx.
+ */
+export async function resolveBookingTarget(
+  db: SQLiteDatabase,
+  type: TransactionType,
+  walletId?: number | null,
+  categoryId?: number | null
+): Promise<{ walletId: number; categoryId: number } | null> {
+  let wallet = walletId ?? null;
+  if (!wallet) {
+    const w = await db.getFirstAsync<{ id: number }>(
+      'SELECT id FROM wallets ORDER BY is_primary DESC, id ASC LIMIT 1'
+    );
+    wallet = w?.id ?? null;
+  }
+  if (!wallet) return null;
+
+  let category = categoryId ?? null;
+  if (!category) {
+    const c = await db.getFirstAsync<{ id: number }>(
+      'SELECT id FROM categories WHERE type = ? AND name = ? LIMIT 1',
+      [type, 'Lainnya']
+    );
+    if (c) {
+      category = c.id;
+    } else {
+      const fallback = await db.getFirstAsync<{ id: number }>(
+        'SELECT id FROM categories WHERE type = ? ORDER BY sort_order ASC, id ASC LIMIT 1',
+        [type]
+      );
+      if (fallback) {
+        category = fallback.id;
+      } else {
+        const created = await db.runAsync(
+          'INSERT INTO categories (name, type, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)',
+          ['Lainnya', type, 'ellipsis-horizontal-outline', '#9CA3AF', 99]
+        );
+        category = created.lastInsertRowId;
+      }
+    }
+  }
+
+  return { walletId: wallet, categoryId: category };
 }
 
 export class ChartQueries {
@@ -571,6 +672,73 @@ export class BillReminderQueries {
 
   async togglePaid(id: number, isPaid: boolean) {
     await this.db.runAsync('UPDATE bill_reminders SET is_paid = ? WHERE id = ?', [isPaid ? 1 : 0, id]);
+  }
+
+  /**
+   * Marks a bill paid and books the matching expense, then rolls a recurring bill
+   * forward to its next due date (so a monthly bill does not stay "paid" forever).
+   * Un-paying deletes the booked transaction and restores the wallet balance.
+   * Returns what happened so the UI can report it.
+   */
+  async setPaid(id: number, isPaid: boolean): Promise<{ booked: boolean; nextDueDate?: string }> {
+    const bill = await this.db.getFirstAsync<BillReminder>('SELECT * FROM bill_reminders WHERE id = ?', [id]);
+    if (!bill) return { booked: false };
+
+    const txQueries = new TransactionQueries(this.db);
+
+    if (!isPaid) {
+      if (bill.paid_transaction_id) {
+        const exists = await this.db.getFirstAsync<{ id: number }>(
+          'SELECT id FROM transactions WHERE id = ?',
+          [bill.paid_transaction_id]
+        );
+        if (exists) await txQueries.delete(bill.paid_transaction_id);
+      }
+      await this.db.runAsync(
+        'UPDATE bill_reminders SET is_paid = 0, paid_transaction_id = NULL WHERE id = ?',
+        [id]
+      );
+      return { booked: false };
+    }
+
+    const target = await resolveBookingTarget(this.db, 'expense', bill.wallet_id, bill.category_id);
+    let txId: number | null = null;
+    if (target) {
+      txId = await txQueries.create({
+        type: 'expense',
+        amount: bill.amount,
+        category_id: target.categoryId,
+        wallet_id: target.walletId,
+        transaction_date: dayjs().format('YYYY-MM-DD'),
+        notes: `Tagihan ${bill.name}`,
+        recurring_id: null,
+      });
+    }
+
+    if (bill.frequency === 'one_time') {
+      await this.db.runAsync(
+        'UPDATE bill_reminders SET is_paid = 1, paid_transaction_id = ? WHERE id = ?',
+        [txId, id]
+      );
+      return { booked: txId !== null };
+    }
+
+    // Recurring bill: advance past today so it reappears as an upcoming bill.
+    const step = bill.frequency === 'yearly' ? 12 : 1;
+    let next = dayjs(bill.due_date).add(step, 'month');
+    const today = dayjs().format('YYYY-MM-DD');
+    let guard = 0;
+    while (next.format('YYYY-MM-DD') <= today && guard < 24) {
+      next = next.add(step, 'month');
+      guard++;
+    }
+    const nextDueDate = next.format('YYYY-MM-DD');
+
+    await this.db.runAsync(
+      'UPDATE bill_reminders SET is_paid = 0, due_date = ?, paid_transaction_id = NULL WHERE id = ?',
+      [nextDueDate, id]
+    );
+    return { booked: txId !== null, nextDueDate };
   }
 
   async updateCalendarEventId(id: number, eventId: string) {
@@ -920,9 +1088,17 @@ export class NetWorthQueries {
     const walletSum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(balance), 0) as total FROM wallets');
     const assetSum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(current_value), 0) as total FROM assets');
     const liabilitySum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(current_balance), 0) as total FROM liabilities');
+    // Unsettled person-to-person debts count too: money owed to you is an asset,
+    // money you owe is a liability.
+    const debtSum = await this.db.getFirstAsync<{ receivable: number; payable: number }>(`
+      SELECT
+        COALESCE(SUM(CASE WHEN direction = 'receivable' THEN amount - paid_amount ELSE 0 END), 0) as receivable,
+        COALESCE(SUM(CASE WHEN direction = 'payable' THEN amount - paid_amount ELSE 0 END), 0) as payable
+      FROM debts WHERE is_settled = 0
+    `);
 
-    const totalAssets = (walletSum?.total ?? 0) + (assetSum?.total ?? 0);
-    const totalLiabilities = liabilitySum?.total ?? 0;
+    const totalAssets = (walletSum?.total ?? 0) + (assetSum?.total ?? 0) + (debtSum?.receivable ?? 0);
+    const totalLiabilities = (liabilitySum?.total ?? 0) + (debtSum?.payable ?? 0);
     return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities };
   }
 
@@ -1019,28 +1195,197 @@ export class SubscriptionQueries {
     );
 
     const txnQueries = new TransactionQueries(this.db);
+    const cycleMonths = (c: Subscription['billing_cycle']) => (c === 'monthly' ? 1 : c === 'yearly' ? 12 : 3);
 
     for (const sub of dueSubs) {
-      if (sub.auto_create && sub.wallet_id && sub.category_id) {
-        await txnQueries.create({
-          type: 'expense',
-          amount: sub.amount,
-          category_id: sub.category_id,
-          wallet_id: sub.wallet_id,
-          transaction_date: today,
-          notes: `Langganan ${sub.name}`,
-          recurring_id: null,
-        });
-      }
+      const target = sub.auto_create
+        // Legacy rows (and any sub saved before the form exposed these pickers)
+        // have no wallet/category; fall back instead of skipping the booking.
+        ? await resolveBookingTarget(this.db, 'expense', sub.wallet_id, sub.category_id)
+        : null;
 
-      const nextDate = dayjs(sub.next_billing_date)
-        .add(sub.billing_cycle === 'monthly' ? 1 : sub.billing_cycle === 'yearly' ? 12 : 3, 'month')
-        .format('YYYY-MM-DD');
+      // Catch up every cycle that already elapsed, not just one per app launch.
+      let due = dayjs(sub.next_billing_date);
+      let guard = 0;
+      while (due.format('YYYY-MM-DD') <= today && guard < 24) {
+        if (target) {
+          await txnQueries.create({
+            type: 'expense',
+            amount: sub.amount,
+            category_id: target.categoryId,
+            wallet_id: target.walletId,
+            transaction_date: due.format('YYYY-MM-DD'),
+            notes: `Langganan ${sub.name}`,
+            recurring_id: null,
+          });
+        }
+        due = due.add(cycleMonths(sub.billing_cycle), 'month');
+        guard++;
+      }
 
       await this.db.runAsync(
         "UPDATE subscriptions SET next_billing_date = ?, updated_at = datetime('now') WHERE id = ?",
-        [nextDate, sub.id]
+        [due.format('YYYY-MM-DD'), sub.id]
       );
     }
+  }
+}
+
+export class DebtQueries {
+  constructor(private db: SQLiteDatabase) {}
+
+  async getAll(includeSettled = true): Promise<(Debt & { wallet_name?: string })[]> {
+    return this.db.getAllAsync<Debt & { wallet_name?: string }>(`
+      SELECT d.*, w.name as wallet_name
+      FROM debts d
+      LEFT JOIN wallets w ON d.wallet_id = w.id
+      ${includeSettled ? '' : 'WHERE d.is_settled = 0'}
+      ORDER BY d.is_settled ASC, COALESCE(d.due_date, '9999-12-31') ASC, d.id DESC
+    `);
+  }
+
+  async getById(id: number): Promise<Debt | null> {
+    return this.db.getFirstAsync<Debt>('SELECT * FROM debts WHERE id = ?', [id]);
+  }
+
+  async getSummary(): Promise<DebtSummary> {
+    const row = await this.db.getFirstAsync<{ receivable: number; payable: number }>(`
+      SELECT
+        COALESCE(SUM(CASE WHEN direction = 'receivable' THEN amount - paid_amount ELSE 0 END), 0) as receivable,
+        COALESCE(SUM(CASE WHEN direction = 'payable' THEN amount - paid_amount ELSE 0 END), 0) as payable
+      FROM debts WHERE is_settled = 0
+    `);
+    const totalReceivable = row?.receivable ?? 0;
+    const totalPayable = row?.payable ?? 0;
+    return { totalReceivable, totalPayable, net: totalReceivable - totalPayable };
+  }
+
+  async getPayments(debtId: number): Promise<DebtPayment[]> {
+    return this.db.getAllAsync<DebtPayment>(
+      'SELECT * FROM debt_payments WHERE debt_id = ? ORDER BY payment_date DESC, id DESC',
+      [debtId]
+    );
+  }
+
+  /**
+   * Records a debt. When `bookTransaction` is set, the principal also moves through
+   * a wallet: lending out money is an expense, borrowing is income.
+   */
+  async create(
+    data: {
+      person_name: string;
+      direction: DebtDirection;
+      amount: number;
+      due_date?: string | null;
+      wallet_id?: number | null;
+      notes?: string | null;
+    },
+    bookTransaction = false
+  ): Promise<number> {
+    let newId = 0;
+    await this.db.withTransactionAsync(async () => {
+      const res = await this.db.runAsync(
+        'INSERT INTO debts (person_name, direction, amount, due_date, wallet_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
+        [data.person_name, data.direction, data.amount, data.due_date ?? null, data.wallet_id ?? null, data.notes ?? null]
+      );
+      newId = res.lastInsertRowId;
+
+      if (bookTransaction) {
+        const type: TransactionType = data.direction === 'receivable' ? 'expense' : 'income';
+        const target = await resolveBookingTarget(this.db, type, data.wallet_id, null);
+        if (target) {
+          await new TransactionQueries(this.db).create({
+            type,
+            amount: data.amount,
+            category_id: target.categoryId,
+            wallet_id: target.walletId,
+            transaction_date: dayjs().format('YYYY-MM-DD'),
+            notes: data.direction === 'receivable'
+              ? `Piutang ${data.person_name}`
+              : `Utang dari ${data.person_name}`,
+            recurring_id: null,
+          });
+        }
+      }
+    });
+    return newId;
+  }
+
+  async update(id: number, data: Partial<Omit<Debt, 'id' | 'created_at' | 'updated_at' | 'paid_amount'>>) {
+    const fields: string[] = [];
+    const values: any[] = [];
+    if (data.person_name !== undefined) { fields.push('person_name = ?'); values.push(data.person_name); }
+    if (data.direction !== undefined) { fields.push('direction = ?'); values.push(data.direction); }
+    if (data.amount !== undefined) { fields.push('amount = ?'); values.push(data.amount); }
+    if (data.due_date !== undefined) { fields.push('due_date = ?'); values.push(data.due_date); }
+    if (data.wallet_id !== undefined) { fields.push('wallet_id = ?'); values.push(data.wallet_id); }
+    if (data.notes !== undefined) { fields.push('notes = ?'); values.push(data.notes); }
+    if (data.is_settled !== undefined) { fields.push('is_settled = ?'); values.push(data.is_settled ? 1 : 0); }
+    if (fields.length === 0) return;
+    fields.push("updated_at = datetime('now')");
+    values.push(id);
+    await this.db.runAsync(`UPDATE debts SET ${fields.join(', ')} WHERE id = ?`, values);
+  }
+
+  /**
+   * Adds a repayment. Receiving money back on a receivable is income; paying down
+   * what you owe is an expense. Settles the debt once fully repaid.
+   */
+  async addPayment(
+    debtId: number,
+    amount: number,
+    opts: { date?: string; walletId?: number | null; notes?: string | null; bookTransaction?: boolean } = {}
+  ): Promise<{ settled: boolean; remaining: number }> {
+    const debt = await this.getById(debtId);
+    if (!debt) return { settled: false, remaining: 0 };
+
+    const date = opts.date ?? dayjs().format('YYYY-MM-DD');
+    const capped = Math.min(amount, Math.max(0, debt.amount - debt.paid_amount));
+    if (capped <= 0) return { settled: !!debt.is_settled, remaining: 0 };
+
+    let settled = false;
+    let remaining = 0;
+
+    await this.db.withTransactionAsync(async () => {
+      let txId: number | null = null;
+      if (opts.bookTransaction !== false) {
+        const type: TransactionType = debt.direction === 'receivable' ? 'income' : 'expense';
+        const target = await resolveBookingTarget(this.db, type, opts.walletId ?? debt.wallet_id, null);
+        if (target) {
+          txId = await new TransactionQueries(this.db).create({
+            type,
+            amount: capped,
+            category_id: target.categoryId,
+            wallet_id: target.walletId,
+            transaction_date: date,
+            notes: debt.direction === 'receivable'
+              ? `Pelunasan piutang ${debt.person_name}`
+              : `Pembayaran utang ke ${debt.person_name}`,
+            recurring_id: null,
+          });
+        }
+      }
+
+      await this.db.runAsync(
+        'INSERT INTO debt_payments (debt_id, amount, payment_date, transaction_id, notes) VALUES (?, ?, ?, ?, ?)',
+        [debtId, capped, date, txId, opts.notes ?? null]
+      );
+
+      const paid = Math.round((debt.paid_amount + capped) * 100) / 100;
+      settled = paid >= debt.amount - 0.01;
+      remaining = Math.max(0, Math.round((debt.amount - paid) * 100) / 100);
+
+      await this.db.runAsync(
+        "UPDATE debts SET paid_amount = ?, is_settled = ?, updated_at = datetime('now') WHERE id = ?",
+        [paid, settled ? 1 : 0, debtId]
+      );
+    });
+
+    return { settled, remaining };
+  }
+
+  /** Deletes the debt; its payment rows cascade. Booked transactions are kept. */
+  async delete(id: number) {
+    await this.db.runAsync('DELETE FROM debts WHERE id = ?', [id]);
   }
 }

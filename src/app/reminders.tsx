@@ -115,8 +115,60 @@ export default function RemindersScreen() {
   };
 
   const handleTogglePaid = async (id: number, current: number) => {
-    await new BillReminderQueries(db).togglePaid(id, current === 0);
-    loadData();
+    const q = new BillReminderQueries(db);
+    const bill = reminders.find(r => r.id === id);
+
+    if (current !== 0) {
+      await q.setPaid(id, false);
+      loadData();
+      return;
+    }
+
+    Alert.alert(
+      'Tandai Lunas',
+      bill ? `Catat pengeluaran ${formatRupiah(bill.amount)} untuk "${bill.name}"?` : 'Catat pengeluaran untuk tagihan ini?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Lunas & Catat',
+          onPress: async () => {
+            try {
+              const res = await q.setPaid(id, true);
+              if (res.nextDueDate) {
+                // Recurring bill moved forward: reschedule notification + calendar.
+                const updated = await q.getAll().then(b => b.find(r => r.id === id));
+                if (updated) {
+                  cancelBillReminder(id).catch(() => {});
+                  scheduleBillReminder(id, updated.name, updated.due_date).catch(() => {});
+                  if (updated.calendar_event_id) {
+                    try {
+                      const newId = await updateEventInCalendar(updated.calendar_event_id, {
+                        ...updated,
+                        created_at: updated.created_at!,
+                      });
+                      if (newId && newId !== updated.calendar_event_id) {
+                        await q.updateCalendarEventId(id, newId);
+                      }
+                    } catch {}
+                  }
+                }
+                Alert.alert(
+                  'Lunas',
+                  `${res.booked ? 'Pengeluaran dicatat. ' : ''}Jatuh tempo berikutnya ${dayjs(res.nextDueDate).format('DD MMM YYYY')}.`
+                );
+              } else {
+                cancelBillReminder(id).catch(() => {});
+                if (res.booked) Alert.alert('Lunas', 'Pengeluaran dicatat.');
+              }
+              loadData();
+            } catch (e) {
+              console.error(e);
+              Alert.alert('Error', 'Gagal menandai lunas');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDelete = (id: number) => {

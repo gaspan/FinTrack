@@ -16,6 +16,7 @@ export interface Wallet {
   icon: string | null;
   color: string | null;
   is_primary?: number;
+  initial_balance?: number;
 }
 
 export interface Transaction {
@@ -105,6 +106,39 @@ export interface BillReminder {
   notes: string | null;
   created_at: string;
   calendar_event_id?: string | null;
+  paid_transaction_id?: number | null;
+}
+
+export type DebtDirection = 'receivable' | 'payable';
+
+export interface Debt {
+  id: number;
+  person_name: string;
+  direction: DebtDirection;
+  amount: number;
+  paid_amount: number;
+  due_date: string | null;
+  wallet_id: number | null;
+  notes: string | null;
+  is_settled: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DebtPayment {
+  id: number;
+  debt_id: number;
+  amount: number;
+  payment_date: string;
+  transaction_id: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface DebtSummary {
+  totalReceivable: number;
+  totalPayable: number;
+  net: number;
 }
 
 export interface AppLock {

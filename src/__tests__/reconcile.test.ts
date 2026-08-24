@@ -48,4 +48,11 @@ describe('reconcileWalletBalances', () => {
       [110000, 1]
     );
   });
+  it('dompet baru dengan saldo awal tidak dinolkan (regresi bug initial_balance)', async () => {
+    // WalletQueries.create kini menulis initial_balance = saldo awal, sehingga
+    // reconcile tidak lagi menghapus saldo dompet yang belum punya transaksi.
+    const db = makeDb([{ id: 1, balance: 5000000, initial_balance: 5000000 }], { 1: 0 });
+    await reconcileWalletBalances(db);
+    expect(db.runAsync).not.toHaveBeenCalled();
+  });
 });

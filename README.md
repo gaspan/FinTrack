@@ -15,7 +15,7 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 
 - **📊 Dashboard Interaktif v2**: Pantau total saldo di **hero gradient full-bleed** dengan rangkuman pemasukan/pengeluaran, indikator tren, dan chip periode gaji. **4 aksi cepat** (Tambah, Transfer, Anggaran, Target) langsung dari dashboard. Analitik keuangan dalam **satu kartu bertab** (Ringkas/Kategori/Tren) — tidak perlu scroll 3 layar lagi. Dilengkapi **widget anggaran** (top-3 progress bar), **ring target menabung** (SVG progress ring horizontal), **sparkline kekayaan bersih** 12 bulan, dan wawasan finansial yang bisa dibuka/tutup.
 - **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan *Overview Donut Chart*, *Expense Category Donut Chart*, *Category Bar Chart*, dan *Grouped Monthly Trend Bar Chart* (6 bulan, menampilkan income & expense berdampingan — bukan hanya salah satu). Semua dalam satu kartu bertab yang menghemat ruang.
-- **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tandai satu dompet sebagai **Dompet Utama** (primary), tambah dompet baru dengan pilihan ikon dan warna, serta hapus dengan konfirmasi.
+- **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tandai satu dompet sebagai **Dompet Utama** (primary), tambah dompet baru dengan pilihan ikon dan warna, **edit dompet** (nama/ikon/warna/saldo awal — perubahan saldo awal otomatis menggeser saldo berjalan tanpa mengubah transaksi), serta hapus dengan konfirmasi yang memberi tahu jumlah transaksi terdampak.
 - **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi *progress bar* visual dengan indikator warna (hijau <70%, kuning 70–90%, merah >90%). **Widget anggaran di dashboard** menampilkan 3 kategori teratas yang paling mendekati batas.
 - **🔄 Budget Rollover**: Aktifkan toggle **"Teruskan sisa ke bulan depan"** per kategori anggaran — sisa yang tidak terpakai otomatis ditambahkan ke limit bulan berikutnya (envelope budgeting). Engine berjalan otomatis saat app dibuka & setelah simpan budget, dengan indikator "Sisa bulan lalu +Rp X" di layar Anggaran dan dashboard. Alert 90%/100% dihitung terhadap *effective limit* (limit + rollover).
 - **📝 Pencatatan Cepat**: Tambah transaksi pemasukan atau pengeluaran hanya dalam beberapa ketukan. Mendukung auto-format mata uang (Rupiah), pemilihan kategori, dompet, dan tanggal.
@@ -31,7 +31,7 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 - **💰 Transfer antar Dompet**: Pindahkan dana dari satu dompet ke dompet lain dengan mudah. Saldo otomatis terupdate di kedua dompet.
 - **🔍 Pencarian & Filter**: Cari transaksi berdasarkan catatan/ nama kategori, filter berdasarkan kategori, dompet, tipe, atau **rentang tanggal multi-bulan**.
 - **📂 Kustomisasi Kategori**: Tambah, edit, atau hapus kategori transaksi sendiri dengan pilihan ikon dan warna.
-- **💾 Backup & Restore**: Ekspor seluruh data ke JSON untuk cadangan, atau impor dari file JSON untuk memulihkan data. Support tabel baru (goals, reminders, rollover budget).
+- **💾 Backup & Restore**: Ekspor seluruh data ke JSON untuk cadangan, atau impor dari file JSON untuk memulihkan data. Format **backup v5** mencakup seluruh 16 tabel (termasuk `debts` & `debt_payments`) dan preferensi aplikasi (tema, notifikasi, periode gaji); backup lama tetap bisa direstore.
 - **☁️ Backup Otomatis (Cloud)**: Section **"Backup Otomatis"** baru di Pengaturan — jadwal **Harian/Mingguan/Bulanan** otomatis setiap app dibuka. Di iOS file backup tampil di **Files & iCloud** (via konfigurasi `expo-file-system`), di Android bisa disimpan langsung ke **Google Drive** (izin folder sekali, URI tersimpan). Pengingat otomatis muncul jika >7 hari tanpa backup & auto-backup nonaktif.
 - **📱 Onboarding**: Panduan 3 langkah untuk pengguna baru saat pertama kali membuka aplikasi.
 - **✏️ Edit Cepat**: Long-press pada item transaksi di daftar untuk langsung Edit atau Hapus tanpa perlu masuk ke halaman detail.
@@ -43,7 +43,7 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 - **🔔 Pengingat Anggaran**: Notifikasi (Alert) otomatis saat pengeluaran kategori mencapai 90% atau lebih dari batas anggaran.
 - **🔒 Offline & Privat**: Seluruh data disimpan langsung di memori perangkat Anda menggunakan SQLite. Tidak ada data yang dikirim ke server eksternal. 100% offline.
 - **🎯 Target Menabung (Savings Goals)**: Tetapkan target tabungan dengan nominal dan deadline. Pantau progress secara visual dengan progress bar dan persentase. **Widget ring SVG di dashboard** menampilkan semua target aktif dalam strip horizontal yang bisa discroll. Tambah dana langsung dari halaman target.
-- **⏰ Pengingat Tagihan (Bill Reminders)**: Catat tagihan rutin (listrik, internet, dll) dengan frekuensi bulanan/tahunan. Dapatkan pengingat otomatis via **sinkronisasi ke Kalender Sistem** (Google Calendar / Apple Calendar) dengan alarm H-1.
+- **⏰ Pengingat Tagihan (Bill Reminders)**: Catat tagihan rutin (listrik, internet, dll) dengan frekuensi bulanan/tahunan. Dapatkan pengingat otomatis via **sinkronisasi ke Kalender Sistem** (Google Calendar / Apple Calendar) dengan alarm H-1. Menandai **"Lunas" otomatis mencatat transaksi pengeluaran** dari dompet & kategori tagihan, lalu tagihan bulanan/tahunan **maju sendiri ke jatuh tempo berikutnya** (bukan berstatus lunas selamanya). Membatalkan status lunas akan menghapus transaksi tersebut dan mengembalikan saldo.
 - **📄 Laporan Tahunan**: Lihat ringkasan finansial sepanjang tahun dengan bar chart perbandingan pemasukan vs pengeluaran per bulan. Navigasi antar tahun.
 - **🔐 Kunci Aplikasi (PIN/Biometric)**: Amankan aplikasi dengan PIN 4 digit atau biometrik (Face ID / Fingerprint). Aktifkan/nonaktifkan dari pengaturan.
 - **🌓 Tema & Font Premium (Dark/Light/Auto)**: Pilih tema tampilan sesuai preferensi Anda. Mode Auto mengikuti pengaturan sistem **secara live** (tidak perlu restart). Font **Inter** di 4 weight (Regular/Medium/SemiBold/Bold) memberikan tipografi modern dan nyaman dibaca. Tema Gelap atau Terang bisa dipilih manual dari tab Pengaturan.
@@ -51,9 +51,10 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 - **💳 Arus Kas (Cash Flow)**: Lihat net cash flow tahun berjalan dengan indikator positif/negatif di dashboard.
 - **📊 Kekayaan Bersih (Net Worth)**: Pantau total kekayaan bersih secara real-time (saldo wallet + aset manual — utang). Dilengkapi **sparkline SVG tren 12 bulan** langsung di kartu ringkas dashboard, line chart di halaman detail, dan snapshot otomatis setiap bulan.
 - **📅 Kalender Transaksi**: Lihat transaksi harian dalam tampilan kalender grid 7×6 dengan dot indikator. Tap hari untuk melihat detail transaksi via bottom sheet. Navigasi bulan dengan swipe gesture.
-- **🔁 Manajemen Langganan (Subscriptions)**: Catat semua langganan (Netflix, Spotify, dll) dengan siklus bulanan/tahunan. Engine auto-create transaksi saat tagihan jatuh tempo + reminder H-1 via kalender. Total biaya bulanan otomatis dihitung.
+- **🔁 Manajemen Langganan (Subscriptions)**: Catat semua langganan (Netflix, Spotify, dll) dengan siklus bulanan/3-bulanan/tahunan. Pilih **dompet & kategori pembayaran** plus toggle **"Catat transaksi otomatis"** dan **"Ingatkan H-1"**, sehingga engine benar-benar membukukan pengeluaran saat tagihan jatuh tempo — termasuk **menyusul semua siklus yang terlewat** bila aplikasi lama tidak dibuka. Langganan lama tanpa dompet/kategori otomatis memakai dompet utama & kategori "Lainnya". Total biaya bulanan dihitung otomatis.
 - **💰 Sisa Budget Harian (Safe to Spend)**: Proyeksi sisa saldo yang aman dibelanjakan per hari dalam **kartu ringkas** dengan progress bar visual. Berdasarkan saldo, tagihan mendatang, target tabungan, **dan gaji yang akan datang dalam bulan berjalan**. Toggle on/off di pengaturan. Dilengkapi halaman forecast 30 hari dengan line chart.
-- **🔔 Notifikasi Push Lokal**: Notifikasi sistem sungguhan (bukan sekadar Alert) via `expo-notifications`. Mencakup **Pengingat Harian** ("Catat pengeluaran hari ini", toggle di Pengaturan), peringatan anggaran 90%/100%, pengingat tagihan H-1 (pukul 09.00), dan pengingat perpanjangan langganan H-1. Android memakai *notification channels* terpisah (Peringatan Anggaran, Pengingat Tagihan, Pengingat Harian, Langganan) dan semua reminder di-reschedule otomatis setiap aplikasi dibuka.
+- **🤝 Utang & Piutang (Debt Tracking)**: Catat uang yang kamu **pinjamkan (piutang)** atau **pinjam (utang)** per orang, lengkap dengan jatuh tempo, dompet, dan catatan. Setiap pencatatan dan pelunasan **otomatis membuat transaksi nyata** sehingga saldo dompet & laporan tetap sinkron (opsional saat membuat). Mendukung **pembayaran bertahap** dengan progress bar, pelunasan otomatis saat lunas, indikator jatuh tempo (terlewat / hari ini / n hari lagi), kartu ringkas posisi bersih, dan filter Belum Lunas/Semua. Sisa piutang/utang ikut diperhitungkan di **Kekayaan Bersih**.
+- **🔔 Notifikasi Push Lokal**: Notifikasi sistem sungguhan (bukan sekadar Alert) via `expo-notifications`. Mencakup **Pengingat Harian** ("Catat pengeluaran hari ini") dengan **jam yang bisa diatur** di Pengaturan (stepper 30 menit, default 20.00) dan langsung dijadwalkan ulang tanpa perlu restart, peringatan anggaran 90%/100%, pengingat tagihan H-1 (pukul 09.00), dan pengingat perpanjangan langganan H-1. Android memakai *notification channels* terpisah (Peringatan Anggaran, Pengingat Tagihan, Pengingat Harian, Langganan) dan semua reminder di-reschedule otomatis setiap aplikasi dibuka.
 - **☁️ Backup Cloud Akun (Supabase)**: Layar **"Backup Cloud"** untuk menyimpan data ke Supabase Storage dengan **akun username & password** (tanpa email). Fitur: daftar/masuk akun, backup manual, daftar backup tersimpan (tanggal + ukuran file), restore dengan konfirmasi, hapus backup, dan toggle **"Unggah Otomatis"** yang mengikuti jadwal Backup Otomatis. Maksimal 10 backup terbaru disimpan — backup lama otomatis dihapus. Konfigurasi via `.env` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`) dengan panduan setup SQL di [`supabase-setup.sql`](./supabase-setup.sql).
 - **🧾 Rekonsiliasi Saldo Dompet Otomatis**: Setiap kali aplikasi dibuka, saldo semua dompet diverifikasi ulang dari `initial_balance + jumlah transaksi` dan dikoreksi otomatis jika selisih (mencegah drift saldo akibat data tidak konsisten).
 
@@ -82,7 +83,7 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 * **Framework**: React Native 0.86 & Expo SDK ~57 (React 19.2.4)
 * **Routing**: Expo Router (File-based routing)
 * **Bahasa**: TypeScript
-* **Database**: `expo-sqlite` (SQLite lokal, migrasi v5 — kolom rollover pada `budgets`; `PRAGMA journal_mode=WAL` + `busy_timeout` untuk mencegah lock saat akses konkuren)
+* **Database**: `expo-sqlite` (SQLite lokal, migrasi v7 — tabel `debts` & `debt_payments`, kolom `bill_reminders.paid_transaction_id`, perbaikan `wallets.initial_balance`; `PRAGMA journal_mode=WAL` + `busy_timeout` untuk mencegah lock saat akses konkuren)
 * **Visualisasi Data**: `react-native-gifted-charts`
 * **Date Picker**: `react-native-ui-datepicker`
 * **Manajemen Tanggal**: `dayjs`
@@ -156,7 +157,11 @@ npm test
 | `src/__tests__/forecast.test.ts` | Forecast 30 hari & Safe to Spend — injeksi gaji, anti double-counting, recurring expense, batas bulan |
 | `src/__tests__/backup.test.ts` | Backup — gather data, backup lokal, share sheet, scheduler (interval), Google Drive SAF |
 | `src/__tests__/cloudBackup.test.ts` | Supabase Cloud Backup — auth (sign up/in/out), upload, list, restore, delete, auto-upload toggle |
-| `src/__tests__/reconcile.test.ts` | Rekonsiliasi saldo dompet — koreksi drift, saldo sudah akurat tetap utuh |
+| `src/__tests__/reconcile.test.ts` | Rekonsiliasi saldo dompet — koreksi drift, saldo sudah akurat tetap utuh, regresi dompet baru tidak dinolkan |
+| `src/__tests__/wallets.test.ts` | WalletQueries — `initial_balance` saat create, geser saldo saat edit, pindah dompet utama saat hapus, fallback dompet/kategori |
+| `src/__tests__/subscriptions.test.ts` | Langganan — auto-create transaksi, fallback data lama, `auto_create` off, susul siklus terlewat, siklus tahunan/kuartalan |
+| `src/__tests__/bills.test.ts` | Tagihan — lunas mencatat pengeluaran, maju jatuh tempo bulanan/tahunan, sekali pakai, batal lunas menghapus transaksi |
+| `src/__tests__/debts.test.ts` | Utang/Piutang — arah transaksi, pembayaran bertahap, pelunasan, batas nominal, ringkasan, kontribusi ke Net Worth |
 | `src/__tests__/bootPath.test.ts` | Boot path isolation — lazy Supabase client tidak membuka SQLite kedua saat startup |
 | `src/__tests__/theme.test.tsx` | ThemeProvider — dark/light/auto, live system theme, cycle, error outside provider |
 
@@ -184,6 +189,7 @@ FinTrack/
 │   │   ├── subscription/       # Form langganan [id].tsx
 │   │   ├── cloud-backup.tsx    # Backup Cloud Supabase (akun username/password)
 │   │   ├── net-worth.tsx       # Kekayaan bersih (Net Worth Tracker)
+│   │   ├── debts.tsx           # Utang & Piutang per orang (debt tracking)
 │   │   ├── asset/              # Form aset [id].tsx
 │   │   ├── liability/          # Form utang [id].tsx
 │   │   ├── forecast.tsx        # Proyeksi 30 hari (Safe to Spend)
@@ -211,7 +217,7 @@ FinTrack/
 │   │   ├── forecast/           # Safe to spend & forecast engine (aware gaji)
 │   │   ├── wallets/            # Rekonsiliasi saldo dompet otomatis (reconcile.ts)
 │   │   └── notifications/      # Kalender sync, budget reminder & notifikasi push lokal (expo-notifications)
-│   ├── lib/                    # SQLite schema, migration (v1–v5), seed, query classes
+│   ├── lib/                    # SQLite schema, migration (v1–v7), seed, query classes
 │   ├── types/                  # Definisi tipe TypeScript global
 │   ├── utils/                  # Format Rupiah, haptic, payroll period, proyeksi gaji (salary.ts)
 │   └── __tests__/              # Unit test (Jest + Testing Library)
@@ -230,7 +236,6 @@ FinTrack/
 Berikut fitur-fitur yang sedang direncanakan untuk pengembangan selanjutnya:
 
 - 💱 **Multi Mata Uang** — dukung mata uang selain IDR dengan kurs dinamis
-- 💳 **Pencatatan Utang/Piutang (Debt Tracking)** — catat siapa yang berutang atau memberi utang
 - 📊 **Split Transaksi** — satu transaksi dibagi ke beberapa kategori
 - 📥 **Export CSV** — ekspor data transaksi ke format CSV
 - 📱 **Widget Home Screen** — ringkasan cepat di layar utama HP Android/iOS

@@ -4,7 +4,7 @@ import { DEFAULT_WALLETS } from '../constants/wallets';
 import { bootCheckpoint } from '../lib/bootLog';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 6;
+  const DATABASE_VERSION = 7;
 
   // Wait for locks instead of aborting with "database is locked" when
   // concurrent queries race with a write transaction (expo-sqlite on Android).
@@ -335,6 +335,70 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     });
 
     currentDbVersion = 6;
+  }
+
+  if (currentDbVersion === 6) {
+    const hasColumn = async (table: string, column: string) => {
+      const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+      return cols.some(c => c.name === column);
+    };
+
+    await db.withTransactionAsync(async () => {
+      // Repair wallets whose initial_balance was never written on insert (pre-fix
+      // wallets.tsx omitted the column), which reconcileWalletBalances would then
+      // treat as a real 0 opening balance and wipe the saldo.
+      const broken = await db.getAllAsync<{ id: number; balance: number }>(
+        'SELECT id, balance FROM wallets WHERE COALESCE(initial_balance, 0) = 0 AND balance <> 0'
+      );
+      for (const w of broken) {
+        const { total } = await db.getFirstAsync<{ total: number }>(
+          `SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END), 0) as total
+           FROM transactions WHERE wallet_id = ?`,
+          [w.id]
+        ) ?? { total: 0 };
+        const initial = Math.round((w.balance - total) * 100) / 100;
+        if (initial !== 0) {
+          await db.runAsync('UPDATE wallets SET initial_balance = ? WHERE id = ?', [initial, w.id]);
+        }
+      }
+
+      if (!(await hasColumn('bill_reminders', 'paid_transaction_id'))) {
+        await db.execAsync(`ALTER TABLE bill_reminders ADD COLUMN paid_transaction_id INTEGER;`);
+      }
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS debts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          person_name TEXT NOT NULL,
+          direction TEXT NOT NULL CHECK(direction IN ('receivable', 'payable')),
+          amount REAL NOT NULL,
+          paid_amount REAL NOT NULL DEFAULT 0,
+          due_date TEXT,
+          wallet_id INTEGER,
+          notes TEXT,
+          is_settled INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (wallet_id) REFERENCES wallets (id)
+        );
+
+        CREATE TABLE IF NOT EXISTS debt_payments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          debt_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          payment_date TEXT NOT NULL,
+          transaction_id INTEGER,
+          notes TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (debt_id) REFERENCES debts (id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_debts_settled ON debts(is_settled);
+        CREATE INDEX IF NOT EXISTS idx_debt_pay_debt ON debt_payments(debt_id);
+      `);
+    });
+
+    currentDbVersion = 7;
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

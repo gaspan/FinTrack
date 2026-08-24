@@ -11,6 +11,7 @@ const SETTINGS_KEYS = [
   'safe_to_spend_enabled', 'payroll_enabled', 'payroll_day', 'payroll_category_id',
   'app_pin_hash', 'app_biometric_enabled', 'auto_backup_enabled', 'backup_interval_days',
   'last_backup_date', 'last_auto_backup_date', 'onboarding_done',
+  'notif_enabled', 'daily_reminder_enabled', 'daily_reminder_time', 'theme_preference',
 ];
 
 export interface BackupData {
@@ -30,11 +31,13 @@ export interface BackupData {
   tags?: any[];
   transaction_tags?: any[];
   transaction_attachments?: any[];
+  debts?: any[];
+  debt_payments?: any[];
   settings?: Record<string, string | null>;
 }
 
 export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> {
-  const [wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs, tags, tagLinks, attachments] = await Promise.all([
+  const [wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs, tags, tagLinks, attachments, debts, debtPayments] = await Promise.all([
     db.getAllAsync('SELECT * FROM wallets'),
     db.getAllAsync('SELECT * FROM categories'),
     db.getAllAsync('SELECT * FROM transactions'),
@@ -49,6 +52,8 @@ export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> 
     db.getAllAsync('SELECT * FROM tags'),
     db.getAllAsync('SELECT * FROM transaction_tags'),
     db.getAllAsync('SELECT * FROM transaction_attachments'),
+    db.getAllAsync('SELECT * FROM debts'),
+    db.getAllAsync('SELECT * FROM debt_payments'),
   ]);
 
   const settings: Record<string, string | null> = {};
@@ -57,7 +62,7 @@ export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> 
   }
 
   return {
-    version: 4,
+    version: 5,
     exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     wallets, categories, transactions, budgets,
     recurring_transactions: recurring,
@@ -67,6 +72,7 @@ export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> 
     net_worth_snapshots: snapshots,
     subscriptions: subs,
     tags, transaction_tags: tagLinks, transaction_attachments: attachments,
+    debts, debt_payments: debtPayments,
     settings,
   };
 }
@@ -138,6 +144,8 @@ export const applyBackupData = async (
     await db.execAsync('DELETE FROM transaction_tags');
     await db.execAsync('DELETE FROM tags');
     await db.execAsync('DELETE FROM transaction_attachments');
+    await db.execAsync('DELETE FROM debt_payments');
+    await db.execAsync('DELETE FROM debts');
     await db.execAsync('DELETE FROM subscriptions');
     await db.execAsync('DELETE FROM net_worth_snapshots');
     await db.execAsync('DELETE FROM bill_reminders');
@@ -212,8 +220,20 @@ export const applyBackupData = async (
     }
     for (const r of data.bill_reminders || []) {
       await db.runAsync(
-        'INSERT INTO bill_reminders (id, name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes, calendar_event_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [r.id, r.name, r.amount, r.due_date, r.frequency, r.is_paid, r.category_id, r.wallet_id, r.notes, r.calendar_event_id, r.created_at]
+        'INSERT INTO bill_reminders (id, name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes, calendar_event_id, paid_transaction_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [r.id, r.name, r.amount, r.due_date, r.frequency, r.is_paid, r.category_id, r.wallet_id, r.notes, r.calendar_event_id, r.paid_transaction_id ?? null, r.created_at]
+      );
+    }
+    for (const d of data.debts || []) {
+      await db.runAsync(
+        'INSERT INTO debts (id, person_name, direction, amount, paid_amount, due_date, wallet_id, notes, is_settled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [d.id, d.person_name, d.direction, d.amount, d.paid_amount || 0, d.due_date, d.wallet_id, d.notes, d.is_settled || 0, d.created_at, d.updated_at]
+      );
+    }
+    for (const p of data.debt_payments || []) {
+      await db.runAsync(
+        'INSERT INTO debt_payments (id, debt_id, amount, payment_date, transaction_id, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [p.id, p.debt_id, p.amount, p.payment_date, p.transaction_id, p.notes, p.created_at]
       );
     }
     for (const t of data.tags || []) {

@@ -93,6 +93,18 @@ export default function SettingsScreen() {
     cycleTheme();
   }, [cycleTheme]);
 
+  const shiftReminderTime = useCallback((deltaMinutes: number) => {
+    setDailyReminderTime((prev) => {
+      const [h, m] = prev.split(':').map(Number);
+      const total = (h * 60 + m + deltaMinutes + 1440) % 1440;
+      const next = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+      AsyncStorage.setItem(DAILY_REMINDER_TIME_KEY, next).then(() =>
+        rescheduleAllReminders(db).catch(() => {})
+      );
+      return next;
+    });
+  }, [db]);
+
   const updatePayrollSetting = useCallback(<K extends keyof PayrollSettings>(key: K, value: PayrollSettings[K]) => {
     setPayrollSettings(prev => {
       const next = { ...prev, [key]: value };
@@ -246,6 +258,42 @@ export default function SettingsScreen() {
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/debts' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#F9731620' }]}>
+              <Ionicons name="people-outline" size={20} color="#F97316" />
+            </View>
+            <Text style={styles.itemTitle}>Utang & Piutang</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/forecast' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#0EA5E920' }]}>
+              <Ionicons name="trending-up-outline" size={20} color="#0EA5E9" />
+            </View>
+            <Text style={styles.itemTitle}>Proyeksi 30 Hari</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/transactions/calendar' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#A855F720' }]}>
+              <Ionicons name="calendar-outline" size={20} color="#A855F7" />
+            </View>
+            <Text style={styles.itemTitle}>Kalender Transaksi</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.item} onPress={() => {
           const newVal = !safeToSpendEnabled;
           setSafeToSpendEnabled(newVal);
@@ -355,14 +403,16 @@ export default function SettingsScreen() {
 
         <TouchableOpacity
           style={styles.item}
-          onPress={() => {
+          onPress={async () => {
             const newVal = !notifEnabled;
             setNotifEnabled(newVal);
-            AsyncStorage.setItem(NOTIF_ENABLED_KEY, newVal ? 'true' : 'false');
+            await AsyncStorage.setItem(NOTIF_ENABLED_KEY, newVal ? 'true' : 'false');
             if (!newVal) {
               setDailyReminder(false);
-              AsyncStorage.removeItem(DAILY_REMINDER_KEY);
+              await AsyncStorage.removeItem(DAILY_REMINDER_KEY);
             }
+            // Apply immediately instead of waiting for the next app launch.
+            rescheduleAllReminders(db).catch(() => {});
           }}
         >
           <View style={styles.itemLeft}>
@@ -378,10 +428,11 @@ export default function SettingsScreen() {
           <>
             <TouchableOpacity
               style={styles.item}
-              onPress={() => {
+              onPress={async () => {
                 const newVal = !dailyReminder;
                 setDailyReminder(newVal);
-                AsyncStorage.setItem(DAILY_REMINDER_KEY, newVal ? 'true' : 'false');
+                await AsyncStorage.setItem(DAILY_REMINDER_KEY, newVal ? 'true' : 'false');
+                rescheduleAllReminders(db).catch(() => {});
               }}
             >
               <View style={styles.itemLeft}>
@@ -392,6 +443,26 @@ export default function SettingsScreen() {
               </View>
               <Text style={styles.itemSub}>{dailyReminder ? 'Aktif' : 'Nonaktif'}</Text>
             </TouchableOpacity>
+
+            {dailyReminder && (
+              <View style={styles.item}>
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
+                    <Ionicons name="time-outline" size={20} color="#8B5CF6" />
+                  </View>
+                  <Text style={styles.itemTitle}>Jam pengingat</Text>
+                </View>
+                <View style={styles.dayStepper}>
+                  <TouchableOpacity style={styles.dayButton} onPress={() => shiftReminderTime(-30)}>
+                    <Ionicons name="remove" size={18} color={theme.colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={[styles.dayValue, { minWidth: 52 }]}>{dailyReminderTime}</Text>
+                  <TouchableOpacity style={styles.dayButton} onPress={() => shiftReminderTime(30)}>
+                    <Ionicons name="add" size={18} color={theme.colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </>
         )}
       </View>

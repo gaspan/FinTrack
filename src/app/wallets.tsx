@@ -16,6 +16,7 @@ export default function WalletsScreen() {
   const db = useSQLiteContext();
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Wallet | null>(null);
 
   const loadData = useCallback(async () => {
     try { setWallets(await new WalletQueries(db).getAll()); } catch (e) { console.error(e); }
@@ -23,22 +24,45 @@ export default function WalletsScreen() {
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  const handleAdd = async (data: { name: string; balance: number; icon: string; color: string }) => {
-    const existing = wallets.find(w => w.name.toLowerCase() === data.name.trim().toLowerCase());
-    if (existing) { Alert.alert('Duplikat', `Dompet "${data.name}" sudah ada.`); return; }
+  const closeForm = () => { setShowForm(false); setEditing(null); };
+
+  const handleSubmit = async (data: { name: string; balance: number; icon: string; color: string }) => {
+    const name = data.name.trim();
+    const duplicate = wallets.find(
+      w => w.name.toLowerCase() === name.toLowerCase() && w.id !== editing?.id
+    );
+    if (duplicate) { Alert.alert('Duplikat', `Dompet "${name}" sudah ada.`); return; }
     try {
-      await db.runAsync('INSERT INTO wallets (name, balance, icon, color) VALUES (?, ?, ?, ?)', [data.name, data.balance, data.icon, data.color]);
-      setShowForm(false);
+      const q = new WalletQueries(db);
+      if (editing) await q.update(editing.id, { ...data, name });
+      else await q.create({ ...data, name });
+      closeForm();
       loadData();
-    } catch (e) { console.error(e); Alert.alert('Error', 'Gagal menambah dompet'); }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', editing ? 'Gagal menyimpan dompet' : 'Gagal menambah dompet');
+    }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (wallet: Wallet) => {
     if (wallets.length === 1) { Alert.alert('Gagal', 'Minimal 1 dompet.'); return; }
-    Alert.alert('Hapus Dompet', 'Yakin? Transaksi terkait akan kehilangan referensi.', [
-      { text: 'Batal', style: 'cancel' },
-      { text: 'Hapus', style: 'destructive', onPress: async () => { await db.runAsync('DELETE FROM wallets WHERE id = ?', [id]); loadData(); }},
-    ]);
+    const txCount = await new WalletQueries(db).countTransactions(wallet.id);
+    Alert.alert(
+      'Hapus Dompet',
+      txCount > 0
+        ? `"${wallet.name}" punya ${txCount} transaksi. Transaksi tersebut akan kehilangan referensi dompet. Lanjutkan?`
+        : `Hapus dompet "${wallet.name}"?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Hapus', style: 'destructive',
+          onPress: async () => {
+            try { await new WalletQueries(db).delete(wallet.id); loadData(); }
+            catch (e) { console.error(e); Alert.alert('Error', 'Gagal menghapus dompet'); }
+          },
+        },
+      ]
+    );
   };
 
   const handleSetPrimary = async (id: number) => {
@@ -50,13 +74,17 @@ export default function WalletsScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Manajemen Dompet</Text>
-        <TouchableOpacity onPress={() => setShowForm(true)}>
+        <TouchableOpacity onPress={() => { setEditing(null); setShowForm(true); }}>
           <Ionicons name="add-circle" size={28} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
       {wallets.map(w => (
         <View key={w.id} style={styles.item}>
-          <TouchableOpacity style={styles.itemLeft} onPress={() => !w.is_primary && handleSetPrimary(w.id)}>
+          <TouchableOpacity
+            style={styles.itemLeft}
+            onPress={() => !w.is_primary && handleSetPrimary(w.id)}
+            onLongPress={() => { setEditing(w); setShowForm(true); }}
+          >
             <View style={{ position: 'relative' }}>
               <View style={[styles.icon, { backgroundColor: (w.color || theme.colors.primary) + '20' }]}>
                 <Ionicons name={(w.icon || 'wallet') as any} size={20} color={w.color || theme.colors.primary} />
@@ -76,14 +104,30 @@ export default function WalletsScreen() {
               <Text style={styles.itemBalance}>{formatRupiah(w.balance)}</Text>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(w.id)}>
-            <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
-          </TouchableOpacity>
+          <View style={styles.itemActions}>
+            <TouchableOpacity onPress={() => { setEditing(w); setShowForm(true); }} hitSlop={8}>
+              <Ionicons name="create-outline" size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleDelete(w)} hitSlop={8}>
+              <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
+            </TouchableOpacity>
+          </View>
         </View>
       ))}
-      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowForm(false)}>
+      <Text style={styles.hint}>Tap ikon dompet untuk menjadikan utama, tap ikon pensil untuk mengubah.</Text>
+      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeForm}>
         <View style={styles.modal}>
-          <WalletForm onCancel={() => setShowForm(false)} onSubmit={handleAdd} />
+          <WalletForm
+            key={editing?.id ?? 'new'}
+            initialData={editing ? {
+              name: editing.name,
+              balance: editing.initial_balance ?? editing.balance,
+              icon: editing.icon || 'cash-outline',
+              color: editing.color || theme.colors.primary,
+            } : undefined}
+            onCancel={closeForm}
+            onSubmit={handleSubmit}
+          />
         </View>
       </Modal>
     </ScrollView>
@@ -100,6 +144,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     padding: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border,
   },
   itemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  itemActions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
+  hint: { ...theme.typography.caption, padding: theme.spacing.md, textAlign: 'center' },
   icon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   starBadge: { position: 'absolute', top: -4, right: theme.spacing.md - 4, backgroundColor: theme.colors.surface, borderRadius: 8, padding: 1 },
   starBadgeInactive: { opacity: 0.5 },

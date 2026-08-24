@@ -4,8 +4,8 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, type Theme } from '@/constants/theme';
-import { SubscriptionQueries } from '@/lib/queries';
-import { Subscription } from '@/types';
+import { SubscriptionQueries, WalletQueries, CategoryQueries } from '@/lib/queries';
+import { Subscription, Wallet, Category } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Button } from '@/components/ui/Button';
@@ -41,23 +41,48 @@ export default function SubscriptionFormPage() {
   const [nextBillingDate, setNextBillingDate] = useState('');
   const [icon, setIcon] = useState('card-outline');
   const [color, setColor] = useState('#8B5CF6');
+  const [walletId, setWalletId] = useState<number | undefined>(undefined);
+  const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
+  const [autoCreate, setAutoCreate] = useState(true);
+  const [remind, setRemind] = useState(true);
+  const [notes, setNotes] = useState('');
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
-    if (!isNew && id) {
-      queries.getById(Number(id)).then((sub) => {
+    let alive = true;
+    (async () => {
+      const [ws, cs] = await Promise.all([
+        new WalletQueries(db).getAll(),
+        new CategoryQueries(db).getByType('expense'),
+      ]);
+      if (!alive) return;
+      setWallets(ws);
+      setCategories(cs);
+
+      if (!isNew && id) {
+        const sub = await queries.getById(Number(id));
+        if (!alive) return;
         if (sub) {
           setName(sub.name); setCategory(sub.category);
           setAmount(sub.amount); setBillingCycle(sub.billing_cycle);
           setStartDate(sub.start_date); setNextBillingDate(sub.next_billing_date);
           setIcon(sub.icon); setColor(sub.color);
+          setWalletId(sub.wallet_id ?? undefined);
+          setCategoryId(sub.category_id ?? undefined);
+          setAutoCreate(!!sub.auto_create);
+          setRemind(!!sub.remind);
+          setNotes(sub.notes ?? '');
         }
-        setPageLoading(false);
-      });
-    } else {
+      } else {
+        // Default to the primary wallet so auto-create works without extra taps.
+        setWalletId(ws.find(w => w.is_primary)?.id ?? ws[0]?.id);
+      }
       setPageLoading(false);
-    }
+    })().catch(() => { if (alive) setPageLoading(false); });
+    return () => { alive = false; };
   }, [id]);
 
   const handleSave = async () => {
@@ -71,8 +96,11 @@ export default function SubscriptionFormPage() {
         name: name.trim(), category, amount, billing_cycle: billingCycle,
         start_date: startDate || new Date().toISOString().slice(0, 10),
         next_billing_date: nextBillingDate || new Date().toISOString().slice(0, 10),
-        wallet_id: undefined, category_id: undefined,
-        icon, color, is_active: 1, auto_create: 1, remind: 1, notes: undefined,
+        wallet_id: walletId, category_id: categoryId,
+        icon, color, is_active: 1,
+        auto_create: autoCreate ? 1 : 0,
+        remind: remind ? 1 : 0,
+        notes: notes.trim() || undefined,
       };
       if (isNew) {
         await queries.add(data);
@@ -134,6 +162,60 @@ export default function SubscriptionFormPage() {
         <Input label="Tanggal Mulai" placeholder="YYYY-MM-DD" value={startDate} onChangeText={setStartDate} />
         <Input label="Tagihan Berikutnya" placeholder="YYYY-MM-DD" value={nextBillingDate} onChangeText={setNextBillingDate} />
 
+        <Text style={styles.label}>Dibayar dari Dompet</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+          {wallets.map(w => (
+            <TouchableOpacity
+              key={w.id}
+              style={[styles.chip, walletId === w.id && { backgroundColor: color + '20', borderColor: color }]}
+              onPress={() => setWalletId(w.id)}
+            >
+              <Ionicons
+                name={(w.icon || 'wallet-outline') as any}
+                size={14}
+                color={walletId === w.id ? color : theme.colors.textSecondary}
+              />
+              <Text style={[styles.chipLabel, walletId === w.id && { color, fontWeight: '700' }]}>{w.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <Text style={styles.label}>Kategori Pengeluaran</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+          {categories.map(c => (
+            <TouchableOpacity
+              key={c.id}
+              style={[styles.chip, categoryId === c.id && { backgroundColor: color + '20', borderColor: color }]}
+              onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)}
+            >
+              <Ionicons
+                name={c.icon as any}
+                size={14}
+                color={categoryId === c.id ? color : theme.colors.textSecondary}
+              />
+              <Text style={[styles.chipLabel, categoryId === c.id && { color, fontWeight: '700' }]}>{c.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <TouchableOpacity style={styles.toggleRow} onPress={() => setAutoCreate(v => !v)}>
+          <View style={styles.toggleText}>
+            <Text style={styles.toggleTitle}>Catat transaksi otomatis</Text>
+            <Text style={styles.toggleSub}>Buat pengeluaran saat tagihan jatuh tempo</Text>
+          </View>
+          <Ionicons name={autoCreate ? 'checkbox' : 'square-outline'} size={24} color={color} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.toggleRow} onPress={() => setRemind(v => !v)}>
+          <View style={styles.toggleText}>
+            <Text style={styles.toggleTitle}>Ingatkan H-1</Text>
+            <Text style={styles.toggleSub}>Notifikasi sehari sebelum perpanjangan</Text>
+          </View>
+          <Ionicons name={remind ? 'checkbox' : 'square-outline'} size={24} color={color} />
+        </TouchableOpacity>
+
+        <Input label="Catatan (opsional)" placeholder="Paket keluarga, dibagi 4 orang..." value={notes} onChangeText={setNotes} />
+
         <IconPicker value={icon} onChange={setIcon} color={color} />
         <ColorPicker value={color} onChange={setColor} />
 
@@ -159,5 +241,19 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   cycleRow: { flexDirection: 'row', gap: 10, marginBottom: theme.spacing.md },
   cycleBtn: { flex: 1, padding: 12, borderRadius: 12, borderWidth: 2, borderColor: theme.colors.border, alignItems: 'center' },
   cycleLabel: { fontSize: 13, color: theme.colors.textSecondary },
+  chipScroll: { marginBottom: theme.spacing.md },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 8, marginRight: 8,
+    borderRadius: 20, borderWidth: 2, borderColor: theme.colors.border,
+  },
+  chipLabel: { fontSize: 12, color: theme.colors.textSecondary },
+  toggleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: theme.spacing.sm, marginBottom: theme.spacing.sm,
+  },
+  toggleText: { flex: 1, paddingRight: theme.spacing.md },
+  toggleTitle: { ...theme.typography.body, fontWeight: '500' },
+  toggleSub: { ...theme.typography.caption },
   buttonRow: { flexDirection: 'row', gap: 12, marginTop: theme.spacing.lg },
 });
