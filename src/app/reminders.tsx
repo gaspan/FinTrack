@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { BillReminderQueries, CategoryQueries, WalletQueries } from '@/lib/queries';
 import { BillReminder, Category, Wallet } from '@/types';
 import { syncBillToCalendar, deleteEventFromCalendar, updateEventInCalendar } from '@/features/notifications/calendarSync';
@@ -25,6 +26,8 @@ export default function RemindersScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [reminders, setReminders] = useState<(BillReminder & { category_name?: string; wallet_name?: string })[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -46,15 +49,15 @@ export default function RemindersScreen() {
   const loadData = useCallback(async () => {
     try {
       const [r, c, w] = await Promise.all([
-        new BillReminderQueries(db).getAll(),
-        new CategoryQueries(db).getAll(),
-        new WalletQueries(db).getAll(),
+        new BillReminderQueries(db, bookId).getAll(),
+        new CategoryQueries(db, bookId).getAll(),
+        new WalletQueries(db, bookId).getAll(),
       ]);
       setReminders(r);
       setCategories(c);
       setWallets(w);
     } catch (e) { console.error(e); }
-  }, [db]);
+  }, [db, bookId]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -73,7 +76,7 @@ export default function RemindersScreen() {
     if (!formName || formAmount <= 0) return;
     try {
       setLoading(true);
-      const q = new BillReminderQueries(db);
+      const q = new BillReminderQueries(db, bookId);
       const dueDate = formDueDate || dayjs().add(1, 'month').format('YYYY-MM-DD');
 
       if (editingId) {
@@ -115,7 +118,7 @@ export default function RemindersScreen() {
   };
 
   const handleTogglePaid = async (id: number, current: number) => {
-    const q = new BillReminderQueries(db);
+    const q = new BillReminderQueries(db, bookId);
     const bill = reminders.find(r => r.id === id);
 
     if (current !== 0) {
@@ -175,8 +178,8 @@ export default function RemindersScreen() {
     Alert.alert('Hapus', 'Yakin ingin menghapus?', [
       { text: 'Batal', style: 'cancel' },
       { text: 'Hapus', style: 'destructive', onPress: async () => {
-        const bill = await new BillReminderQueries(db).getAll().then(b => b.find(r => r.id === id));
-        await new BillReminderQueries(db).delete(id);
+        const bill = await new BillReminderQueries(db, bookId).getAll().then(b => b.find(r => r.id === id));
+        await new BillReminderQueries(db, bookId).delete(id);
         if (bill?.calendar_event_id) {
           try { await deleteEventFromCalendar(bill.calendar_event_id); } catch {}
         }

@@ -21,10 +21,11 @@ beforeEach(() => {
 });
 
 describe('backupRestore', () => {
-  it('gatherBackupData mengumpulkan seluruh tabel dengan versi 5', async () => {
+  it('gatherBackupData mengumpulkan seluruh tabel dengan versi 6', async () => {
     const data = await gatherBackupData(db);
 
-    expect(data.version).toBe(5);
+    expect(data.version).toBe(6);
+    expect(data.books).toEqual([]);
     expect(data.wallets).toEqual([]);
     expect(data.transactions).toEqual([]);
     expect(data.tags).toEqual([]);

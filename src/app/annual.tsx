@@ -7,6 +7,7 @@ import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { ChartQueries, TransactionQueries } from '@/lib/queries';
 import { formatRupiah } from '@/utils/format';
 
@@ -18,6 +19,8 @@ export default function AnnualReportScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [year, setYear] = useState(dayjs().year());
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<{ month: string; income: number; expense: number }[]>([]);
@@ -27,7 +30,7 @@ export default function AnnualReportScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const chartQueries = new ChartQueries(db);
+      const chartQueries = new ChartQueries(db, bookId);
       const startDate = `${year}-01-01`;
       const endDate = `${year}-12-31`;
       const summary = await chartQueries.getSummary(startDate, endDate);
@@ -44,7 +47,7 @@ export default function AnnualReportScreen() {
       setMonthlyData(data);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [db, year]);
+  }, [db, bookId, year]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 

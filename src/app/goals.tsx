@@ -7,6 +7,7 @@ import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { SavingsGoalQueries, WalletQueries } from '@/lib/queries';
 import { SavingsGoal, Wallet } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -23,6 +24,8 @@ export default function GoalsScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const router = useRouter();
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -41,13 +44,13 @@ export default function GoalsScreen() {
   const loadData = useCallback(async () => {
     try {
       const [g, w] = await Promise.all([
-        new SavingsGoalQueries(db).getAll(),
-        new WalletQueries(db).getAll(),
+        new SavingsGoalQueries(db, bookId).getAll(),
+        new WalletQueries(db, bookId).getAll(),
       ]);
       setGoals(g);
       setWallets(w);
     } catch (e) { console.error(e); }
-  }, [db]);
+  }, [db, bookId]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -64,7 +67,7 @@ export default function GoalsScreen() {
     if (!formName || formTarget <= 0) return;
     try {
       setLoading(true);
-      await new SavingsGoalQueries(db).create({
+      await new SavingsGoalQueries(db, bookId).create({
         name: formName, target_amount: formTarget,
         deadline: formDeadline || null, wallet_id: formWallet,
         icon: formIcon, color: formColor,
@@ -80,7 +83,7 @@ export default function GoalsScreen() {
     Alert.alert('Hapus Target', 'Yakin ingin menghapus target ini?', [
       { text: 'Batal', style: 'cancel' },
       { text: 'Hapus', style: 'destructive', onPress: async () => {
-        await new SavingsGoalQueries(db).delete(id);
+        await new SavingsGoalQueries(db, bookId).delete(id);
         loadData();
       }},
     ]);
@@ -89,17 +92,17 @@ export default function GoalsScreen() {
   const handleAddFunds = async () => {
     if (!fundGoalId || fundAmount <= 0) return;
     try {
-      const goals = await new SavingsGoalQueries(db).getAll();
+      const goals = await new SavingsGoalQueries(db, bookId).getAll();
       const goal = goals.find(g => g.id === fundGoalId);
       if (!goal) return;
 
-      await new SavingsGoalQueries(db).addFunds(goal.id, fundAmount);
+      await new SavingsGoalQueries(db, bookId).addFunds(goal.id, fundAmount);
       if (goal.wallet_id) {
         await db.runAsync('UPDATE wallets SET balance = balance - ? WHERE id = ?', [fundAmount, goal.wallet_id]);
       }
       const newTotal = goal.current_amount + fundAmount;
       if (newTotal >= goal.target_amount) {
-        await new SavingsGoalQueries(db).markCompleted(goal.id, true);
+        await new SavingsGoalQueries(db, bookId).markCompleted(goal.id, true);
       }
       Alert.alert('Berhasil', `Dana sebesar ${formatRupiah(fundAmount)} berhasil ditambahkan.`);
       setFundGoalId(null);

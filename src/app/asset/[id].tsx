@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { NetWorthQueries } from '@/lib/queries';
 import { Asset } from '@/types';
 import { Input } from '@/components/ui/Input';
@@ -21,9 +22,11 @@ export default function AssetFormPage() {
   const db = useSQLiteContext();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNew = id === 'new';
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const queries = new NetWorthQueries(db);
+  const queries = new NetWorthQueries(db, bookId);
 
   const [name, setName] = useState('');
   const [type, setType] = useState<Asset['type']>('investment');

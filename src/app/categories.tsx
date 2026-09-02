@@ -5,6 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { CategoryQueries } from '@/lib/queries';
 import { Category, TransactionType } from '@/types';
 import { CategoryForm } from '@/components/forms/CategoryForm';
@@ -13,22 +14,24 @@ export default function CategoriesScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [categories, setCategories] = useState<Category[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   const loadData = useCallback(async () => {
-    try { setCategories(await new CategoryQueries(db).getAll()); } catch (e) { console.error(e); }
-  }, [db]);
+    try { setCategories(await new CategoryQueries(db, bookId).getAll()); } catch (e) { console.error(e); }
+  }, [db, bookId]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const handleSave = async (data: { name: string; type: TransactionType; icon: string; color: string }) => {
     try {
       if (editingCategory) {
-        await new CategoryQueries(db).update(editingCategory.id, data);
+        await new CategoryQueries(db, bookId).update(editingCategory.id, data);
       } else {
-        await new CategoryQueries(db).create(data);
+        await new CategoryQueries(db, bookId).create(data);
       }
       setShowForm(false);
       setEditingCategory(null);
@@ -53,7 +56,7 @@ export default function CategoriesScreen() {
             Alert.alert(cat.name, '', [
               { text: 'Batal', style: 'cancel' },
               { text: 'Edit', onPress: () => { setEditingCategory(cat); setShowForm(true); }},
-              { text: 'Hapus', style: 'destructive', onPress: async () => { await new CategoryQueries(db).delete(cat.id); loadData(); }},
+              { text: 'Hapus', style: 'destructive', onPress: async () => { await new CategoryQueries(db, bookId).delete(cat.id); loadData(); }},
             ]);
           }}
         >

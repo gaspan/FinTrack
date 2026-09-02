@@ -7,6 +7,7 @@ import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { RecurringQueries, CategoryQueries, WalletQueries } from '@/lib/queries';
 import { RecurringTransaction, Category, Wallet, TransactionType } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +39,8 @@ export default function RecurringScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const router = useRouter();
   const [recurrings, setRecurrings] = useState<(RecurringTransaction & { category_name: string; wallet_name: string })[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -58,22 +61,22 @@ export default function RecurringScreen() {
   const loadData = useCallback(async () => {
     try {
       const [recs, cats, walls, salary] = await Promise.all([
-        new RecurringQueries(db).getAll(),
-        new CategoryQueries(db).getAll(),
-        new WalletQueries(db).getAll(),
-        getSalaryProjection(db).catch(() => null),
+        new RecurringQueries(db, bookId).getAll(),
+        new CategoryQueries(db, bookId).getAll(),
+        new WalletQueries(db, bookId).getAll(),
+        getSalaryProjection(db, bookId).catch(() => null),
       ]);
       setRecurrings(recs);
       setCategories(cats);
       setWallets(walls);
       setSalaryProjection(salary);
     } catch (e) { console.error(e); }
-  }, [db]);
+  }, [db, bookId]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const handleToggle = async (id: number, current: number) => {
-    await new RecurringQueries(db).toggle(id, current === 0);
+    await new RecurringQueries(db, bookId).toggle(id, current === 0);
     loadData();
   };
 
@@ -81,7 +84,7 @@ export default function RecurringScreen() {
     Alert.alert('Hapus Transaksi Berulang', 'Yakin ingin menghapus?', [
       { text: 'Batal', style: 'cancel' },
       { text: 'Hapus', style: 'destructive', onPress: async () => {
-        await new RecurringQueries(db).delete(id);
+        await new RecurringQueries(db, bookId).delete(id);
         loadData();
       }},
     ]);
@@ -108,7 +111,7 @@ export default function RecurringScreen() {
           [formType, formAmount, formCategory, formWallet, formFrequency, formNotes || null, editingId]
         );
       } else {
-        await new RecurringQueries(db).create({
+        await new RecurringQueries(db, bookId).create({
           type: formType, amount: formAmount, category_id: formCategory,
           wallet_id: formWallet, frequency: formFrequency,
           next_date: formNextDate,

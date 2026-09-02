@@ -4,27 +4,27 @@ import { SafeToSpendData, ForecastPoint } from '@/types';
 import { WalletQueries, TransactionQueries, RecurringQueries, SavingsGoalQueries, BillReminderQueries, SubscriptionQueries } from '@/lib/queries';
 import { getSalaryProjection } from '@/utils/salary';
 
-export async function calculateSafeToSpend(db: SQLiteDatabase): Promise<SafeToSpendData | null> {
+export async function calculateSafeToSpend(db: SQLiteDatabase, bookId: number): Promise<SafeToSpendData | null> {
   const today = dayjs();
   const endOfMonth = today.endOf('month');
   const daysRemaining = endOfMonth.diff(today, 'day');
 
-  const walletQueries = new WalletQueries(db);
+  const walletQueries = new WalletQueries(db, bookId);
   const wallets = await walletQueries.getAll();
   if (wallets.length === 0) return null;
   const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
 
-  const subQueries = new SubscriptionQueries(db);
-  const recurringQueries = new RecurringQueries(db);
-  const reminderQueries = new BillReminderQueries(db);
-  const goalQueries = new SavingsGoalQueries(db);
+  const subQueries = new SubscriptionQueries(db, bookId);
+  const recurringQueries = new RecurringQueries(db, bookId);
+  const reminderQueries = new BillReminderQueries(db, bookId);
+  const goalQueries = new SavingsGoalQueries(db, bookId);
 
   const [upcomingSubs, allRecurring, allReminders, goals, salary] = await Promise.all([
     subQueries.getUpcomingRenewals(daysRemaining),
     recurringQueries.getActive(),
     reminderQueries.getAll(),
     goalQueries.getAll(),
-    getSalaryProjection(db).catch(() => null),
+    getSalaryProjection(db, bookId).catch(() => null),
   ]);
 
   const upcomingBills =
@@ -69,22 +69,22 @@ export async function calculateSafeToSpend(db: SQLiteDatabase): Promise<SafeToSp
   };
 }
 
-export async function generateForecast(db: SQLiteDatabase, days: number = 30): Promise<ForecastPoint[]> {
+export async function generateForecast(db: SQLiteDatabase, days: number = 30, bookId: number = 1): Promise<ForecastPoint[]> {
   const today = dayjs();
   const points: ForecastPoint[] = [];
 
-  const walletQueries = new WalletQueries(db);
+  const walletQueries = new WalletQueries(db, bookId);
   const wallets = await walletQueries.getAll();
   let currentBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
 
-  const recurringQueries = new RecurringQueries(db);
+  const recurringQueries = new RecurringQueries(db, bookId);
   const [allRecurring, salary] = await Promise.all([
     recurringQueries.getActive(),
-    getSalaryProjection(db).catch(() => null),
+    getSalaryProjection(db, bookId).catch(() => null),
   ]);
   const hasRecurringIncome = allRecurring.some(r => r.type === 'income' && r.is_active === 1);
 
-  const txQueries = new TransactionQueries(db);
+  const txQueries = new TransactionQueries(db, bookId);
   const last30Days = await txQueries.getByDateRange(
     today.subtract(30, 'day').format('YYYY-MM-DD'),
     today.format('YYYY-MM-DD')

@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { NetWorthQueries } from '@/lib/queries';
 import { Asset, Liability, NetWorthSnapshot } from '@/types';
 import { formatRupiah } from '@/utils/format';
@@ -13,9 +14,11 @@ import { LiabilitiesList } from '@/components/networth/LiabilitiesList';
 
 export default function NetWorthPage() {
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const queries = new NetWorthQueries(db);
+  const queries = new NetWorthQueries(db, bookId);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,7 +42,7 @@ export default function NetWorthPage() {
     setAssets(assetsData);
     setLiabilities(liabData);
     setHistory(hist);
-  }, [db]);
+  }, [db, bookId]);
 
   useFocusEffect(
     useCallback(() => {

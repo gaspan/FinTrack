@@ -7,6 +7,7 @@ import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { BudgetQueries, CategoryQueries } from '@/lib/queries';
 import { Category } from '@/types';
 import { BudgetForm } from '@/components/forms/BudgetForm';
@@ -18,6 +19,8 @@ export default function BudgetScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook, books } = useBook();
+  const bookId = activeBook?.id ?? 1;
   
   const [refreshing, setRefreshing] = useState(false);
   const [currentMonth] = useState(dayjs().format('YYYY-MM'));
@@ -32,13 +35,13 @@ export default function BudgetScreen() {
   const loadData = useCallback(async () => {
     try {
       const [budgetData, catData] = await Promise.all([
-        new BudgetQueries(db).getByMonth(currentMonth),
-        new CategoryQueries(db).getByType('expense'),
+        new BudgetQueries(db, bookId).getByMonth(currentMonth),
+        new CategoryQueries(db, bookId).getByType('expense'),
       ]);
       setBudgets(budgetData);
       setCategories(catData);
     } catch (e) { console.error(e); }
-  }, [db, currentMonth]);
+  }, [db, bookId, currentMonth]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -65,8 +68,8 @@ export default function BudgetScreen() {
   const handleSaveBudget = async (limit: number, rolloverEnabled: boolean) => {
     if (!selectedCategory) return;
     try {
-      await new BudgetQueries(db).setBudget(selectedCategory.id, limit, currentMonth, rolloverEnabled);
-      await new RolloverEngine(db).process();
+      await new BudgetQueries(db, bookId).setBudget(selectedCategory.id, limit, currentMonth, rolloverEnabled);
+      await new RolloverEngine(db, books).process();
       hapticSuccess();
       setShowForm(false);
       await loadData();

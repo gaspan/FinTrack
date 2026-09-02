@@ -44,12 +44,25 @@ export default function TabLayout() {
 
       requestNotificationPermission();
 
-      const engine = new RecurringEngine(db);
+      const books = await db.getAllAsync<import('@/types').Book>(
+        'SELECT * FROM books WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+      );
+      const bookIds = books.map(b => b.id);
+
+      const engine = new RecurringEngine(db, books);
       engine.processRecurringTransactions()
-        .then(() => new RolloverEngine(db).process())
-        .then(() => checkBudgetAlerts(db))
-        .then(() => new SubscriptionQueries(db).processRenewals())
-        .then(() => new NetWorthQueries(db).ensureMonthlySnapshot())
+        .then(() => new RolloverEngine(db, books).process())
+        .then(() => checkBudgetAlerts(db, books))
+        .then(async () => {
+          for (const bookId of bookIds) {
+            await new SubscriptionQueries(db, bookId).processRenewals();
+          }
+        })
+        .then(async () => {
+          for (const bookId of bookIds) {
+            await new NetWorthQueries(db, bookId).ensureMonthlySnapshot();
+          }
+        })
         .then(() => reconcileWalletBalances(db))
         .then(() => rescheduleAllReminders(db))
         .then(() => checkAndBackup(db))

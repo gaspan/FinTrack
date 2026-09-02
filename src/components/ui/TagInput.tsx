@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { TagQueries } from '@/lib/queries';
 import { Tag } from '@/types';
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 
 export interface TagInputRef {
   commitPending: () => Promise<number[]>;
@@ -19,6 +20,8 @@ export const TagInput = forwardRef<TagInputRef, TagInputProps>(({ selectedTags, 
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [inputText, setInputText] = useState('');
   const [suggestions, setSuggestions] = useState<Tag[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -31,7 +34,7 @@ export const TagInput = forwardRef<TagInputRef, TagInputProps>(({ selectedTags, 
       if (selectedTags.some(t => t.name.toLowerCase() === name.toLowerCase())) {
         return selectedTags.map(t => t.id);
       }
-      const newTag = await new TagQueries(db).create(name);
+      const newTag = await new TagQueries(db, bookId).create(name);
       const updated = [...selectedTags, newTag];
       onTagsChange(updated);
       setInputText('');
@@ -39,7 +42,7 @@ export const TagInput = forwardRef<TagInputRef, TagInputProps>(({ selectedTags, 
       setShowSuggestions(false);
       return updated.map(t => t.id);
     }
-  }), [inputText, selectedTags, db, onTagsChange]);
+  }), [inputText, selectedTags, db, bookId, onTagsChange]);
 
   const searchTags = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -47,11 +50,11 @@ export const TagInput = forwardRef<TagInputRef, TagInputProps>(({ selectedTags, 
       setShowSuggestions(false);
       return;
     }
-    const results = await new TagQueries(db).search(query);
+    const results = await new TagQueries(db, bookId).search(query);
     const filtered = results.filter(t => !selectedTags.find(s => s.id === t.id));
     setSuggestions(filtered);
     setShowSuggestions(true);
-  }, [db, selectedTags]);
+  }, [db, bookId, selectedTags]);
 
   const handleTextChange = (text: string) => {
     setInputText(text);
@@ -69,7 +72,7 @@ export const TagInput = forwardRef<TagInputRef, TagInputProps>(({ selectedTags, 
   const createAndAdd = async () => {
     const name = inputText.trim();
     if (!name) return;
-    const tagQueries = new TagQueries(db);
+    const tagQueries = new TagQueries(db, bookId);
     const newTag = await tagQueries.create(name);
     onTagsChange([...selectedTags, newTag]);
     setInputText('');

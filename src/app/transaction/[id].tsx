@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { TransactionQueries, TagQueries } from '@/lib/queries';
 import { TransactionWithDetails, Tag, TransactionAttachment } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +17,8 @@ export default function TransactionDetailScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const router = useRouter();
 
   const [transaction, setTransaction] = useState<TransactionWithDetails | null>(null);
@@ -49,8 +52,8 @@ export default function TransactionDetailScreen() {
           if (mounted && tx) {
             setTransaction(tx);
             const [txTags, txAttachments] = await Promise.all([
-              new TagQueries(db).getByTransaction(txId),
-              new TransactionQueries(db).getAttachments(txId),
+              new TagQueries(db, bookId).getByTransaction(txId),
+              new TransactionQueries(db, bookId).getAttachments(txId),
             ]);
             if (mounted) {
               setTags(txTags);
@@ -67,7 +70,7 @@ export default function TransactionDetailScreen() {
       fetchTx();
 
       return () => { mounted = false; };
-    }, [id, db])
+    }, [id, db, bookId])
   );
 
   const handleDelete = () => {
@@ -82,7 +85,7 @@ export default function TransactionDetailScreen() {
           onPress: async () => {
             try {
               setDeleting(true);
-              const txQueries = new TransactionQueries(db);
+              const txQueries = new TransactionQueries(db, bookId);
               await txQueries.delete(parseInt(id, 10));
               router.back();
             } catch (e) {

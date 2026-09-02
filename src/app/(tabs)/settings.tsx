@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { exportBackup, importBackup, LAST_BACKUP_DATE_KEY } from '@/features/export/backupRestore';
 import { AUTO_BACKUP_ENABLED_KEY, BACKUP_INTERVAL_KEY, LAST_AUTO_BACKUP_KEY, BACKUP_INTERVALS } from '@/features/cloud-backup/backupScheduler';
 import {
@@ -31,6 +32,8 @@ export default function SettingsScreen() {
   const { theme, themeName, cycleTheme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [backingUp, setBackingUp] = useState(false);
   const [importing, setImporting] = useState(false);
   const [safeToSpendEnabled, setSafeToSpendEnabled] = useState(true);
@@ -52,7 +55,7 @@ export default function SettingsScreen() {
       setSafeToSpendEnabled(val !== 'false');
     });
 
-    const categoryQueries = new CategoryQueries(db);
+    const categoryQueries = new CategoryQueries(db, bookId);
     categoryQueries.getByType('income').then(setIncomeCategories);
 
     Promise.all([
@@ -87,7 +90,7 @@ export default function SettingsScreen() {
       setDailyReminder(daily);
       setDailyReminderTime(`${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`);
     });
-  }, [db]));
+  }, [db, bookId]));
 
   const handleThemeCycle = useCallback(() => {
     cycleTheme();
@@ -140,6 +143,19 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.itemRight}>
             <Text style={styles.itemSub}>Kelola dompet</Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/books' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#6366F120' }]}>
+              <Ionicons name="book-outline" size={20} color="#6366F1" />
+            </View>
+            <Text style={styles.itemTitle}>Pembukuan</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Text style={styles.itemSub}>Ganti / kelola buku</Text>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
           </View>
         </TouchableOpacity>

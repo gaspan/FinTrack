@@ -4,6 +4,11 @@ Fitur yang diuji:
 1. Budget Rollover
 2. Recurring Income (Auto-Salary)
 3. Cloud Backup
+4. Dompet (Wallet Fix + Edit)
+5. Langganan (Auto-Create + Kalender + Remind Toggle)
+6. Tagihan (Lunas → Transaksi + Maju Otomatis)
+7. Utang & Piutang (Debt Tracking)
+8. Pengingat Harian + Shortcut Settings
 
 Cara pakai: ikuti langkah tiap test case, centang checkbox sesuai hasil. Tulis hasil aktual jika tidak sesuai ekspektasi.
 

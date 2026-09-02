@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { Button } from '@/components/ui/Button';
 import { formatRupiah } from '@/utils/format';
 
@@ -14,6 +15,8 @@ export default function ImportScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
 
@@ -69,9 +72,9 @@ export default function ImportScreen() {
         return;
       }
 
-      const expenseCat = await db.getFirstAsync<{ id: number }>("SELECT id FROM categories WHERE type='expense' AND name='Lainnya' LIMIT 1");
-      const incomeCat = await db.getFirstAsync<{ id: number }>("SELECT id FROM categories WHERE type='income' AND name='Lainnya' LIMIT 1");
-      const defaultWallet = await db.getFirstAsync<{ id: number }>('SELECT id FROM wallets ORDER BY id ASC LIMIT 1');
+      const expenseCat = await db.getFirstAsync<{ id: number }>("SELECT id FROM categories WHERE type='expense' AND name='Lainnya' AND book_id = ? LIMIT 1", [bookId]);
+      const incomeCat = await db.getFirstAsync<{ id: number }>("SELECT id FROM categories WHERE type='income' AND name='Lainnya' AND book_id = ? LIMIT 1", [bookId]);
+      const defaultWallet = await db.getFirstAsync<{ id: number }>('SELECT id FROM wallets WHERE book_id = ? ORDER BY id ASC LIMIT 1', [bookId]);
 
       if (!expenseCat || !incomeCat || !defaultWallet) {
         Alert.alert('Error', 'Data kategori atau dompet tidak ditemukan');
@@ -108,18 +111,18 @@ export default function ImportScreen() {
           const catId = isExpense ? expenseCat.id : incomeCat.id;
 
           const exists = await db.getFirstAsync<{ id: number }>(
-            'SELECT id FROM transactions WHERE amount = ? AND category_id = ? AND transaction_date = ? AND notes = ? LIMIT 1',
-            [amount, catId, dateStr, desc]
+            'SELECT id FROM transactions WHERE book_id = ? AND amount = ? AND category_id = ? AND transaction_date = ? AND notes = ? LIMIT 1',
+            [bookId, amount, catId, dateStr, desc]
           );
           if (exists) { skipped++; continue; }
 
           await db.runAsync(
-            'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes) VALUES (?, ?, ?, ?, ?, ?)',
-            [txType, Math.abs(amount), catId, defaultWallet.id, dateStr, desc]
+            'INSERT INTO transactions (book_id, type, amount, category_id, wallet_id, transaction_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [bookId, txType, Math.abs(amount), catId, defaultWallet.id, dateStr, desc]
           );
 
           const op = txType === 'income' ? '+' : '-';
-          await db.runAsync(`UPDATE wallets SET balance = balance ${op} ? WHERE id = ?`, [Math.abs(amount), defaultWallet.id]);
+          await db.runAsync(`UPDATE wallets SET balance = balance ${op} ? WHERE id = ? AND book_id = ?`, [Math.abs(amount), defaultWallet.id, bookId]);
 
           imported++;
         } catch { skipped++; }

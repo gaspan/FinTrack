@@ -12,11 +12,13 @@ const SETTINGS_KEYS = [
   'app_pin_hash', 'app_biometric_enabled', 'auto_backup_enabled', 'backup_interval_days',
   'last_backup_date', 'last_auto_backup_date', 'onboarding_done',
   'notif_enabled', 'daily_reminder_enabled', 'daily_reminder_time', 'theme_preference',
+  'active_book_id',
 ];
 
 export interface BackupData {
   version: number;
   exportedAt: string;
+  books?: any[];
   wallets: any[];
   categories: any[];
   transactions: any[];
@@ -37,7 +39,8 @@ export interface BackupData {
 }
 
 export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> {
-  const [wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs, tags, tagLinks, attachments, debts, debtPayments] = await Promise.all([
+  const [books, wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs, tags, tagLinks, attachments, debts, debtPayments] = await Promise.all([
+    db.getAllAsync('SELECT * FROM books'),
     db.getAllAsync('SELECT * FROM wallets'),
     db.getAllAsync('SELECT * FROM categories'),
     db.getAllAsync('SELECT * FROM transactions'),
@@ -62,8 +65,9 @@ export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> 
   }
 
   return {
-    version: 5,
+    version: 6,
     exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    books,
     wallets, categories, transactions, budgets,
     recurring_transactions: recurring,
     savings_goals: goals,
@@ -157,77 +161,88 @@ export const applyBackupData = async (
     await db.execAsync('DELETE FROM liabilities');
     await db.execAsync('DELETE FROM wallets');
     await db.execAsync('DELETE FROM categories');
+    await db.execAsync('DELETE FROM books');
+
+    const booksToRestore = data.books?.length
+      ? data.books
+      : [{ id: 1, name: 'Pribadi', icon: 'book-outline', color: '#6366F1', is_active: 1, sort_order: 1, created_at: dayjs().format('YYYY-MM-DD HH:mm:ss') }];
+    for (const b of booksToRestore) {
+      await db.runAsync(
+        'INSERT INTO books (id, name, icon, color, is_active, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [b.id, b.name || 'Pembukuan', b.icon || 'book-outline', b.color || '#6366F1', b.is_active ?? 1, b.sort_order ?? b.id ?? 1, b.created_at ?? dayjs().format('YYYY-MM-DD HH:mm:ss')]
+      );
+    }
 
     for (const cat of data.categories) {
       await db.runAsync(
-        'INSERT INTO categories (id, name, type, icon, color, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
-        [cat.id, cat.name, cat.type, cat.icon, cat.color, cat.sort_order]
+        'INSERT INTO categories (id, book_id, name, type, icon, color, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [cat.id, cat.book_id ?? 1, cat.name, cat.type, cat.icon, cat.color, cat.sort_order]
       );
     }
     for (const w of data.wallets) {
       await db.runAsync(
-        'INSERT INTO wallets (id, name, balance, icon, color, is_primary, initial_balance) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [w.id, w.name, w.balance, w.icon, w.color, w.is_primary || 0, w.initial_balance || 0]
+        'INSERT INTO wallets (id, book_id, name, balance, icon, color, is_primary, initial_balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [w.id, w.book_id ?? 1, w.name, w.balance, w.icon, w.color, w.is_primary || 0, w.initial_balance || 0]
       );
     }
     for (const a of data.assets || []) {
       await db.runAsync(
-        'INSERT INTO assets (id, name, type, current_value, initial_value, purchase_date, notes, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [a.id, a.name, a.type, a.current_value, a.initial_value, a.purchase_date, a.notes, a.icon, a.color, a.created_at, a.updated_at]
+        'INSERT INTO assets (id, book_id, name, type, current_value, initial_value, purchase_date, notes, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [a.id, a.book_id ?? 1, a.name, a.type, a.current_value, a.initial_value, a.purchase_date, a.notes, a.icon, a.color, a.created_at, a.updated_at]
       );
     }
     for (const l of data.liabilities || []) {
       await db.runAsync(
-        'INSERT INTO liabilities (id, name, type, current_balance, original_amount, interest_rate, monthly_payment, due_date, notes, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [l.id, l.name, l.type, l.current_balance, l.original_amount, l.interest_rate, l.monthly_payment, l.due_date, l.notes, l.icon, l.color, l.created_at, l.updated_at]
+        'INSERT INTO liabilities (id, book_id, name, type, current_balance, original_amount, interest_rate, monthly_payment, due_date, notes, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [l.id, l.book_id ?? 1, l.name, l.type, l.current_balance, l.original_amount, l.interest_rate, l.monthly_payment, l.due_date, l.notes, l.icon, l.color, l.created_at, l.updated_at]
       );
     }
     for (const s of data.net_worth_snapshots || []) {
       await db.runAsync(
-        'INSERT INTO net_worth_snapshots (id, snapshot_date, total_assets, total_liabilities, net_worth, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [s.id, s.snapshot_date, s.total_assets, s.total_liabilities, s.net_worth, s.created_at]
+        'INSERT INTO net_worth_snapshots (id, book_id, snapshot_date, total_assets, total_liabilities, net_worth, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [s.id, s.book_id ?? 1, s.snapshot_date, s.total_assets, s.total_liabilities, s.net_worth, s.created_at]
       );
     }
     for (const s of data.subscriptions || []) {
       await db.runAsync(
-        'INSERT INTO subscriptions (id, name, category, amount, billing_cycle, start_date, next_billing_date, wallet_id, category_id, icon, color, is_active, cancelled_date, auto_create, remind, calendar_event_id, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [s.id, s.name, s.category, s.amount, s.billing_cycle, s.start_date, s.next_billing_date, s.wallet_id, s.category_id, s.icon, s.color, s.is_active, s.cancelled_date, s.auto_create, s.remind, s.calendar_event_id, s.notes, s.created_at, s.updated_at]
+        'INSERT INTO subscriptions (id, book_id, name, category, amount, billing_cycle, start_date, next_billing_date, wallet_id, category_id, icon, color, is_active, cancelled_date, auto_create, remind, calendar_event_id, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [s.id, s.book_id ?? 1, s.name, s.category, s.amount, s.billing_cycle, s.start_date, s.next_billing_date, s.wallet_id, s.category_id, s.icon, s.color, s.is_active, s.cancelled_date, s.auto_create, s.remind, s.calendar_event_id, s.notes, s.created_at, s.updated_at]
       );
     }
     for (const tx of data.transactions) {
       await db.runAsync(
-        'INSERT INTO transactions (id, type, amount, category_id, wallet_id, transaction_date, notes, recurring_id, transfer_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [tx.id, tx.type, tx.amount, tx.category_id, tx.wallet_id, tx.transaction_date, tx.notes, tx.recurring_id, tx.transfer_id || null, tx.created_at]
+        'INSERT INTO transactions (id, book_id, type, amount, category_id, wallet_id, transaction_date, notes, recurring_id, transfer_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [tx.id, tx.book_id ?? 1, tx.type, tx.amount, tx.category_id, tx.wallet_id, tx.transaction_date, tx.notes, tx.recurring_id, tx.transfer_id || null, tx.created_at]
       );
     }
     for (const b of data.budgets || []) {
       await db.runAsync(
-        'INSERT INTO budgets (id, category_id, monthly_limit, month, rollover_amount, rollover_enabled) VALUES (?, ?, ?, ?, ?, ?)',
-        [b.id, b.category_id, b.monthly_limit, b.month, b.rollover_amount || 0, b.rollover_enabled || 0]
+        'INSERT INTO budgets (id, book_id, category_id, monthly_limit, month, rollover_amount, rollover_enabled) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [b.id, b.book_id ?? 1, b.category_id, b.monthly_limit, b.month, b.rollover_amount || 0, b.rollover_enabled || 0]
       );
     }
     for (const r of data.recurring_transactions || []) {
       await db.runAsync(
-        'INSERT INTO recurring_transactions (id, type, amount, category_id, wallet_id, frequency, next_date, notes, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [r.id, r.type, r.amount, r.category_id, r.wallet_id, r.frequency, r.next_date, r.notes, r.is_active]
+        'INSERT INTO recurring_transactions (id, book_id, type, amount, category_id, wallet_id, frequency, next_date, notes, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [r.id, r.book_id ?? 1, r.type, r.amount, r.category_id, r.wallet_id, r.frequency, r.next_date, r.notes, r.is_active]
       );
     }
     for (const g of data.savings_goals || []) {
       await db.runAsync(
-        'INSERT INTO savings_goals (id, name, target_amount, current_amount, deadline, wallet_id, icon, color, is_completed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [g.id, g.name, g.target_amount, g.current_amount, g.deadline, g.wallet_id, g.icon, g.color, g.is_completed, g.created_at]
+        'INSERT INTO savings_goals (id, book_id, name, target_amount, current_amount, deadline, wallet_id, icon, color, is_completed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [g.id, g.book_id ?? 1, g.name, g.target_amount, g.current_amount, g.deadline, g.wallet_id, g.icon, g.color, g.is_completed, g.created_at]
       );
     }
     for (const r of data.bill_reminders || []) {
       await db.runAsync(
-        'INSERT INTO bill_reminders (id, name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes, calendar_event_id, paid_transaction_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [r.id, r.name, r.amount, r.due_date, r.frequency, r.is_paid, r.category_id, r.wallet_id, r.notes, r.calendar_event_id, r.paid_transaction_id ?? null, r.created_at]
+        'INSERT INTO bill_reminders (id, book_id, name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes, calendar_event_id, paid_transaction_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [r.id, r.book_id ?? 1, r.name, r.amount, r.due_date, r.frequency, r.is_paid, r.category_id, r.wallet_id, r.notes, r.calendar_event_id, r.paid_transaction_id ?? null, r.created_at]
       );
     }
     for (const d of data.debts || []) {
       await db.runAsync(
-        'INSERT INTO debts (id, person_name, direction, amount, paid_amount, due_date, wallet_id, notes, is_settled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [d.id, d.person_name, d.direction, d.amount, d.paid_amount || 0, d.due_date, d.wallet_id, d.notes, d.is_settled || 0, d.created_at, d.updated_at]
+        'INSERT INTO debts (id, book_id, person_name, direction, amount, paid_amount, due_date, wallet_id, notes, is_settled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [d.id, d.book_id ?? 1, d.person_name, d.direction, d.amount, d.paid_amount || 0, d.due_date, d.wallet_id, d.notes, d.is_settled || 0, d.created_at, d.updated_at]
       );
     }
     for (const p of data.debt_payments || []) {
@@ -238,8 +253,8 @@ export const applyBackupData = async (
     }
     for (const t of data.tags || []) {
       await db.runAsync(
-        'INSERT INTO tags (id, name, color, created_at) VALUES (?, ?, ?, ?)',
-        [t.id, t.name, t.color, t.created_at]
+        'INSERT INTO tags (id, book_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)',
+        [t.id, t.book_id ?? 1, t.name, t.color, t.created_at]
       );
     }
     for (const tt of data.transaction_tags || []) {

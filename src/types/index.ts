@@ -1,5 +1,15 @@
 export type TransactionType = 'income' | 'expense';
 
+export interface Book {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+  is_active: number;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -7,6 +17,7 @@ export interface Category {
   icon: string;
   color: string;
   sort_order: number;
+  book_id?: number;
 }
 
 export interface Wallet {
@@ -17,6 +28,7 @@ export interface Wallet {
   color: string | null;
   is_primary?: number;
   initial_balance?: number;
+  book_id?: number;
 }
 
 export interface Transaction {
@@ -30,6 +42,7 @@ export interface Transaction {
   recurring_id: number | null;
   transfer_id?: number | null;
   created_at: string;
+  book_id?: number;
 }
 
 export interface TransactionWithDetails extends Transaction {
@@ -54,6 +67,7 @@ export interface Tag {
   name: string;
   color: string;
   created_at: string;
+  book_id?: number;
 }
 
 export interface Budget {
@@ -63,6 +77,7 @@ export interface Budget {
   month: string;
   rollover_amount: number;
   rollover_enabled: number;
+  book_id?: number;
 }
 
 export interface RecurringFrequency {
@@ -79,6 +94,7 @@ export interface RecurringTransaction {
   next_date: string;
   notes: string | null;
   is_active: number;
+  book_id?: number;
 }
 
 export interface SavingsGoal {
@@ -92,6 +108,7 @@ export interface SavingsGoal {
   color: string;
   is_completed: number;
   created_at: string;
+  book_id?: number;
 }
 
 export interface BillReminder {
@@ -107,6 +124,7 @@ export interface BillReminder {
   created_at: string;
   calendar_event_id?: string | null;
   paid_transaction_id?: number | null;
+  book_id?: number;
 }
 
 export type DebtDirection = 'receivable' | 'payable';
@@ -123,6 +141,7 @@ export interface Debt {
   is_settled: number;
   created_at: string;
   updated_at: string;
+  book_id?: number;
 }
 
 export interface DebtPayment {
@@ -133,6 +152,7 @@ export interface DebtPayment {
   transaction_id: number | null;
   notes: string | null;
   created_at: string;
+  book_id?: number;
 }
 
 export interface DebtSummary {
@@ -235,6 +255,7 @@ export interface Asset {
   color: string;
   created_at: string;
   updated_at: string;
+  book_id?: number;
 }
 
 export interface Liability {
@@ -251,6 +272,7 @@ export interface Liability {
   color: string;
   created_at: string;
   updated_at: string;
+  book_id?: number;
 }
 
 export interface NetWorthSnapshot {
@@ -260,6 +282,7 @@ export interface NetWorthSnapshot {
   total_liabilities: number;
   net_worth: number;
   created_at: string;
+  book_id?: number;
 }
 
 export interface Subscription {
@@ -282,6 +305,7 @@ export interface Subscription {
   notes?: string;
   created_at: string;
   updated_at: string;
+  book_id?: number;
 }
 
 export interface SafeToSpendData {

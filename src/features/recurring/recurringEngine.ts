@@ -1,31 +1,34 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import dayjs from 'dayjs';
 import { RecurringQueries, TransactionQueries } from '@/lib/queries';
+import type { Book } from '@/types';
 
 export class RecurringEngine {
-  private recurringQueries: RecurringQueries;
-  private transactionQueries: TransactionQueries;
-
-  constructor(private db: SQLiteDatabase) {
-    this.recurringQueries = new RecurringQueries(db);
-    this.transactionQueries = new TransactionQueries(db);
-  }
+  constructor(private db: SQLiteDatabase, private books: Book[]) {}
 
   async processRecurringTransactions() {
+    for (const book of this.books) {
+      await this.processBook(book.id);
+    }
+  }
+
+  private async processBook(bookId: number) {
+    const recurringQueries = new RecurringQueries(this.db, bookId);
+    const transactionQueries = new TransactionQueries(this.db, bookId);
     const today = dayjs().format('YYYY-MM-DD');
-    
+
     // 1. Get all active recurring transactions
-    const activeRecurring = await this.recurringQueries.getActive();
-    
+    const activeRecurring = await recurringQueries.getActive();
+
     for (const rt of activeRecurring) {
       let nextDate = dayjs(rt.next_date);
       let count = 0;
-      
+
       // 2. Loop in case it's overdue by multiple periods
       while (nextDate.isBefore(dayjs(today).add(1, 'day'), 'day') && count < 10) {
-        
+
         // 3. Create the transaction
-        await this.transactionQueries.create({
+        await transactionQueries.create({
           type: rt.type,
           amount: rt.amount,
           category_id: rt.category_id,
@@ -45,13 +48,13 @@ export class RecurringEngine {
         } else if (rt.frequency === 'yearly') {
           nextDate = nextDate.add(1, 'year');
         }
-        
+
         count++;
       }
 
       // 5. Update next_date in DB if it changed
       if (nextDate.format('YYYY-MM-DD') !== rt.next_date) {
-        await this.recurringQueries.updateNextDate(rt.id, nextDate.format('YYYY-MM-DD'));
+        await recurringQueries.updateNextDate(rt.id, nextDate.format('YYYY-MM-DD'));
       }
     }
   }

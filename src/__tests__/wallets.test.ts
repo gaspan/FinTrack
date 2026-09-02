@@ -13,12 +13,12 @@ function makeDb(overrides: Partial<Record<string, any>> = {}) {
 describe('WalletQueries.create', () => {
   it('menyimpan initial_balance sama dengan saldo awal (cegah saldo hilang saat reconcile)', async () => {
     const db = makeDb();
-    await new WalletQueries(db).create({ name: 'BCA', balance: 5_000_000, icon: 'card-outline', color: '#3B82F6' });
+    await new WalletQueries(db, 1).create({ name: 'BCA', balance: 5_000_000, icon: 'card-outline', color: '#3B82F6' });
 
     const [sql, params] = db.runAsync.mock.calls[0];
     expect(sql).toContain('initial_balance');
-    // name, balance, initial_balance, icon, color
-    expect(params).toEqual(['BCA', 5_000_000, 5_000_000, 'card-outline', '#3B82F6']);
+    // name, balance, initial_balance, icon, color, book_id
+    expect(params).toEqual(['BCA', 5_000_000, 5_000_000, 'card-outline', '#3B82F6', 1]);
   });
 });
 
@@ -28,15 +28,15 @@ describe('WalletQueries.update', () => {
       getFirstAsync: jest.fn().mockResolvedValue({ balance: 700_000, initial_balance: 500_000 }),
     });
     // Saldo awal dikoreksi 500rb -> 600rb, transaksi tercatat +200rb tetap utuh.
-    await new WalletQueries(db).update(1, { name: 'Cash', balance: 600_000, icon: 'cash-outline', color: '#10B981' });
+    await new WalletQueries(db, 1).update(1, { name: 'Cash', balance: 600_000, icon: 'cash-outline', color: '#10B981' });
 
     const [, params] = db.runAsync.mock.calls[0];
-    expect(params).toEqual(['Cash', 'cash-outline', '#10B981', 600_000, 800_000, 1]);
+    expect(params).toEqual(['Cash', 'cash-outline', '#10B981', 600_000, 800_000, 1, 1]);
   });
 
   it('tidak melakukan apa pun bila dompet tidak ditemukan', async () => {
     const db = makeDb();
-    await new WalletQueries(db).update(42, { name: 'X', balance: 1, icon: 'i', color: '#000' });
+    await new WalletQueries(db, 1).update(42, { name: 'X', balance: 1, icon: 'i', color: '#000' });
     expect(db.runAsync).not.toHaveBeenCalled();
   });
 });
@@ -48,15 +48,15 @@ describe('WalletQueries.delete', () => {
         .mockResolvedValueOnce({ is_primary: 1 })
         .mockResolvedValueOnce({ id: 3 }),
     });
-    await new WalletQueries(db).delete(1);
+    await new WalletQueries(db, 1).delete(1);
 
-    expect(db.runAsync).toHaveBeenCalledWith('DELETE FROM wallets WHERE id = ?', [1]);
+    expect(db.runAsync).toHaveBeenCalledWith('DELETE FROM wallets WHERE id = ? AND book_id = ?', [1, 1]);
     expect(db.runAsync).toHaveBeenCalledWith('UPDATE wallets SET is_primary = 1 WHERE id = ?', [3]);
   });
 
   it('tidak menunjuk dompet utama baru bila yang dihapus bukan utama', async () => {
     const db = makeDb({ getFirstAsync: jest.fn().mockResolvedValue({ is_primary: 0 }) });
-    await new WalletQueries(db).delete(2);
+    await new WalletQueries(db, 1).delete(2);
 
     expect(db.runAsync).toHaveBeenCalledTimes(1);
   });
@@ -65,7 +65,7 @@ describe('WalletQueries.delete', () => {
 describe('resolveBookingTarget', () => {
   it('memakai wallet & kategori yang diberikan tanpa query tambahan', async () => {
     const db = makeDb();
-    const res = await resolveBookingTarget(db, 'expense', 7, 12);
+    const res = await resolveBookingTarget(db, 'expense', 7, 12, 1);
 
     expect(res).toEqual({ walletId: 7, categoryId: 12 });
     expect(db.getFirstAsync).not.toHaveBeenCalled();
@@ -77,7 +77,7 @@ describe('resolveBookingTarget', () => {
         .mockResolvedValueOnce({ id: 4 })
         .mockResolvedValueOnce({ id: 9 }),
     });
-    const res = await resolveBookingTarget(db, 'expense', null, null);
+    const res = await resolveBookingTarget(db, 'expense', null, null, 1);
 
     expect(res).toEqual({ walletId: 4, categoryId: 9 });
   });
@@ -90,7 +90,7 @@ describe('resolveBookingTarget', () => {
         .mockResolvedValueOnce(null),
       runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 77 }),
     });
-    const res = await resolveBookingTarget(db, 'income', null, null);
+    const res = await resolveBookingTarget(db, 'income', null, null, 1);
 
     expect(res).toEqual({ walletId: 4, categoryId: 77 });
     expect(db.runAsync.mock.calls[0][0]).toContain('INSERT INTO categories');
@@ -98,6 +98,6 @@ describe('resolveBookingTarget', () => {
 
   it('mengembalikan null bila tidak ada dompet sama sekali', async () => {
     const db = makeDb({ getFirstAsync: jest.fn().mockResolvedValue(null) });
-    expect(await resolveBookingTarget(db, 'expense', null, null)).toBeNull();
+    expect(await resolveBookingTarget(db, 'expense', null, null, 1)).toBeNull();
   });
 });

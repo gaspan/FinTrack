@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { WalletQueries } from '@/lib/queries';
 import { Wallet } from '@/types';
 import { NumericInput } from '@/components/ui/NumericInput';
@@ -17,6 +18,8 @@ export default function TransferScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const router = useRouter();
 
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -27,8 +30,8 @@ export default function TransferScreen() {
   const [loading, setLoading] = useState(false);
 
   useFocusEffect(useCallback(() => {
-    new WalletQueries(db).getAll().then(setWallets).catch(console.error);
-  }, [db]));
+    new WalletQueries(db, bookId).getAll().then(setWallets).catch(console.error);
+  }, [db, bookId]));
 
   const handleTransfer = async () => {
     if (!sourceId || !targetId || amount <= 0) return;

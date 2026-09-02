@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import dayjs from 'dayjs';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { ChartQueries, TransactionQueries } from '@/lib/queries';
 import { generateAndShareExcel } from '@/features/export/excelGenerator';
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
@@ -13,6 +14,8 @@ export default function ExportScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
   const [endDate, setEndDate] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));
@@ -20,8 +23,8 @@ export default function ExportScreen() {
   const handleExport = async () => {
     try {
       setLoading(true);
-      const txQueries = new TransactionQueries(db);
-      const chartQueries = new ChartQueries(db);
+      const txQueries = new TransactionQueries(db, bookId);
+      const chartQueries = new ChartQueries(db, bookId);
       
       const transactions = await txQueries.getByDateRange(startDate, endDate);
       

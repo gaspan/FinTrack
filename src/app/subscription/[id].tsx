@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { SubscriptionQueries, WalletQueries, CategoryQueries } from '@/lib/queries';
 import { Subscription, Wallet, Category } from '@/types';
 import { Input } from '@/components/ui/Input';
@@ -29,11 +30,13 @@ const CYCLE_OPTIONS = [
 
 export default function SubscriptionFormPage() {
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNew = id === 'new';
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const queries = new SubscriptionQueries(db);
+  const queries = new SubscriptionQueries(db, bookId);
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState<Subscription['category']>('streaming');
@@ -58,8 +61,8 @@ export default function SubscriptionFormPage() {
     let alive = true;
     (async () => {
       const [ws, cs] = await Promise.all([
-        new WalletQueries(db).getAll(),
-        new CategoryQueries(db).getByType('expense'),
+        new WalletQueries(db, bookId).getAll(),
+        new CategoryQueries(db, bookId).getByType('expense'),
       ]);
       if (!alive) return;
       setWallets(ws);
@@ -87,7 +90,7 @@ export default function SubscriptionFormPage() {
       setPageLoading(false);
     })().catch(() => { if (alive) setPageLoading(false); });
     return () => { alive = false; };
-  }, [id]);
+  }, [id, bookId]);
 
   const handleSave = async () => {
     if (!name.trim() || amount <= 0) {

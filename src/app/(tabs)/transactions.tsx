@@ -7,6 +7,7 @@ import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { TransactionQueries, CategoryQueries, WalletQueries, TagQueries } from '@/lib/queries';
 import { TransactionWithDetails, Category, Wallet, Tag } from '@/types';
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
@@ -23,6 +24,8 @@ export default function TransactionsScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [transactions, setTransactions] = useState<TransactionWithDetails[]>([]);
@@ -55,10 +58,10 @@ export default function TransactionsScreen() {
       setInitialLoading(true);
       const params = getFilterParams();
       const [result, cats, walls, tags] = await Promise.all([
-        new TransactionQueries(db).getAllPaginated({ ...params, limit: PAGE_SIZE, offset: 0 }),
-        new CategoryQueries(db).getAll(),
-        new WalletQueries(db).getAll(),
-        new TagQueries(db).getAll(),
+        new TransactionQueries(db, bookId).getAllPaginated({ ...params, limit: PAGE_SIZE, offset: 0 }),
+        new CategoryQueries(db, bookId).getAll(),
+        new WalletQueries(db, bookId).getAll(),
+        new TagQueries(db, bookId).getAll(),
       ]);
       setTransactions(result.data);
       setTotalFiltered(result.total);
@@ -69,7 +72,7 @@ export default function TransactionsScreen() {
       setAllTags(tags);
     } catch (e) { console.error(e); }
     finally { setInitialLoading(false); }
-  }, [db, getFilterParams]);
+  }, [db, bookId, getFilterParams]);
 
   useFocusEffect(useCallback(() => { loadInitialData(); }, [loadInitialData]));
 
@@ -85,7 +88,7 @@ export default function TransactionsScreen() {
     try {
       const nextPage = currentPage + 1;
       const params = getFilterParams();
-      const result = await new TransactionQueries(db).getAllPaginated({
+      const result = await new TransactionQueries(db, bookId).getAllPaginated({
         ...params,
         limit: PAGE_SIZE,
         offset: nextPage * PAGE_SIZE,
@@ -140,7 +143,7 @@ export default function TransactionsScreen() {
 
   const handleDeleteTx = async (id: number) => {
     try {
-      await new TransactionQueries(db).delete(id);
+      await new TransactionQueries(db, bookId).delete(id);
       hapticMedium();
       loadInitialData();
     } catch (e) { console.error(e); }

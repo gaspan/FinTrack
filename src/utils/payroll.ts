@@ -20,25 +20,26 @@ export function getSalaryDate(year: number, month: number, day: number): dayjs.D
 
 export async function findSalaryCategoryId(
   db: SQLiteDatabase,
+  bookId: number,
   preferredCategoryId?: number | null
 ): Promise<number | null> {
   if (preferredCategoryId) {
     const exists = await db.getFirstAsync<{ id: number }>(
-      'SELECT id FROM categories WHERE id = ? AND type = ?',
-      [preferredCategoryId, 'income']
+      'SELECT id FROM categories WHERE id = ? AND book_id = ? AND type = ?',
+      [preferredCategoryId, bookId, 'income']
     );
     if (exists) return exists.id;
   }
 
   const byName = await db.getFirstAsync<{ id: number }>(
-    'SELECT id FROM categories WHERE name = ? AND type = ?',
-    [SALARY_CATEGORY_NAME, 'income']
+    'SELECT id FROM categories WHERE book_id = ? AND name = ? AND type = ?',
+    [bookId, SALARY_CATEGORY_NAME, 'income']
   );
   if (byName) return byName.id;
 
   const firstIncome = await db.getFirstAsync<{ id: number }>(
-    'SELECT id FROM categories WHERE type = ? ORDER BY sort_order ASC LIMIT 1',
-    ['income']
+    'SELECT id FROM categories WHERE book_id = ? AND type = ? ORDER BY sort_order ASC LIMIT 1',
+    [bookId, 'income']
   );
   return firstIncome?.id ?? null;
 }
@@ -46,13 +47,14 @@ export async function findSalaryCategoryId(
 export async function getLastSalaryDate(
   db: SQLiteDatabase,
   salaryCategoryId: number,
-  beforeOrOn: string
+  beforeOrOn: string,
+  bookId: number
 ): Promise<string | null> {
   const row = await db.getFirstAsync<{ transaction_date: string }>(
     `SELECT transaction_date FROM transactions
-     WHERE category_id = ? AND type = ? AND transaction_date <= ?
+     WHERE book_id = ? AND category_id = ? AND type = ? AND transaction_date <= ?
      ORDER BY transaction_date DESC, created_at DESC LIMIT 1`,
-    [salaryCategoryId, 'income', beforeOrOn]
+    [bookId, salaryCategoryId, 'income', beforeOrOn]
   );
   return row?.transaction_date ?? null;
 }
@@ -60,13 +62,14 @@ export async function getLastSalaryDate(
 export async function getNextSalaryDate(
   db: SQLiteDatabase,
   salaryCategoryId: number,
-  after: string
+  after: string,
+  bookId: number
 ): Promise<string | null> {
   const row = await db.getFirstAsync<{ transaction_date: string }>(
     `SELECT transaction_date FROM transactions
-     WHERE category_id = ? AND type = ? AND transaction_date > ?
+     WHERE book_id = ? AND category_id = ? AND type = ? AND transaction_date > ?
      ORDER BY transaction_date ASC, created_at ASC LIMIT 1`,
-    [salaryCategoryId, 'income', after]
+    [bookId, salaryCategoryId, 'income', after]
   );
   return row?.transaction_date ?? null;
 }
@@ -96,13 +99,14 @@ export async function getPayrollPeriod(
   db: SQLiteDatabase,
   salaryDay: number,
   salaryCategoryId: number,
-  referenceDate: dayjs.Dayjs = dayjs()
+  referenceDate: dayjs.Dayjs = dayjs(),
+  bookId = 1
 ): Promise<PayrollPeriod> {
   const ref = referenceDate.startOf('day');
   const defaultPeriod = getDefaultPayrollPeriod(salaryDay, ref);
 
-  const lastSalary = await getLastSalaryDate(db, salaryCategoryId, ref.format('YYYY-MM-DD'));
-  const nextSalary = await getNextSalaryDate(db, salaryCategoryId, ref.format('YYYY-MM-DD'));
+  const lastSalary = await getLastSalaryDate(db, salaryCategoryId, ref.format('YYYY-MM-DD'), bookId);
+  const nextSalary = await getNextSalaryDate(db, salaryCategoryId, ref.format('YYYY-MM-DD'), bookId);
 
   let startDate = defaultPeriod.startDate;
   let endDate = defaultPeriod.endDate;
@@ -133,11 +137,12 @@ export async function getPreviousPayrollPeriod(
   db: SQLiteDatabase,
   salaryDay: number,
   salaryCategoryId: number,
-  currentStartDate: string
+  currentStartDate: string,
+  bookId = 1
 ): Promise<PayrollPeriod> {
   const start = dayjs(currentStartDate).subtract(1, 'day').startOf('day');
 
-  const lastSalary = await getLastSalaryDate(db, salaryCategoryId, start.format('YYYY-MM-DD'));
+  const lastSalary = await getLastSalaryDate(db, salaryCategoryId, start.format('YYYY-MM-DD'), bookId);
 
   let prevStart: dayjs.Dayjs;
   if (lastSalary) {

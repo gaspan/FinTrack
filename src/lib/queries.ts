@@ -28,7 +28,7 @@ import {
 import { CATEGORY_CLASSIFICATION } from '@/constants/categories';
 
 export class TransactionQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAllWithDetails(): Promise<TransactionWithDetails[]> {
     const txs = await this.db.getAllAsync<TransactionWithDetails>(`
@@ -41,8 +41,9 @@ export class TransactionQueries {
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
       JOIN wallets w ON t.wallet_id = w.id
+      WHERE t.book_id = ?
       ORDER BY t.transaction_date DESC, t.created_at DESC
-    `);
+    `, [this.bookId]);
 
     const txIds = txs.map(t => t.id);
     if (txIds.length === 0) return txs;
@@ -88,9 +89,9 @@ export class TransactionQueries {
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
       JOIN wallets w ON t.wallet_id = w.id
-      WHERE t.transaction_date >= ? AND t.transaction_date <= ? AND t.transfer_id IS NULL
+      WHERE t.book_id = ? AND t.transaction_date >= ? AND t.transaction_date <= ? AND t.transfer_id IS NULL
       ORDER BY t.transaction_date DESC, t.created_at DESC
-    `, [startDate, endDate]);
+    `, [this.bookId, startDate, endDate]);
   }
 
   async getAllPaginated(options: {
@@ -106,8 +107,8 @@ export class TransactionQueries {
   }): Promise<PaginatedResult<TransactionWithDetails>> {
     const { limit = 20, offset = 0, startDate, endDate, type, categoryId, walletId, searchText, tagIds } = options;
 
-    const conditions: string[] = [];
-    const params: any[] = [];
+    const conditions: string[] = ['t.book_id = ?'];
+    const params: any[] = [this.bookId];
 
     if (startDate && endDate) {
       conditions.push('t.transaction_date >= ? AND t.transaction_date <= ?');
@@ -223,8 +224,8 @@ export class TransactionQueries {
     let newId = 0;
     await this.db.withTransactionAsync(async () => {
       const result = await this.db.runAsync(
-        'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes, recurring_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [tx.type, tx.amount, tx.category_id, tx.wallet_id, tx.transaction_date, tx.notes, tx.recurring_id]
+        'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes, recurring_id, book_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [tx.type, tx.amount, tx.category_id, tx.wallet_id, tx.transaction_date, tx.notes, tx.recurring_id, this.bookId]
       );
       newId = result.lastInsertRowId;
 
@@ -293,64 +294,67 @@ export class TransactionQueries {
 }
 
 export class CategoryQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAll(): Promise<Category[]> {
     return this.db.getAllAsync<Category>(
-      'SELECT * FROM categories ORDER BY sort_order ASC'
+      'SELECT * FROM categories WHERE book_id = ? ORDER BY sort_order ASC',
+      [this.bookId]
     );
   }
 
   async getByType(type: TransactionType): Promise<Category[]> {
     return this.db.getAllAsync<Category>(
-      'SELECT * FROM categories WHERE type = ? ORDER BY sort_order ASC',
-      [type]
+      'SELECT * FROM categories WHERE book_id = ? AND type = ? ORDER BY sort_order ASC',
+      [this.bookId, type]
     );
   }
 
   async create(data: { name: string; type: TransactionType; icon: string; color: string }) {
     const maxOrder = await this.db.getFirstAsync<{ max: number }>(
-      'SELECT MAX(sort_order) as max FROM categories WHERE type = ?',
-      [data.type]
+      'SELECT MAX(sort_order) as max FROM categories WHERE book_id = ? AND type = ?',
+      [this.bookId, data.type]
     );
     const sortOrder = (maxOrder?.max || 0) + 1;
     await this.db.runAsync(
-      'INSERT INTO categories (name, type, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)',
-      [data.name, data.type, data.icon, data.color, sortOrder]
+      'INSERT INTO categories (name, type, icon, color, sort_order, book_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [data.name, data.type, data.icon, data.color, sortOrder, this.bookId]
     );
   }
 
   async update(id: number, data: { name: string; icon: string; color: string }) {
     await this.db.runAsync(
-      'UPDATE categories SET name = ?, icon = ?, color = ? WHERE id = ?',
-      [data.name, data.icon, data.color, id]
+      'UPDATE categories SET name = ?, icon = ?, color = ? WHERE id = ? AND book_id = ?',
+      [data.name, data.icon, data.color, id, this.bookId]
     );
   }
 
   async delete(id: number) {
-    await this.db.runAsync('DELETE FROM categories WHERE id = ?', [id]);
+    await this.db.runAsync('DELETE FROM categories WHERE id = ? AND book_id = ?', [id, this.bookId]);
   }
 }
 
 export class WalletQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAll(): Promise<Wallet[]> {
     return this.db.getAllAsync<Wallet>(
-      'SELECT * FROM wallets ORDER BY is_primary DESC, id ASC'
+      'SELECT * FROM wallets WHERE book_id = ? ORDER BY is_primary DESC, id ASC',
+      [this.bookId]
     );
   }
 
   async getPrimary(): Promise<Wallet | null> {
     return this.db.getFirstAsync<Wallet>(
-      "SELECT * FROM wallets WHERE is_primary = 1 LIMIT 1"
+      'SELECT * FROM wallets WHERE book_id = ? AND is_primary = 1 LIMIT 1',
+      [this.bookId]
     );
   }
 
   async setPrimary(id: number) {
     await this.db.withTransactionAsync(async () => {
-      await this.db.runAsync('UPDATE wallets SET is_primary = 0');
-      await this.db.runAsync('UPDATE wallets SET is_primary = 1 WHERE id = ?', [id]);
+      await this.db.runAsync('UPDATE wallets SET is_primary = 0 WHERE book_id = ?', [this.bookId]);
+      await this.db.runAsync('UPDATE wallets SET is_primary = 1 WHERE id = ? AND book_id = ?', [id, this.bookId]);
     });
   }
 
@@ -359,8 +363,8 @@ export class WalletQueries {
     // recomputes balance as initial_balance + sum(transactions), so leaving it at
     // 0 would silently wipe the saldo on the next app launch.
     const res = await this.db.runAsync(
-      'INSERT INTO wallets (name, balance, initial_balance, icon, color) VALUES (?, ?, ?, ?, ?)',
-      [data.name, data.balance, data.balance, data.icon, data.color]
+      'INSERT INTO wallets (name, balance, initial_balance, icon, color, book_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [data.name, data.balance, data.balance, data.icon, data.color, this.bookId]
     );
     return res.lastInsertRowId;
   }
@@ -369,22 +373,22 @@ export class WalletQueries {
     // Editing the opening balance shifts the current balance by the same delta so
     // recorded transactions stay intact.
     const current = await this.db.getFirstAsync<{ balance: number; initial_balance: number }>(
-      'SELECT balance, COALESCE(initial_balance, 0) as initial_balance FROM wallets WHERE id = ?',
-      [id]
+      'SELECT balance, COALESCE(initial_balance, 0) as initial_balance FROM wallets WHERE id = ? AND book_id = ?',
+      [id, this.bookId]
     );
     if (!current) return;
 
     const delta = data.balance - current.initial_balance;
     await this.db.runAsync(
-      'UPDATE wallets SET name = ?, icon = ?, color = ?, initial_balance = ?, balance = ? WHERE id = ?',
-      [data.name, data.icon, data.color, data.balance, Math.round((current.balance + delta) * 100) / 100, id]
+      'UPDATE wallets SET name = ?, icon = ?, color = ?, initial_balance = ?, balance = ? WHERE id = ? AND book_id = ?',
+      [data.name, data.icon, data.color, data.balance, Math.round((current.balance + delta) * 100) / 100, id, this.bookId]
     );
   }
 
   async countTransactions(id: number): Promise<number> {
     const row = await this.db.getFirstAsync<{ c: number }>(
-      'SELECT COUNT(*) as c FROM transactions WHERE wallet_id = ?',
-      [id]
+      'SELECT COUNT(*) as c FROM transactions WHERE book_id = ? AND wallet_id = ?',
+      [this.bookId, id]
     );
     return row?.c ?? 0;
   }
@@ -392,12 +396,12 @@ export class WalletQueries {
   async delete(id: number) {
     await this.db.withTransactionAsync(async () => {
       const wasPrimary = await this.db.getFirstAsync<{ is_primary: number }>(
-        'SELECT is_primary FROM wallets WHERE id = ?',
-        [id]
+        'SELECT is_primary FROM wallets WHERE id = ? AND book_id = ?',
+        [id, this.bookId]
       );
-      await this.db.runAsync('DELETE FROM wallets WHERE id = ?', [id]);
+      await this.db.runAsync('DELETE FROM wallets WHERE id = ? AND book_id = ?', [id, this.bookId]);
       if (wasPrimary?.is_primary) {
-        const next = await this.db.getFirstAsync<{ id: number }>('SELECT id FROM wallets ORDER BY id ASC LIMIT 1');
+        const next = await this.db.getFirstAsync<{ id: number }>('SELECT id FROM wallets WHERE book_id = ? ORDER BY id ASC LIMIT 1', [this.bookId]);
         if (next) await this.db.runAsync('UPDATE wallets SET is_primary = 1 WHERE id = ?', [next.id]);
       }
     });
@@ -413,12 +417,14 @@ export async function resolveBookingTarget(
   db: SQLiteDatabase,
   type: TransactionType,
   walletId?: number | null,
-  categoryId?: number | null
+  categoryId?: number | null,
+  bookId?: number | null
 ): Promise<{ walletId: number; categoryId: number } | null> {
   let wallet = walletId ?? null;
   if (!wallet) {
     const w = await db.getFirstAsync<{ id: number }>(
-      'SELECT id FROM wallets ORDER BY is_primary DESC, id ASC LIMIT 1'
+      'SELECT id FROM wallets WHERE book_id = ? ORDER BY is_primary DESC, id ASC LIMIT 1',
+      [bookId ?? 1]
     );
     wallet = w?.id ?? null;
   }
@@ -427,22 +433,22 @@ export async function resolveBookingTarget(
   let category = categoryId ?? null;
   if (!category) {
     const c = await db.getFirstAsync<{ id: number }>(
-      'SELECT id FROM categories WHERE type = ? AND name = ? LIMIT 1',
-      [type, 'Lainnya']
+      'SELECT id FROM categories WHERE book_id = ? AND type = ? AND name = ? LIMIT 1',
+      [bookId ?? 1, type, 'Lainnya']
     );
     if (c) {
       category = c.id;
     } else {
       const fallback = await db.getFirstAsync<{ id: number }>(
-        'SELECT id FROM categories WHERE type = ? ORDER BY sort_order ASC, id ASC LIMIT 1',
-        [type]
+        'SELECT id FROM categories WHERE book_id = ? AND type = ? ORDER BY sort_order ASC, id ASC LIMIT 1',
+        [bookId ?? 1, type]
       );
       if (fallback) {
         category = fallback.id;
       } else {
         const created = await db.runAsync(
-          'INSERT INTO categories (name, type, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)',
-          ['Lainnya', type, 'ellipsis-horizontal-outline', '#9CA3AF', 99]
+          'INSERT INTO categories (name, type, icon, color, sort_order, book_id) VALUES (?, ?, ?, ?, ?, ?)',
+          ['Lainnya', type, 'ellipsis-horizontal-outline', '#9CA3AF', 99, bookId ?? 1]
         );
         category = created.lastInsertRowId;
       }
@@ -453,7 +459,7 @@ export async function resolveBookingTarget(
 }
 
 export class ChartQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getCategoryBreakdown(startDate: string, endDate: string, type: TransactionType) {
     return this.db.getAllAsync<{ category_name: string, total: number, color: string }>(`
@@ -463,19 +469,19 @@ export class ChartQueries {
         c.color 
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
-      WHERE t.type = ? AND t.transaction_date >= ? AND t.transaction_date <= ? AND t.transfer_id IS NULL
+      WHERE t.book_id = ? AND t.type = ? AND t.transaction_date >= ? AND t.transaction_date <= ? AND t.transfer_id IS NULL
       GROUP BY c.id
       ORDER BY total DESC
-    `, [type, startDate, endDate]);
+    `, [this.bookId, type, startDate, endDate]);
   }
 
   async getSummary(startDate: string, endDate: string) {
     const income = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT SUM(amount) as total FROM transactions WHERE type = 'income' AND transaction_date >= ? AND transaction_date <= ? AND transfer_id IS NULL
-    `, [startDate, endDate]);
+      SELECT SUM(amount) as total FROM transactions WHERE book_id = ? AND type = 'income' AND transaction_date >= ? AND transaction_date <= ? AND transfer_id IS NULL
+    `, [this.bookId, startDate, endDate]);
     const expense = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT SUM(amount) as total FROM transactions WHERE type = 'expense' AND transaction_date >= ? AND transaction_date <= ? AND transfer_id IS NULL
-    `, [startDate, endDate]);
+      SELECT SUM(amount) as total FROM transactions WHERE book_id = ? AND type = 'expense' AND transaction_date >= ? AND transaction_date <= ? AND transfer_id IS NULL
+    `, [this.bookId, startDate, endDate]);
 
     return {
       totalIncome: income?.total || 0,
@@ -485,7 +491,7 @@ export class ChartQueries {
 }
 
 export class BudgetQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getByMonth(month: string) {
     return this.db.getAllAsync<Budget & { category_name: string, spent: number, color: string }>(`
@@ -500,15 +506,15 @@ export class BudgetQueries {
         AND t.transaction_date LIKE ? 
         AND t.type = 'expense'
         AND t.transfer_id IS NULL
-      WHERE b.month = ?
+      WHERE b.book_id = ? AND b.month = ?
       GROUP BY b.id
-    `, [`${month}%`, month]);
+    `, [this.bookId, `${month}%`, month]);
   }
 
   async getByCategoryMonth(categoryId: number, month: string) {
     return this.db.getFirstAsync<Budget>(
-      'SELECT * FROM budgets WHERE category_id = ? AND month = ?',
-      [categoryId, month]
+      'SELECT * FROM budgets WHERE book_id = ? AND category_id = ? AND month = ?',
+      [this.bookId, categoryId, month]
     );
   }
 
@@ -522,8 +528,8 @@ export class BudgetQueries {
       );
     } else {
       await this.db.runAsync(
-        'INSERT INTO budgets (category_id, monthly_limit, month, rollover_amount, rollover_enabled) VALUES (?, ?, ?, 0, ?)',
-        [categoryId, monthlyLimit, month, rolloverEnabled ? 1 : 0]
+        'INSERT INTO budgets (category_id, monthly_limit, month, rollover_amount, rollover_enabled, book_id) VALUES (?, ?, ?, 0, ?, ?)',
+        [categoryId, monthlyLimit, month, rolloverEnabled ? 1 : 0, this.bookId]
       );
     }
   }
@@ -537,11 +543,12 @@ export class BudgetQueries {
 }
 
 export class RecurringQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getActive(): Promise<RecurringTransaction[]> {
     return this.db.getAllAsync<RecurringTransaction>(
-      'SELECT * FROM recurring_transactions WHERE is_active = 1'
+      'SELECT * FROM recurring_transactions WHERE book_id = ? AND is_active = 1',
+      [this.bookId]
     );
   }
   
@@ -551,19 +558,20 @@ export class RecurringQueries {
       FROM recurring_transactions r
       JOIN categories c ON r.category_id = c.id
       JOIN wallets w ON r.wallet_id = w.id
+      WHERE r.book_id = ?
       ORDER BY r.id DESC
-    `);
+    `, [this.bookId]);
   }
 
-  async create(rt: Omit<RecurringTransaction, 'id' | 'is_active'>) {
+  async create(rt: Omit<RecurringTransaction, 'id' | 'is_active' | 'book_id'>) {
     await this.db.runAsync(
-      'INSERT INTO recurring_transactions (type, amount, category_id, wallet_id, frequency, next_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [rt.type, rt.amount, rt.category_id, rt.wallet_id, rt.frequency, rt.next_date, rt.notes]
+      'INSERT INTO recurring_transactions (type, amount, category_id, wallet_id, frequency, next_date, notes, book_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [rt.type, rt.amount, rt.category_id, rt.wallet_id, rt.frequency, rt.next_date, rt.notes, this.bookId]
     );
   }
   
   async delete(id: number) {
-    await this.db.runAsync('DELETE FROM recurring_transactions WHERE id = ?', [id]);
+    await this.db.runAsync('DELETE FROM recurring_transactions WHERE id = ? AND book_id = ?', [id, this.bookId]);
   }
 
   async toggle(id: number, isActive: boolean) {
@@ -582,18 +590,19 @@ export class RecurringQueries {
 }
 
 export class SavingsGoalQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAll(): Promise<SavingsGoal[]> {
     return this.db.getAllAsync<SavingsGoal>(
-      'SELECT * FROM savings_goals ORDER BY is_completed ASC, deadline ASC'
+      'SELECT * FROM savings_goals WHERE book_id = ? ORDER BY is_completed ASC, deadline ASC',
+      [this.bookId]
     );
   }
 
   async create(data: { name: string; target_amount: number; deadline: string | null; wallet_id: number | null; icon: string; color: string }) {
     return this.db.runAsync(
-      'INSERT INTO savings_goals (name, target_amount, deadline, wallet_id, icon, color) VALUES (?, ?, ?, ?, ?, ?)',
-      [data.name, data.target_amount, data.deadline, data.wallet_id, data.icon, data.color]
+      'INSERT INTO savings_goals (name, target_amount, deadline, wallet_id, icon, color, book_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [data.name, data.target_amount, data.deadline, data.wallet_id, data.icon, data.color, this.bookId]
     );
   }
 
@@ -630,7 +639,7 @@ export class SavingsGoalQueries {
 }
 
 export class BillReminderQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAll(): Promise<(BillReminder & { category_name?: string; wallet_name?: string })[]> {
     return this.db.getAllAsync(`
@@ -638,14 +647,15 @@ export class BillReminderQueries {
       FROM bill_reminders b
       LEFT JOIN categories c ON b.category_id = c.id
       LEFT JOIN wallets w ON b.wallet_id = w.id
+      WHERE b.book_id = ?
       ORDER BY b.is_paid ASC, b.due_date ASC
-    `);
+    `, [this.bookId]);
   }
 
-  async create(data: Omit<BillReminder, 'id' | 'created_at'>) {
+  async create(data: Omit<BillReminder, 'id' | 'created_at' | 'book_id'>) {
     return this.db.runAsync(
-      'INSERT INTO bill_reminders (name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [data.name, data.amount, data.due_date, data.frequency, data.is_paid, data.category_id, data.wallet_id, data.notes]
+      'INSERT INTO bill_reminders (name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes, book_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [data.name, data.amount, data.due_date, data.frequency, data.is_paid, data.category_id, data.wallet_id, data.notes, this.bookId]
     );
   }
 
@@ -680,7 +690,7 @@ export class BillReminderQueries {
     const bill = await this.db.getFirstAsync<BillReminder>('SELECT * FROM bill_reminders WHERE id = ?', [id]);
     if (!bill) return { booked: false };
 
-    const txQueries = new TransactionQueries(this.db);
+    const txQueries = new TransactionQueries(this.db, this.bookId);
 
     if (!isPaid) {
       if (bill.paid_transaction_id) {
@@ -697,7 +707,7 @@ export class BillReminderQueries {
       return { booked: false };
     }
 
-    const target = await resolveBookingTarget(this.db, 'expense', bill.wallet_id, bill.category_id);
+    const target = await resolveBookingTarget(this.db, 'expense', bill.wallet_id, bill.category_id, this.bookId);
     let txId: number | null = null;
     if (target) {
       txId = await txQueries.create({
@@ -743,33 +753,38 @@ export class BillReminderQueries {
 }
 
 export class TagQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAll(): Promise<Tag[]> {
-    return this.db.getAllAsync<Tag>('SELECT * FROM tags ORDER BY name ASC');
+    return this.db.getAllAsync<Tag>(
+      'SELECT * FROM tags WHERE book_id = ? ORDER BY name ASC',
+      [this.bookId]
+    );
   }
 
   async search(query: string): Promise<Tag[]> {
     return this.db.getAllAsync<Tag>(
-      'SELECT * FROM tags WHERE name LIKE ? ORDER BY name ASC LIMIT 10',
-      [`%${query}%`]
+      'SELECT * FROM tags WHERE book_id = ? AND name LIKE ? ORDER BY name ASC LIMIT 10',
+      [this.bookId, `%${query}%`]
     );
   }
 
   async create(name: string, color?: string): Promise<Tag> {
     const result = await this.db.runAsync(
-      'INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)',
-      [name, color || '#6366f1']
+      'INSERT OR IGNORE INTO tags (name, color, book_id) VALUES (?, ?, ?)',
+      [name, color || '#6366f1', this.bookId]
     );
     if (result.changes === 0) {
-      const existing = await this.db.getFirstAsync<Tag>('SELECT * FROM tags WHERE name = ?', [name]);
+      const existing = await this.db.getFirstAsync<Tag>(
+        'SELECT * FROM tags WHERE book_id = ? AND name = ?', [this.bookId, name]
+      );
       return existing!;
     }
     return { id: result.lastInsertRowId, name, color: color || '#6366f1', created_at: new Date().toISOString() };
   }
 
   async delete(id: number) {
-    await this.db.runAsync('DELETE FROM tags WHERE id = ?', [id]);
+    await this.db.runAsync('DELETE FROM tags WHERE id = ? AND book_id = ?', [id, this.bookId]);
   }
 
   async getByTransaction(txId: number): Promise<Tag[]> {
@@ -809,7 +824,7 @@ export class TagQueries {
 }
 
 export class InsightQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getCategoryComparison(currentMonth: string, prevMonth: string): Promise<CategoryInsight[]> {
     const rows = await this.db.getAllAsync<any>(`
@@ -824,11 +839,11 @@ export class InsightQueries {
       LEFT JOIN transactions t ON c.id = t.category_id AND t.type = 'expense'
         AND t.transfer_id IS NULL
         AND (strftime('%Y-%m', t.transaction_date) = ? OR strftime('%Y-%m', t.transaction_date) = ?)
-      WHERE c.type = 'expense'
+      WHERE c.type = 'expense' AND c.book_id = ? AND t.book_id = ?
       GROUP BY c.id
       HAVING current_total > 0 OR prev_total > 0
       ORDER BY current_total DESC
-    `, [currentMonth, prevMonth, currentMonth, prevMonth]);
+    `, [currentMonth, prevMonth, currentMonth, prevMonth, this.bookId, this.bookId]);
 
     return rows.map(r => {
       const delta = r.current_total - r.prev_total;
@@ -857,10 +872,10 @@ export class InsightQueries {
       FROM categories c
       LEFT JOIN transactions t ON c.id = t.category_id AND t.type = 'expense'
         AND t.transfer_id IS NULL
-      WHERE c.type = 'expense'
+      WHERE c.type = 'expense' AND c.book_id = ? AND t.book_id = ?
       GROUP BY c.id
       HAVING current_amount > avg_amount * 2 AND avg_amount > 0
-    `, [startLookback, month, month]);
+    `, [this.bookId, this.bookId, startLookback, month, month]);
 
     return avgData.map(d => ({
       type: 'anomaly' as const,
@@ -878,10 +893,10 @@ export class InsightQueries {
         strftime('%Y-%m', transaction_date) as month,
         SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as flow
       FROM transactions
-      WHERE transaction_date >= date('now', '-5 months') AND transfer_id IS NULL
+      WHERE book_id = ? AND transaction_date >= date('now', '-5 months') AND transfer_id IS NULL
       GROUP BY strftime('%Y-%m', transaction_date)
       ORDER BY month ASC
-    `);
+    `, [this.bookId]);
 
     const alerts: SpendingAlert[] = [];
     const deficitMonths = monthlyFlow.filter(m => m.flow < 0);
@@ -913,45 +928,45 @@ export class InsightQueries {
 
     const income = await this.db.getFirstAsync<{ total: number }>(`
       SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE type = 'income' AND strftime('%Y-%m', transaction_date) = ? AND transfer_id IS NULL
-    `, [currentMonth]);
+      WHERE book_id = ? AND type = 'income' AND strftime('%Y-%m', transaction_date) = ? AND transfer_id IS NULL
+    `, [this.bookId, currentMonth]);
 
     const expense = await this.db.getFirstAsync<{ total: number }>(`
       SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE type = 'expense' AND strftime('%Y-%m', transaction_date) = ? AND transfer_id IS NULL
-    `, [currentMonth]);
+      WHERE book_id = ? AND type = 'expense' AND strftime('%Y-%m', transaction_date) = ? AND transfer_id IS NULL
+    `, [this.bookId, currentMonth]);
 
     const avgExpense = await this.db.getFirstAsync<{ avg: number; total: number }>(`
       SELECT COALESCE(SUM(amount), 0) / 3.0 as avg, COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE type = 'expense' AND strftime('%Y-%m', transaction_date) >= ? AND transfer_id IS NULL
-    `, [threeMosAgo]);
+      WHERE book_id = ? AND type = 'expense' AND strftime('%Y-%m', transaction_date) >= ? AND transfer_id IS NULL
+    `, [this.bookId, threeMosAgo]);
 
     const balance = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT COALESCE(SUM(balance), 0) as total FROM wallets
-    `);
+      SELECT COALESCE(SUM(balance), 0) as total FROM wallets WHERE book_id = ?
+    `, [this.bookId]);
 
     const overBudget = await this.db.getFirstAsync<{ count: number }>(`
       SELECT COUNT(*) as count FROM budgets b
-      WHERE b.month = ? AND (b.monthly_limit + b.rollover_amount) < (
+      WHERE b.book_id = ? AND b.month = ? AND (b.monthly_limit + b.rollover_amount) < (
         SELECT COALESCE(SUM(t.amount), 0) FROM transactions t
         WHERE t.category_id = b.category_id AND t.type = 'expense'
         AND strftime('%Y-%m', t.transaction_date) = b.month
         AND t.transfer_id IS NULL
       )
-    `, [currentMonth]);
+    `, [this.bookId, currentMonth]);
 
     const goal = await this.db.getFirstAsync<{ count: number }>(`
-      SELECT COUNT(*) as count FROM savings_goals WHERE is_completed = 0
-    `);
+      SELECT COUNT(*) as count FROM savings_goals WHERE book_id = ? AND is_completed = 0
+    `, [this.bookId]);
 
     const catBreakdown = await this.db.getAllAsync<{ name: string; total: number }>(`
       SELECT c.name, COALESCE(SUM(t.amount), 0) as total
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
-      WHERE t.type = 'expense' AND strftime('%Y-%m', t.transaction_date) = ? AND t.transfer_id IS NULL
+      WHERE t.book_id = ? AND t.type = 'expense' AND strftime('%Y-%m', t.transaction_date) = ? AND t.transfer_id IS NULL
       GROUP BY c.id
       ORDER BY total DESC
-    `, [currentMonth]);
+    `, [this.bookId, currentMonth]);
 
     const classification = catBreakdown.map(c => ({
       name: c.name,
@@ -973,7 +988,7 @@ export class InsightQueries {
 }
 
 export class TrendQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getMonthlyTrend(months: number = 12): Promise<MonthlyTrendPoint[]> {
     return this.db.getAllAsync<MonthlyTrendPoint>(`
@@ -982,47 +997,45 @@ export class TrendQueries {
         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
         SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
       FROM transactions
-      WHERE transaction_date >= date('now', ?||' months') AND transfer_id IS NULL
+      WHERE book_id = ? AND transaction_date >= date('now', ?||' months') AND transfer_id IS NULL
       GROUP BY strftime('%Y-%m', transaction_date)
       ORDER BY month ASC
-    `, [`-${months}`]);
+    `, [this.bookId, `-${months}`]);
   }
 
-  async getCashFlow(walletId?: number): Promise<{ month: string; flow: number }[]> {
-    let whereClause = '';
-    const params: any[] = [];
-    if (walletId) {
-      whereClause = 'AND wallet_id = ?';
-      params.push(walletId);
-    }
+  async getCashFlow(): Promise<{ month: string; flow: number }[]> {
     return this.db.getAllAsync(`
       SELECT 
         strftime('%Y-%m', transaction_date) as month,
         SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as flow
       FROM transactions
-      WHERE transaction_date >= date('now', '-12 months') AND transfer_id IS NULL ${whereClause}
+      WHERE book_id = ? AND transaction_date >= date('now', '-12 months') AND transfer_id IS NULL
       GROUP BY strftime('%Y-%m', transaction_date)
       ORDER BY month ASC
-    `, params);
+    `, [this.bookId]);
   }
 }
 
 export class NetWorthQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAssets(): Promise<Asset[]> {
-    return this.db.getAllAsync<Asset>('SELECT * FROM assets ORDER BY created_at DESC');
+    return this.db.getAllAsync<Asset>(
+      'SELECT * FROM assets WHERE book_id = ? ORDER BY created_at DESC', [this.bookId]
+    );
   }
 
   async getAssetById(id: number): Promise<Asset | null> {
-    return this.db.getFirstAsync<Asset>('SELECT * FROM assets WHERE id = ?', [id]);
+    return this.db.getFirstAsync<Asset>(
+      'SELECT * FROM assets WHERE book_id = ? AND id = ?', [this.bookId, id]
+    );
   }
 
-  async addAsset(data: Omit<Asset, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
+  async addAsset(data: Omit<Asset, 'id' | 'created_at' | 'updated_at' | 'book_id'>): Promise<number> {
     const result = await this.db.runAsync(
-      `INSERT INTO assets (name, type, current_value, initial_value, purchase_date, notes, icon, color)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [data.name, data.type, data.current_value, data.initial_value ?? null, data.purchase_date ?? null, data.notes ?? null, data.icon, data.color]
+      `INSERT INTO assets (name, type, current_value, initial_value, purchase_date, notes, icon, color, book_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.name, data.type, data.current_value, data.initial_value ?? null, data.purchase_date ?? null, data.notes ?? null, data.icon, data.color, this.bookId]
     );
     return result.lastInsertRowId;
   }
@@ -1038,26 +1051,30 @@ export class NetWorthQueries {
     }
     fields.push("updated_at = datetime('now')");
     params.push(id);
-    await this.db.runAsync(`UPDATE assets SET ${fields.join(', ')} WHERE id = ?`, params);
+    await this.db.runAsync(`UPDATE assets SET ${fields.join(', ')} WHERE id = ? AND book_id = ?`, [...params, this.bookId]);
   }
 
   async deleteAsset(id: number): Promise<void> {
-    await this.db.runAsync('DELETE FROM assets WHERE id = ?', [id]);
+    await this.db.runAsync('DELETE FROM assets WHERE id = ? AND book_id = ?', [id, this.bookId]);
   }
 
   async getLiabilities(): Promise<Liability[]> {
-    return this.db.getAllAsync<Liability>('SELECT * FROM liabilities ORDER BY created_at DESC');
+    return this.db.getAllAsync<Liability>(
+      'SELECT * FROM liabilities WHERE book_id = ? ORDER BY created_at DESC', [this.bookId]
+    );
   }
 
   async getLiabilityById(id: number): Promise<Liability | null> {
-    return this.db.getFirstAsync<Liability>('SELECT * FROM liabilities WHERE id = ?', [id]);
+    return this.db.getFirstAsync<Liability>(
+      'SELECT * FROM liabilities WHERE book_id = ? AND id = ?', [this.bookId, id]
+    );
   }
 
-  async addLiability(data: Omit<Liability, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
+  async addLiability(data: Omit<Liability, 'id' | 'created_at' | 'updated_at' | 'book_id'>): Promise<number> {
     const result = await this.db.runAsync(
-      `INSERT INTO liabilities (name, type, current_balance, original_amount, interest_rate, monthly_payment, due_date, notes, icon, color)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [data.name, data.type, data.current_balance, data.original_amount ?? null, data.interest_rate ?? null, data.monthly_payment ?? null, data.due_date ?? null, data.notes ?? null, data.icon, data.color]
+      `INSERT INTO liabilities (name, type, current_balance, original_amount, interest_rate, monthly_payment, due_date, notes, icon, color, book_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.name, data.type, data.current_balance, data.original_amount ?? null, data.interest_rate ?? null, data.monthly_payment ?? null, data.due_date ?? null, data.notes ?? null, data.icon, data.color, this.bookId]
     );
     return result.lastInsertRowId;
   }
@@ -1073,25 +1090,31 @@ export class NetWorthQueries {
     }
     fields.push("updated_at = datetime('now')");
     params.push(id);
-    await this.db.runAsync(`UPDATE liabilities SET ${fields.join(', ')} WHERE id = ?`, params);
+    await this.db.runAsync(`UPDATE liabilities SET ${fields.join(', ')} WHERE id = ? AND book_id = ?`, [...params, this.bookId]);
   }
 
   async deleteLiability(id: number): Promise<void> {
-    await this.db.runAsync('DELETE FROM liabilities WHERE id = ?', [id]);
+    await this.db.runAsync('DELETE FROM liabilities WHERE id = ? AND book_id = ?', [id, this.bookId]);
   }
 
   async getCurrentNetWorth(): Promise<{ totalAssets: number; totalLiabilities: number; netWorth: number }> {
-    const walletSum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(balance), 0) as total FROM wallets');
-    const assetSum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(current_value), 0) as total FROM assets');
-    const liabilitySum = await this.db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(current_balance), 0) as total FROM liabilities');
+    const walletSum = await this.db.getFirstAsync<{ total: number }>(
+      'SELECT COALESCE(SUM(balance), 0) as total FROM wallets WHERE book_id = ?', [this.bookId]
+    );
+    const assetSum = await this.db.getFirstAsync<{ total: number }>(
+      'SELECT COALESCE(SUM(current_value), 0) as total FROM assets WHERE book_id = ?', [this.bookId]
+    );
+    const liabilitySum = await this.db.getFirstAsync<{ total: number }>(
+      'SELECT COALESCE(SUM(current_balance), 0) as total FROM liabilities WHERE book_id = ?', [this.bookId]
+    );
     // Unsettled person-to-person debts count too: money owed to you is an asset,
     // money you owe is a liability.
     const debtSum = await this.db.getFirstAsync<{ receivable: number; payable: number }>(`
       SELECT
         COALESCE(SUM(CASE WHEN direction = 'receivable' THEN amount - paid_amount ELSE 0 END), 0) as receivable,
         COALESCE(SUM(CASE WHEN direction = 'payable' THEN amount - paid_amount ELSE 0 END), 0) as payable
-      FROM debts WHERE is_settled = 0
-    `);
+      FROM debts WHERE book_id = ? AND is_settled = 0
+    `, [this.bookId]);
 
     const totalAssets = (walletSum?.total ?? 0) + (assetSum?.total ?? 0) + (debtSum?.receivable ?? 0);
     const totalLiabilities = (liabilitySum?.total ?? 0) + (debtSum?.payable ?? 0);
@@ -1100,41 +1123,43 @@ export class NetWorthQueries {
 
   async getNetWorthHistory(months: number = 12): Promise<NetWorthSnapshot[]> {
     return this.db.getAllAsync<NetWorthSnapshot>(
-      'SELECT * FROM net_worth_snapshots ORDER BY snapshot_date DESC LIMIT ?',
-      [months]
+      'SELECT * FROM net_worth_snapshots WHERE book_id = ? ORDER BY snapshot_date DESC LIMIT ?',
+      [this.bookId, months]
     );
   }
 
   async ensureMonthlySnapshot(): Promise<void> {
     const monthStart = dayjs().startOf('month').format('YYYY-MM-DD');
     const existing = await this.db.getFirstAsync<NetWorthSnapshot>(
-      'SELECT id FROM net_worth_snapshots WHERE snapshot_date = ?', [monthStart]
+      'SELECT id FROM net_worth_snapshots WHERE book_id = ? AND snapshot_date = ?', [this.bookId, monthStart]
     );
     if (existing) return;
 
     const { totalAssets, totalLiabilities, netWorth } = await this.getCurrentNetWorth();
     await this.db.runAsync(
-      'INSERT INTO net_worth_snapshots (snapshot_date, total_assets, total_liabilities, net_worth) VALUES (?, ?, ?, ?)',
-      [monthStart, totalAssets, totalLiabilities, netWorth]
+      'INSERT INTO net_worth_snapshots (snapshot_date, total_assets, total_liabilities, net_worth, book_id) VALUES (?, ?, ?, ?, ?)',
+      [monthStart, totalAssets, totalLiabilities, netWorth, this.bookId]
     );
   }
 }
 
 export class SubscriptionQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAll(includeInactive?: boolean): Promise<Subscription[]> {
-    const where = includeInactive ? '' : 'WHERE is_active = 1';
-    return this.db.getAllAsync<Subscription>(`SELECT * FROM subscriptions ${where} ORDER BY name ASC`);
+    const where = includeInactive ? 'WHERE book_id = ?' : 'WHERE book_id = ? AND is_active = 1';
+    return this.db.getAllAsync<Subscription>(`SELECT * FROM subscriptions ${where} ORDER BY name ASC`, [this.bookId]);
   }
 
   async getById(id: number): Promise<Subscription | null> {
-    return this.db.getFirstAsync<Subscription>('SELECT * FROM subscriptions WHERE id = ?', [id]);
+    return this.db.getFirstAsync<Subscription>(
+      'SELECT * FROM subscriptions WHERE book_id = ? AND id = ?', [this.bookId, id]
+    );
   }
 
   async getTotalMonthly(): Promise<number> {
     const rows = await this.db.getAllAsync<{ amount: number; billing_cycle: string }>(
-      'SELECT amount, billing_cycle FROM subscriptions WHERE is_active = 1'
+      'SELECT amount, billing_cycle FROM subscriptions WHERE book_id = ? AND is_active = 1', [this.bookId]
     );
     return rows.reduce((sum, r) => {
       const monthly = r.billing_cycle === 'yearly' ? r.amount / 12 : r.billing_cycle === 'quarterly' ? r.amount / 3 : r.amount;
@@ -1145,18 +1170,18 @@ export class SubscriptionQueries {
   async getUpcomingRenewals(days: number): Promise<Subscription[]> {
     const until = dayjs().add(days, 'day').format('YYYY-MM-DD');
     return this.db.getAllAsync<Subscription>(
-      'SELECT * FROM subscriptions WHERE is_active = 1 AND next_billing_date <= ? ORDER BY next_billing_date ASC',
-      [until]
+      'SELECT * FROM subscriptions WHERE book_id = ? AND is_active = 1 AND next_billing_date <= ? ORDER BY next_billing_date ASC',
+      [this.bookId, until]
     );
   }
 
-  async add(data: Omit<Subscription, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
+  async add(data: Omit<Subscription, 'id' | 'created_at' | 'updated_at' | 'book_id'>): Promise<number> {
     const result = await this.db.runAsync(
-      `INSERT INTO subscriptions (name, category, amount, billing_cycle, start_date, next_billing_date, wallet_id, category_id, icon, color, is_active, auto_create, remind, calendar_event_id, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO subscriptions (name, category, amount, billing_cycle, start_date, next_billing_date, wallet_id, category_id, icon, color, is_active, auto_create, remind, calendar_event_id, notes, book_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.name, data.category, data.amount, data.billing_cycle, data.start_date, data.next_billing_date,
        data.wallet_id ?? null, data.category_id ?? null, data.icon, data.color, data.is_active ?? 1,
-       data.auto_create ?? 1, data.remind ?? 1, data.calendar_event_id ?? null, data.notes ?? null]
+       data.auto_create ?? 1, data.remind ?? 1, data.calendar_event_id ?? null, data.notes ?? null, this.bookId]
     );
     return result.lastInsertRowId;
   }
@@ -1172,39 +1197,39 @@ export class SubscriptionQueries {
     }
     fields.push("updated_at = datetime('now')");
     params.push(id);
-    await this.db.runAsync(`UPDATE subscriptions SET ${fields.join(', ')} WHERE id = ?`, params);
+    await this.db.runAsync(`UPDATE subscriptions SET ${fields.join(', ')} WHERE id = ? AND book_id = ?`, [...params, this.bookId]);
   }
 
   async cancel(id: number): Promise<void> {
     const today = dayjs().format('YYYY-MM-DD');
     await this.db.runAsync(
-      "UPDATE subscriptions SET is_active = 0, cancelled_date = ?, updated_at = datetime('now') WHERE id = ?",
-      [today, id]
+      "UPDATE subscriptions SET is_active = 0, cancelled_date = ?, updated_at = datetime('now') WHERE id = ? AND book_id = ?",
+      [today, id, this.bookId]
     );
   }
 
   async clearCalendarEvent(id: number): Promise<void> {
     await this.db.runAsync(
-      "UPDATE subscriptions SET calendar_event_id = NULL, updated_at = datetime('now') WHERE id = ?",
-      [id]
+      "UPDATE subscriptions SET calendar_event_id = NULL, updated_at = datetime('now') WHERE id = ? AND book_id = ?",
+      [id, this.bookId]
     );
   }
 
   async processRenewals(): Promise<void> {
     const today = dayjs().format('YYYY-MM-DD');
     const dueSubs = await this.db.getAllAsync<Subscription>(
-      'SELECT * FROM subscriptions WHERE is_active = 1 AND next_billing_date <= ?',
-      [today]
+      'SELECT * FROM subscriptions WHERE book_id = ? AND is_active = 1 AND next_billing_date <= ?',
+      [this.bookId, today]
     );
 
-    const txnQueries = new TransactionQueries(this.db);
+    const txnQueries = new TransactionQueries(this.db, this.bookId);
     const cycleMonths = (c: Subscription['billing_cycle']) => (c === 'monthly' ? 1 : c === 'yearly' ? 12 : 3);
 
     for (const sub of dueSubs) {
       const target = sub.auto_create
         // Legacy rows (and any sub saved before the form exposed these pickers)
         // have no wallet/category; fall back instead of skipping the booking.
-        ? await resolveBookingTarget(this.db, 'expense', sub.wallet_id, sub.category_id)
+        ? await resolveBookingTarget(this.db, 'expense', sub.wallet_id, sub.category_id, this.bookId)
         : null;
 
       // Catch up every cycle that already elapsed, not just one per app launch.
@@ -1238,20 +1263,22 @@ export class SubscriptionQueries {
 }
 
 export class DebtQueries {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: SQLiteDatabase, private bookId: number) {}
 
   async getAll(includeSettled = true): Promise<(Debt & { wallet_name?: string })[]> {
     return this.db.getAllAsync<Debt & { wallet_name?: string }>(`
       SELECT d.*, w.name as wallet_name
       FROM debts d
       LEFT JOIN wallets w ON d.wallet_id = w.id
-      ${includeSettled ? '' : 'WHERE d.is_settled = 0'}
+      WHERE d.book_id = ? ${includeSettled ? '' : 'AND d.is_settled = 0'}
       ORDER BY d.is_settled ASC, COALESCE(d.due_date, '9999-12-31') ASC, d.id DESC
-    `);
+    `, [this.bookId]);
   }
 
   async getById(id: number): Promise<Debt | null> {
-    return this.db.getFirstAsync<Debt>('SELECT * FROM debts WHERE id = ?', [id]);
+    return this.db.getFirstAsync<Debt>(
+      'SELECT * FROM debts WHERE book_id = ? AND id = ?', [this.bookId, id]
+    );
   }
 
   async getSummary(): Promise<DebtSummary> {
@@ -1259,8 +1286,8 @@ export class DebtQueries {
       SELECT
         COALESCE(SUM(CASE WHEN direction = 'receivable' THEN amount - paid_amount ELSE 0 END), 0) as receivable,
         COALESCE(SUM(CASE WHEN direction = 'payable' THEN amount - paid_amount ELSE 0 END), 0) as payable
-      FROM debts WHERE is_settled = 0
-    `);
+      FROM debts WHERE book_id = ? AND is_settled = 0
+    `, [this.bookId]);
     const totalReceivable = row?.receivable ?? 0;
     const totalPayable = row?.payable ?? 0;
     return { totalReceivable, totalPayable, net: totalReceivable - totalPayable };
@@ -1268,8 +1295,8 @@ export class DebtQueries {
 
   async getPayments(debtId: number): Promise<DebtPayment[]> {
     return this.db.getAllAsync<DebtPayment>(
-      'SELECT * FROM debt_payments WHERE debt_id = ? ORDER BY payment_date DESC, id DESC',
-      [debtId]
+      'SELECT * FROM debt_payments WHERE book_id = ? AND debt_id = ? ORDER BY payment_date DESC, id DESC',
+      [this.bookId, debtId]
     );
   }
 
@@ -1291,16 +1318,16 @@ export class DebtQueries {
     let newId = 0;
     await this.db.withTransactionAsync(async () => {
       const res = await this.db.runAsync(
-        'INSERT INTO debts (person_name, direction, amount, due_date, wallet_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
-        [data.person_name, data.direction, data.amount, data.due_date ?? null, data.wallet_id ?? null, data.notes ?? null]
+        'INSERT INTO debts (person_name, direction, amount, due_date, wallet_id, notes, book_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [data.person_name, data.direction, data.amount, data.due_date ?? null, data.wallet_id ?? null, data.notes ?? null, this.bookId]
       );
       newId = res.lastInsertRowId;
 
       if (bookTransaction) {
         const type: TransactionType = data.direction === 'receivable' ? 'expense' : 'income';
-        const target = await resolveBookingTarget(this.db, type, data.wallet_id, null);
+        const target = await resolveBookingTarget(this.db, type, data.wallet_id, null, this.bookId);
         if (target) {
-          await new TransactionQueries(this.db).create({
+          await new TransactionQueries(this.db, this.bookId).create({
             type,
             amount: data.amount,
             category_id: target.categoryId,
@@ -1356,9 +1383,9 @@ export class DebtQueries {
       let txId: number | null = null;
       if (opts.bookTransaction !== false) {
         const type: TransactionType = debt.direction === 'receivable' ? 'income' : 'expense';
-        const target = await resolveBookingTarget(this.db, type, opts.walletId ?? debt.wallet_id, null);
+        const target = await resolveBookingTarget(this.db, type, opts.walletId ?? debt.wallet_id, null, this.bookId);
         if (target) {
-          txId = await new TransactionQueries(this.db).create({
+          txId = await new TransactionQueries(this.db, this.bookId).create({
             type,
             amount: capped,
             category_id: target.categoryId,
@@ -1373,8 +1400,8 @@ export class DebtQueries {
       }
 
       await this.db.runAsync(
-        'INSERT INTO debt_payments (debt_id, amount, payment_date, transaction_id, notes) VALUES (?, ?, ?, ?, ?)',
-        [debtId, capped, date, txId, opts.notes ?? null]
+        'INSERT INTO debt_payments (debt_id, amount, payment_date, transaction_id, notes, book_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [debtId, capped, date, txId, opts.notes ?? null, this.bookId]
       );
 
       const paid = Math.round((debt.paid_amount + capped) * 100) / 100;

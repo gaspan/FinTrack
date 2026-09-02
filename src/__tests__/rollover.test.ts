@@ -35,28 +35,30 @@ const makePrevBudget = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
+const books = [{ id: 1, name: 'Pribadi', icon: 'book-outline', color: '#6366F1', is_active: 1, sort_order: 1, created_at: '' }];
+
 describe('RolloverEngine', () => {
   it('meneruskan sisa anggaran (limit - spent) ke bulan berjalan', async () => {
     getByMonthSpy.mockResolvedValue([makePrevBudget()]);
 
-    await new RolloverEngine(db as any).process();
+    await new RolloverEngine(db as any, books as any).process();
 
     expect(setBudgetSpy).toHaveBeenCalledWith(1, 1000000, currentMonth, true);
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE budgets SET rollover_amount = ? WHERE category_id = ? AND month = ?',
-      [400000, 1, currentMonth]
+      'UPDATE budgets SET rollover_amount = ? WHERE book_id = ? AND category_id = ? AND month = ?',
+      [400000, 1, 1, currentMonth]
     );
   });
 
   it('tidak meneruskan sisa negatif jika anggaran habis terpakai', async () => {
     getByMonthSpy.mockResolvedValue([makePrevBudget({ spent: 1500000 })]);
 
-    await new RolloverEngine(db as any).process();
+    await new RolloverEngine(db as any, books as any).process();
 
     expect(setBudgetSpy).toHaveBeenCalledWith(1, 1000000, currentMonth, true);
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE budgets SET rollover_amount = ? WHERE category_id = ? AND month = ?',
-      [0, 1, currentMonth]
+      'UPDATE budgets SET rollover_amount = ? WHERE book_id = ? AND category_id = ? AND month = ?',
+      [0, 1, 1, currentMonth]
     );
   });
 
@@ -67,7 +69,7 @@ describe('RolloverEngine', () => {
       rollover_amount: 0, rollover_enabled: 1,
     });
 
-    await new RolloverEngine(db as any).process();
+    await new RolloverEngine(db as any, books as any).process();
 
     expect(setBudgetSpy).toHaveBeenCalledWith(1, 2000000, currentMonth, true);
   });
@@ -79,17 +81,17 @@ describe('RolloverEngine', () => {
       rollover_amount: 300000, rollover_enabled: 0,
     });
 
-    await new RolloverEngine(db as any).process();
+    await new RolloverEngine(db as any, books as any).process();
 
     expect(setBudgetSpy).not.toHaveBeenCalled();
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE budgets SET rollover_amount = 0 WHERE category_id = ? AND month = ?',
-      [1, currentMonth]
+      'UPDATE budgets SET rollover_amount = 0 WHERE book_id = ? AND category_id = ? AND month = ?',
+      [1, 1, currentMonth]
     );
   });
 
   it('tidak melakukan apa pun jika tidak ada budget bulan lalu', async () => {
-    await new RolloverEngine(db as any).process();
+    await new RolloverEngine(db as any, books as any).process();
 
     expect(setBudgetSpy).not.toHaveBeenCalled();
     expect(db.runAsync).not.toHaveBeenCalled();

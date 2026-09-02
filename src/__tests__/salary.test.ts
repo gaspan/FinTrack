@@ -24,7 +24,7 @@ describe('getSalaryProjection', () => {
   it('mengembalikan null jika payroll nonaktif', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce('false');
 
-    const result = await getSalaryProjection(db);
+    const result = await getSalaryProjection(db, 1);
 
     expect(result).toBeNull();
     expect(getByDateRangeSpy).not.toHaveBeenCalled();
@@ -33,7 +33,7 @@ describe('getSalaryProjection', () => {
   it('mengembalikan null jika tidak ada kategori gaji', async () => {
     findSalaryCategoryIdMock.mockResolvedValue(null);
 
-    const result = await getSalaryProjection(db);
+    const result = await getSalaryProjection(db, 1);
 
     expect(result).toBeNull();
   });
@@ -43,7 +43,7 @@ describe('getSalaryProjection', () => {
       { id: 1, type: 'expense', amount: 100000, category_id: 1, wallet_id: 1, transaction_date: dayjs().format('YYYY-MM-DD'), notes: null, recurring_id: null, created_at: '' } as any,
     ]);
 
-    const result = await getSalaryProjection(db);
+    const result = await getSalaryProjection(db, 1);
 
     expect(result).toBeNull();
   });
@@ -54,7 +54,7 @@ describe('getSalaryProjection', () => {
       { id: 2, type: 'income', amount: 7000000, category_id: 1, wallet_id: 1, transaction_date: dayjs().subtract(2, 'month').format('YYYY-MM-DD'), notes: null, recurring_id: null, created_at: '' } as any,
     ]);
 
-    const result = await getSalaryProjection(db);
+    const result = await getSalaryProjection(db, 1);
 
     expect(result).not.toBeNull();
     expect(result!.amount).toBe(6000000);
@@ -69,7 +69,7 @@ describe('getSalaryProjection', () => {
       { id: 2, type: 'income', amount: 99999999, category_id: 2, wallet_id: 1, transaction_date: dayjs().subtract(2, 'month').format('YYYY-MM-DD'), notes: null, recurring_id: null, created_at: '' } as any,
     ]);
 
-    const result = await getSalaryProjection(db);
+    const result = await getSalaryProjection(db, 1);
 
     expect(result!.amount).toBe(5000000);
   });

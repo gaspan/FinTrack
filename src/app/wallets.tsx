@@ -5,6 +5,7 @@ import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { WalletQueries } from '@/lib/queries';
 import { Wallet } from '@/types';
 import { WalletForm } from '@/components/forms/WalletForm';
@@ -14,13 +15,15 @@ export default function WalletsScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Wallet | null>(null);
 
   const loadData = useCallback(async () => {
-    try { setWallets(await new WalletQueries(db).getAll()); } catch (e) { console.error(e); }
-  }, [db]);
+    try { setWallets(await new WalletQueries(db, bookId).getAll()); } catch (e) { console.error(e); }
+  }, [db, bookId]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -33,7 +36,7 @@ export default function WalletsScreen() {
     );
     if (duplicate) { Alert.alert('Duplikat', `Dompet "${name}" sudah ada.`); return; }
     try {
-      const q = new WalletQueries(db);
+      const q = new WalletQueries(db, bookId);
       if (editing) await q.update(editing.id, { ...data, name });
       else await q.create({ ...data, name });
       closeForm();
@@ -46,7 +49,7 @@ export default function WalletsScreen() {
 
   const handleDelete = async (wallet: Wallet) => {
     if (wallets.length === 1) { Alert.alert('Gagal', 'Minimal 1 dompet.'); return; }
-    const txCount = await new WalletQueries(db).countTransactions(wallet.id);
+    const txCount = await new WalletQueries(db, bookId).countTransactions(wallet.id);
     Alert.alert(
       'Hapus Dompet',
       txCount > 0
@@ -57,7 +60,7 @@ export default function WalletsScreen() {
         {
           text: 'Hapus', style: 'destructive',
           onPress: async () => {
-            try { await new WalletQueries(db).delete(wallet.id); loadData(); }
+            try { await new WalletQueries(db, bookId).delete(wallet.id); loadData(); }
             catch (e) { console.error(e); Alert.alert('Error', 'Gagal menghapus dompet'); }
           },
         },
@@ -66,7 +69,7 @@ export default function WalletsScreen() {
   };
 
   const handleSetPrimary = async (id: number) => {
-    await new WalletQueries(db).setPrimary(id);
+    await new WalletQueries(db, bookId).setPrimary(id);
     loadData();
   };
 

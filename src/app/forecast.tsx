@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { Card } from '@/components/ui/Card';
 import { LineChart } from 'react-native-gifted-charts';
 import { SafeToSpendData, ForecastPoint } from '@/types';
@@ -12,6 +13,8 @@ import { formatRupiah } from '@/utils/format';
 
 export default function ForecastPage() {
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const { theme } = useTheme();
   const styles = makeStyles(theme);
 
@@ -19,9 +22,9 @@ export default function ForecastPage() {
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
 
   useFocusEffect(useCallback(() => {
-    calculateSafeToSpend(db).then(setSafeData);
-    generateForecast(db).then(setForecast);
-  }, [db]));
+    calculateSafeToSpend(db, bookId).then(setSafeData);
+    generateForecast(db, 30, bookId).then(setForecast);
+  }, [db, bookId]));
 
   const chartData = forecast.map((f) => ({
     value: f.projected_balance,

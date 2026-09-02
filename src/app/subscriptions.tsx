@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { SubscriptionQueries } from '@/lib/queries';
 import { Subscription } from '@/types';
 import { formatRupiah } from '@/utils/format';
@@ -13,9 +14,11 @@ import { syncEventToCalendar, deleteEventFromCalendar } from '@/features/notific
 
 export default function SubscriptionsPage() {
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const queries = new SubscriptionQueries(db);
+  const queries = new SubscriptionQueries(db, bookId);
 
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [totalMonthly, setTotalMonthly] = useState(0);
@@ -41,7 +44,7 @@ export default function SubscriptionsPage() {
         if (eventId) await queries.update(s.id, { calendar_event_id: eventId });
       } catch {}
     }
-  }, [db]);
+  }, [db, bookId]);
 
   const loadData = useCallback(async () => {
     const [data, total] = await Promise.all([
@@ -51,7 +54,7 @@ export default function SubscriptionsPage() {
     setSubs(data);
     setTotalMonthly(total);
     resyncCalendar(data);
-  }, [db, filter, resyncCalendar]);
+  }, [db, bookId, filter, resyncCalendar]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 

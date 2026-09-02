@@ -11,8 +11,8 @@ export interface InsightData {
   financialTips: FinancialTip[];
 }
 
-export async function loadInsights(db: SQLiteDatabase): Promise<InsightData> {
-  const queries = new InsightQueries(db);
+export async function loadInsights(db: SQLiteDatabase, bookId: number): Promise<InsightData> {
+  const queries = new InsightQueries(db, bookId);
   const currentMonth = dayjs().format('YYYY-MM');
   const prevMonth = dayjs().subtract(1, 'month').format('YYYY-MM');
 

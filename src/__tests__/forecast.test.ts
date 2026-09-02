@@ -34,7 +34,7 @@ describe('generateForecast', () => {
     const salaryDate = dayjs().add(10, 'day').format('YYYY-MM-DD');
     salaryMock.mockResolvedValue({ amount: 5000000, nextDate: salaryDate, salaryDay: 25, salaryCategoryId: 1 });
 
-    const points = await generateForecast(db, 20);
+    const points = await generateForecast(db, 20, 1);
 
     const atSalaryDay = points.find(p => p.date === salaryDate)!;
     expect(atSalaryDay.income).toBe(5000000);
@@ -51,7 +51,7 @@ describe('generateForecast', () => {
       { id: 1, type: 'income', amount: 3000000, category_id: 1, wallet_id: 1, frequency: 'monthly', next_date: salaryDate, notes: null, is_active: 1 } as any,
     ]);
 
-    const points = await generateForecast(db, 20);
+    const points = await generateForecast(db, 20, 1);
 
     const atSalaryDay = points.find(p => p.date === salaryDate)!;
     expect(atSalaryDay.income).toBe(3000000);
@@ -63,7 +63,7 @@ describe('generateForecast', () => {
       { id: 2, type: 'expense', amount: 50000, category_id: 2, wallet_id: 1, frequency: 'monthly', next_date: expenseDate, notes: null, is_active: 1 } as any,
     ]);
 
-    const points = await generateForecast(db, 15);
+    const points = await generateForecast(db, 15, 1);
 
     const atExpenseDay = points.find(p => p.date === expenseDate)!;
     expect(atExpenseDay.expense).toBe(50000);
@@ -79,7 +79,7 @@ describe('calculateSafeToSpend', () => {
       salaryCategoryId: 1,
     });
 
-    const result = await calculateSafeToSpend(db);
+    const result = await calculateSafeToSpend(db, 1);
 
     expect(result).not.toBeNull();
     expect(result!.remainingBalance).toBe(1000000 + 5000000);
@@ -93,7 +93,7 @@ describe('calculateSafeToSpend', () => {
       salaryCategoryId: 1,
     });
 
-    const result = await calculateSafeToSpend(db);
+    const result = await calculateSafeToSpend(db, 1);
 
     expect(result!.remainingBalance).toBe(1000000);
   });
@@ -101,7 +101,7 @@ describe('calculateSafeToSpend', () => {
   it('mengembalikan null jika tidak ada dompet', async () => {
     walletGetAllSpy.mockResolvedValue([]);
 
-    const result = await calculateSafeToSpend(db);
+    const result = await calculateSafeToSpend(db, 1);
 
     expect(result).toBeNull();
   });

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { CategoryQueries, WalletQueries, TransactionQueries, TagQueries } from '@/lib/queries';
 import { Category, Wallet, TransactionType, TransactionWithDetails, Tag } from '@/types';
 import { TransactionForm } from '@/components/forms/TransactionForm';
@@ -13,6 +14,8 @@ export default function EditTransactionScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -29,8 +32,8 @@ export default function EditTransactionScreen() {
         const txId = parseInt(id, 10);
         if (isNaN(txId)) return;
 
-        const categoryQueries = new CategoryQueries(db);
-        const walletQueries = new WalletQueries(db);
+        const categoryQueries = new CategoryQueries(db, bookId);
+        const walletQueries = new WalletQueries(db, bookId);
 
         const [tx, cats, walls, tags, attachments] = await Promise.all([
           db.getFirstAsync<TransactionWithDetails>(`
@@ -47,8 +50,8 @@ export default function EditTransactionScreen() {
           `, [txId]),
           categoryQueries.getAll(),
           walletQueries.getAll(),
-          new TagQueries(db).getByTransaction(txId),
-          new TransactionQueries(db).getAttachments(txId),
+          new TagQueries(db, bookId).getByTransaction(txId),
+          new TransactionQueries(db, bookId).getAttachments(txId),
         ]);
 
         if (tx) setTransaction(tx);
@@ -65,7 +68,7 @@ export default function EditTransactionScreen() {
     };
 
     loadData();
-  }, [id, db]);
+  }, [id, db, bookId]);
 
   const handleSubmit = async (data: {
     type: TransactionType;
@@ -80,10 +83,10 @@ export default function EditTransactionScreen() {
     try {
       setSubmitting(true);
       const txId = parseInt(id, 10);
-      const txQueries = new TransactionQueries(db);
+      const txQueries = new TransactionQueries(db, bookId);
       await txQueries.update(txId, data);
 
-      const tagQueries = new TagQueries(db);
+      const tagQueries = new TagQueries(db, bookId);
       await tagQueries.setTransactionTags(txId, data.tags);
 
       // Remove old attachments, add new ones

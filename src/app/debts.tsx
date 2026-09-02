@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { DebtQueries, WalletQueries } from '@/lib/queries';
 import { Debt, DebtDirection, DebtSummary, DebtPayment, Wallet } from '@/types';
 import { formatRupiah } from '@/utils/format';
@@ -25,6 +26,9 @@ export default function DebtsScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
 
   const [debts, setDebts] = useState<DebtRow[]>([]);
   const [summary, setSummary] = useState<DebtSummary>({ totalReceivable: 0, totalPayable: 0, net: 0 });
@@ -51,11 +55,11 @@ export default function DebtsScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const q = new DebtQueries(db);
+      const q = new DebtQueries(db, bookId);
       const [rows, sum, ws] = await Promise.all([
         q.getAll(filter === 'all'),
         q.getSummary(),
-        new WalletQueries(db).getAll(),
+        new WalletQueries(db, bookId).getAll(),
       ]);
       setDebts(rows);
       setSummary(sum);
@@ -64,7 +68,7 @@ export default function DebtsScreen() {
       setPayments({});
       setExpandedId(null);
     } catch (e) { console.error(e); }
-  }, [db, filter]);
+  }, [db, bookId, filter]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -75,7 +79,7 @@ export default function DebtsScreen() {
     setExpandedId(debtId);
     if (!payments[debtId]) {
       try {
-        const rows = await new DebtQueries(db).getPayments(debtId);
+        const rows = await new DebtQueries(db, bookId).getPayments(debtId);
         setPayments(prev => ({ ...prev, [debtId]: rows }));
       } catch (e) { console.error(e); }
     }
@@ -117,7 +121,7 @@ export default function DebtsScreen() {
     }
     setSaving(true);
     try {
-      const q = new DebtQueries(db);
+      const q = new DebtQueries(db, bookId);
       if (editing) {
         await q.update(editing.id, {
           person_name: personName.trim(),
@@ -156,7 +160,7 @@ export default function DebtsScreen() {
         {
           text: 'Hapus', style: 'destructive',
           onPress: async () => {
-            try { await new DebtQueries(db).delete(d.id); loadData(); }
+            try { await new DebtQueries(db, bookId).delete(d.id); loadData(); }
             catch (e) { console.error(e); Alert.alert('Error', 'Gagal menghapus'); }
           },
         },
@@ -172,7 +176,7 @@ export default function DebtsScreen() {
   const handlePayment = async () => {
     if (!payTarget || payAmount <= 0) return;
     try {
-      const res = await new DebtQueries(db).addPayment(payTarget.id, payAmount, {
+      const res = await new DebtQueries(db, bookId).addPayment(payTarget.id, payAmount, {
         walletId: payTarget.wallet_id,
       });
       hapticSuccess();

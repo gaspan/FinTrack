@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { migrateDbIfNeeded } from '@/lib/database';
 import { ThemeProvider, useTheme } from '@/constants/theme';
+import { BookProvider } from '@/constants/books';
 import { getStoredPin } from '@/lib/lockStorage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { bootCheckpoint, markBootOk } from '@/lib/bootLog';
@@ -112,6 +113,7 @@ function NavigationStack() {
         <Stack.Screen name="transfer" options={{ presentation: 'modal', headerShown: true, title: 'Transfer Dompet' }} />
         <Stack.Screen name="wallets" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Dompet' }} />
         <Stack.Screen name="categories" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Kategori' }} />
+        <Stack.Screen name="books" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Pembukuan' }} />
         <Stack.Screen name="cloud-backup" options={{ presentation: 'modal', headerShown: true, title: 'Backup Cloud' }} />
         <Stack.Screen name="debts" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -177,7 +179,9 @@ function RootContent() {
       onInit={handleDbInit}
       onError={handleDbError}
     >
-      <NavigationStack />
+      <BookProvider>
+        <NavigationStack />
+      </BookProvider>
     </SQLiteProvider>
   );
 }

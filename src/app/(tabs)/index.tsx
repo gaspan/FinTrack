@@ -7,6 +7,7 @@ import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { ChartQueries, WalletQueries, TransactionQueries, TrendQueries, NetWorthQueries, BudgetQueries, SavingsGoalQueries } from '@/lib/queries';
 import { getPayrollPeriod, getPreviousPayrollPeriod, findSalaryCategoryId } from '@/utils/payroll';
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
@@ -47,6 +48,8 @@ export default function DashboardScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   
   const [initialLoad, setInitialLoad] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -90,14 +93,14 @@ export default function DashboardScreen() {
 
     const salaryDay = dayRaw ? parseInt(dayRaw, 10) : 25;
     const preferredCategoryId = categoryIdRaw ? parseInt(categoryIdRaw, 10) : null;
-    const salaryCategoryId = await findSalaryCategoryId(db, preferredCategoryId);
+    const salaryCategoryId = await findSalaryCategoryId(db, bookId, preferredCategoryId);
 
     if (!salaryCategoryId) {
       setPayrollPeriod(null);
       return null;
     }
 
-    const period = await getPayrollPeriod(db, salaryDay, salaryCategoryId);
+    const period = await getPayrollPeriod(db, salaryDay, salaryCategoryId, undefined, bookId);
     const nextPeriod = {
       startDate: period.startDate,
       endDate: period.endDate,
@@ -110,7 +113,7 @@ export default function DashboardScreen() {
     setStartDate(period.startDate);
     setEndDate(period.endDate);
     return nextPeriod;
-  }, [db, isManualDateRange]);
+  }, [db, isManualDateRange, bookId]);
 
   const handleDateRangeChange = useCallback((start: string, end: string) => {
     setIsManualDateRange(true);
@@ -130,10 +133,10 @@ export default function DashboardScreen() {
     salaryCategoryId?: number | null;
   }) => {
     try {
-      const chartQueries = new ChartQueries(db);
-      const walletQueries = new WalletQueries(db);
-      const txQueries = new TransactionQueries(db);
-      const trendQueries = new TrendQueries(db);
+      const chartQueries = new ChartQueries(db, bookId);
+      const walletQueries = new WalletQueries(db, bookId);
+      const txQueries = new TransactionQueries(db, bookId);
+      const trendQueries = new TrendQueries(db, bookId);
 
       const walletsAll = await walletQueries.getAll();
       const balance = walletsAll.reduce((acc, w) => acc + w.balance, 0);
@@ -157,14 +160,14 @@ export default function DashboardScreen() {
         payrollEnabled = enabledRaw !== 'false';
         salaryDay = dayRaw ? parseInt(dayRaw, 10) : 25;
         const preferredCategoryId = categoryIdRaw ? parseInt(categoryIdRaw, 10) : null;
-        salaryCategoryId = payrollEnabled ? await findSalaryCategoryId(db, preferredCategoryId) : null;
+        salaryCategoryId = payrollEnabled ? await findSalaryCategoryId(db, bookId, preferredCategoryId) : null;
       }
 
       let prevStartDate = dayjs(currentStartDate).subtract(1, 'month').startOf('month').format('YYYY-MM-DD');
       let prevEndDate = dayjs(currentEndDate).subtract(1, 'month').endOf('month').format('YYYY-MM-DD');
 
       if (payrollEnabled && salaryCategoryId) {
-        const prevPeriod = await getPreviousPayrollPeriod(db, salaryDay, salaryCategoryId, currentStartDate);
+        const prevPeriod = await getPreviousPayrollPeriod(db, salaryDay, salaryCategoryId, currentStartDate, bookId);
         prevStartDate = prevPeriod.startDate;
         prevEndDate = prevPeriod.endDate;
       }
@@ -190,7 +193,7 @@ export default function DashboardScreen() {
       const txs = await txQueries.getByDateRange(currentStartDate, currentEndDate);
       setRecentTransactions(txs.slice(0, 5));
 
-      const nwQ = new NetWorthQueries(db);
+      const nwQ = new NetWorthQueries(db, bookId);
       const nw = await nwQ.getCurrentNetWorth();
       setNetWorthData(nw);
 
@@ -198,8 +201,8 @@ export default function DashboardScreen() {
       setNetWorthHistory(nwHistory.map(s => s.net_worth).reverse());
 
       const [budgetRows, goalRows] = await Promise.all([
-        new BudgetQueries(db).getByMonth(dayjs().format('YYYY-MM')),
-        new SavingsGoalQueries(db).getAll(),
+        new BudgetQueries(db, bookId).getByMonth(dayjs().format('YYYY-MM')),
+        new SavingsGoalQueries(db, bookId).getAll(),
       ]);
       setBudgets(budgetRows as BudgetRow[]);
       setGoals(goalRows);
@@ -207,17 +210,17 @@ export default function DashboardScreen() {
       const enabled = await AsyncStorage.getItem('safe_to_spend_enabled');
       setSafeToSpendEnabled(enabled !== 'false');
 
-      const safeData = await calculateSafeToSpend(db);
+      const safeData = await calculateSafeToSpend(db, bookId);
       setSafeToSpendData(safeData);
 
-      const insights = await loadInsights(db);
+      const insights = await loadInsights(db, bookId);
       setInsightData(insights);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
       setInitialLoad(false);
     }
-  }, [db, startDate, endDate, chartType]);
+  }, [db, startDate, endDate, chartType, bookId]);
 
   useFocusEffect(useCallback(() => {
     initPayrollPeriod().then(config => {
@@ -267,8 +270,8 @@ export default function DashboardScreen() {
   const handleExportPDF = useCallback(async () => {
     try {
       setExporting(true);
-      const chartQueries = new ChartQueries(db);
-      const txQueries = new TransactionQueries(db);
+      const chartQueries = new ChartQueries(db, bookId);
+      const txQueries = new TransactionQueries(db, bookId);
       const [currentSummary, breakdown, allTx] = await Promise.all([
         chartQueries.getSummary(startDate, endDate),
         chartQueries.getCategoryBreakdown(startDate, endDate, chartType),
@@ -285,7 +288,7 @@ export default function DashboardScreen() {
     } finally {
       setExporting(false);
     }
-  }, [db, startDate, endDate, chartType]);
+  }, [db, startDate, endDate, chartType, bookId]);
 
   const currentChartTotal = useMemo(() => {
     return chartType === 'income' ? summary.totalIncome : summary.totalExpense;

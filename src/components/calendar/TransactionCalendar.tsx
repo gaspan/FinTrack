@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native
 import { useSQLiteContext } from 'expo-sqlite';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { TransactionQueries } from '@/lib/queries';
 import { CalendarDayData } from '@/types';
 import { CalendarDay } from './CalendarDay';
@@ -17,6 +18,8 @@ interface TransactionCalendarProps {
 
 export const TransactionCalendar: React.FC<TransactionCalendarProps> = ({ onSelectDay }) => {
   const db = useSQLiteContext();
+  const { activeBook } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const [currentMonth, setCurrentMonth] = useState(dayjs().startOf('month'));
@@ -26,7 +29,7 @@ export const TransactionCalendar: React.FC<TransactionCalendarProps> = ({ onSele
   const loadMonth = useCallback(async (month: dayjs.Dayjs) => {
     const start = month.format('YYYY-MM-DD');
     const end = month.endOf('month').format('YYYY-MM-DD');
-    const queries = new TransactionQueries(db);
+    const queries = new TransactionQueries(db, bookId);
     const txs = await queries.getByDateRange(start, end);
 
     const map = new Map<string, CalendarDayData>();
@@ -43,7 +46,7 @@ export const TransactionCalendar: React.FC<TransactionCalendarProps> = ({ onSele
       day.net = day.income - day.expense;
     }
     setCalendarData(map);
-  }, [db]);
+  }, [db, bookId]);
 
   React.useEffect(() => { loadMonth(currentMonth); }, [currentMonth, loadMonth]);
 

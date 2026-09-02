@@ -38,7 +38,7 @@ const baseBill = (over: Record<string, any> = {}) => ({
 describe('BillReminderQueries.setPaid', () => {
   it('mencatat pengeluaran saat tagihan ditandai lunas', async () => {
     const { db, inserted } = makeDb(baseBill());
-    const res = await new BillReminderQueries(db).setPaid(1, true);
+    const res = await new BillReminderQueries(db, 1).setPaid(1, true);
 
     expect(res.booked).toBe(true);
     expect(inserted).toHaveLength(1);
@@ -52,7 +52,7 @@ describe('BillReminderQueries.setPaid', () => {
   it('tagihan bulanan maju ke jatuh tempo berikutnya dan kembali belum lunas', async () => {
     const due = dayjs().format('YYYY-MM-DD');
     const { db, billUpdates } = makeDb(baseBill({ due_date: due }));
-    const res = await new BillReminderQueries(db).setPaid(1, true);
+    const res = await new BillReminderQueries(db, 1).setPaid(1, true);
 
     expect(res.nextDueDate).toBe(dayjs(due).add(1, 'month').format('YYYY-MM-DD'));
     const update = billUpdates[0];
@@ -62,7 +62,7 @@ describe('BillReminderQueries.setPaid', () => {
 
   it('tagihan sekali pakai tetap berstatus lunas dan menyimpan id transaksi', async () => {
     const { db, billUpdates } = makeDb(baseBill({ frequency: 'one_time' }));
-    const res = await new BillReminderQueries(db).setPaid(1, true);
+    const res = await new BillReminderQueries(db, 1).setPaid(1, true);
 
     expect(res.nextDueDate).toBeUndefined();
     expect(billUpdates[0][0]).toContain('is_paid = 1');
@@ -72,7 +72,7 @@ describe('BillReminderQueries.setPaid', () => {
   it('tagihan tahunan maju 12 bulan', async () => {
     const due = dayjs().format('YYYY-MM-DD');
     const { db } = makeDb(baseBill({ frequency: 'yearly', due_date: due }));
-    const res = await new BillReminderQueries(db).setPaid(1, true);
+    const res = await new BillReminderQueries(db, 1).setPaid(1, true);
 
     expect(res.nextDueDate).toBe(dayjs(due).add(12, 'month').format('YYYY-MM-DD'));
   });
@@ -80,14 +80,14 @@ describe('BillReminderQueries.setPaid', () => {
   it('melewati jatuh tempo yang sudah lewat sampai melampaui hari ini', async () => {
     const due = dayjs().subtract(3, 'month').format('YYYY-MM-DD');
     const { db } = makeDb(baseBill({ due_date: due }));
-    const res = await new BillReminderQueries(db).setPaid(1, true);
+    const res = await new BillReminderQueries(db, 1).setPaid(1, true);
 
     expect(dayjs(res.nextDueDate).isAfter(dayjs(), 'day')).toBe(true);
   });
 
   it('membatalkan lunas menghapus transaksi yang sudah dibukukan', async () => {
     const { db } = makeDb(baseBill({ is_paid: 1, paid_transaction_id: 55 }));
-    await new BillReminderQueries(db).setPaid(1, false);
+    await new BillReminderQueries(db, 1).setPaid(1, false);
 
     expect(db.runAsync).toHaveBeenCalledWith('DELETE FROM transactions WHERE id = ?', [55]);
     const clear = db.runAsync.mock.calls.find((c: any[]) => String(c[0]).includes('paid_transaction_id = NULL'));
@@ -96,7 +96,7 @@ describe('BillReminderQueries.setPaid', () => {
 
   it('tidak melakukan apa pun bila tagihan tidak ditemukan', async () => {
     const { db } = makeDb(null);
-    const res = await new BillReminderQueries(db).setPaid(99, true);
+    const res = await new BillReminderQueries(db, 1).setPaid(99, true);
 
     expect(res).toEqual({ booked: false });
     expect(db.runAsync).not.toHaveBeenCalled();

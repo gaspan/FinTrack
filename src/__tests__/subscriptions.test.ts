@@ -36,7 +36,7 @@ const baseSub = (over: Sub = {}): Sub => ({
 describe('SubscriptionQueries.processRenewals', () => {
   it('mencatat transaksi pengeluaran saat tagihan jatuh tempo', async () => {
     const { db, inserted, updated } = makeDb([baseSub()]);
-    await new SubscriptionQueries(db).processRenewals();
+    await new SubscriptionQueries(db, 1).processRenewals();
 
     expect(inserted).toHaveLength(1);
     const [type, amount, categoryId, walletId] = inserted[0];
@@ -49,7 +49,7 @@ describe('SubscriptionQueries.processRenewals', () => {
 
   it('fallback ke dompet utama & kategori Lainnya untuk langganan lama tanpa wallet/kategori', async () => {
     const { db, inserted } = makeDb([baseSub({ wallet_id: null, category_id: null })]);
-    await new SubscriptionQueries(db).processRenewals();
+    await new SubscriptionQueries(db, 1).processRenewals();
 
     expect(inserted).toHaveLength(1);
     const [, , categoryId, walletId] = inserted[0];
@@ -59,7 +59,7 @@ describe('SubscriptionQueries.processRenewals', () => {
 
   it('tidak mencatat transaksi bila auto_create nonaktif, tapi tanggal tetap maju', async () => {
     const { db, inserted, updated } = makeDb([baseSub({ auto_create: 0 })]);
-    await new SubscriptionQueries(db).processRenewals();
+    await new SubscriptionQueries(db, 1).processRenewals();
 
     expect(inserted).toHaveLength(0);
     expect(updated).toHaveLength(1);
@@ -68,7 +68,7 @@ describe('SubscriptionQueries.processRenewals', () => {
   it('menyusul seluruh siklus yang terlewat, bukan hanya satu', async () => {
     const threeMonthsAgo = dayjs().subtract(3, 'month').format('YYYY-MM-DD');
     const { db, inserted } = makeDb([baseSub({ next_billing_date: threeMonthsAgo })]);
-    await new SubscriptionQueries(db).processRenewals();
+    await new SubscriptionQueries(db, 1).processRenewals();
 
     expect(inserted.length).toBeGreaterThanOrEqual(3);
     // Tanggal transaksi memakai tanggal jatuh tempo asli, bukan hari ini.
@@ -78,7 +78,7 @@ describe('SubscriptionQueries.processRenewals', () => {
   it('memajukan tanggal sesuai siklus tahunan', async () => {
     const due = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
     const { db, updated } = makeDb([baseSub({ billing_cycle: 'yearly', next_billing_date: due })]);
-    await new SubscriptionQueries(db).processRenewals();
+    await new SubscriptionQueries(db, 1).processRenewals();
 
     expect(updated[0][0]).toBe(dayjs(due).add(12, 'month').format('YYYY-MM-DD'));
   });
@@ -86,7 +86,7 @@ describe('SubscriptionQueries.processRenewals', () => {
   it('memajukan tanggal sesuai siklus kuartalan', async () => {
     const due = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
     const { db, updated } = makeDb([baseSub({ billing_cycle: 'quarterly', next_billing_date: due })]);
-    await new SubscriptionQueries(db).processRenewals();
+    await new SubscriptionQueries(db, 1).processRenewals();
 
     expect(updated[0][0]).toBe(dayjs(due).add(3, 'month').format('YYYY-MM-DD'));
   });
@@ -95,7 +95,7 @@ describe('SubscriptionQueries.processRenewals', () => {
 describe('SubscriptionQueries.processRenewals — kalender', () => {
   it('menandai calendar_event_id basi (NULL) saat tanggal bergeser', async () => {
     const { db, updated } = makeDb([baseSub({ calendar_event_id: 'evt-1' })]);
-    await new SubscriptionQueries(db).processRenewals();
+    await new SubscriptionQueries(db, 1).processRenewals();
 
     expect(updated).toHaveLength(1);
     const updateSql = db.runAsync.mock.calls.find((c: any[]) => String(c[0]).includes('UPDATE subscriptions'))[0];

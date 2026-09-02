@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'rea
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { formatRupiah } from '@/utils/format';
 
 interface DashboardHeroProps {
@@ -37,6 +39,8 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { activeBook } = useBook();
+  const bookColor = activeBook?.color || theme.colors.primary;
 
   return (
     <LinearGradient
@@ -71,6 +75,19 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
       </Text>
 
       <View style={styles.chipRow}>
+        {activeBook && (
+          <TouchableOpacity
+            style={styles.chip}
+            activeOpacity={0.7}
+            onPress={() => router.push('/books' as any)}
+          >
+            <Ionicons name={(activeBook.icon || 'book-outline') as any} size={12} color={bookColor} />
+            <Text style={[styles.chipText, { color: bookColor }]} numberOfLines={1}>
+              {activeBook.name}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={bookColor} />
+          </TouchableOpacity>
+        )}
         <View style={styles.chip}>
           <Ionicons
             name={trend.isUp ? 'trending-up' : 'trending-down'}

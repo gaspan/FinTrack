@@ -15,7 +15,7 @@ export interface SalaryProjection {
   salaryCategoryId: number;
 }
 
-export async function getSalaryProjection(db: SQLiteDatabase): Promise<SalaryProjection | null> {
+export async function getSalaryProjection(db: SQLiteDatabase, bookId: number): Promise<SalaryProjection | null> {
   const [enabledRaw, dayRaw, catRaw] = await Promise.all([
     AsyncStorage.getItem(PAYROLL_ENABLED_KEY),
     AsyncStorage.getItem(PAYROLL_DAY_KEY),
@@ -24,10 +24,10 @@ export async function getSalaryProjection(db: SQLiteDatabase): Promise<SalaryPro
   if (enabledRaw === 'false') return null;
 
   const salaryDay = dayRaw ? parseInt(dayRaw, 10) : 25;
-  const salaryCategoryId = await findSalaryCategoryId(db, catRaw ? parseInt(catRaw, 10) : null);
+  const salaryCategoryId = await findSalaryCategoryId(db, bookId, catRaw ? parseInt(catRaw, 10) : null);
   if (!salaryCategoryId) return null;
 
-  const txQueries = new TransactionQueries(db);
+  const txQueries = new TransactionQueries(db, bookId);
   const txs = await txQueries.getByDateRange(
     dayjs().subtract(3, 'month').startOf('month').format('YYYY-MM-DD'),
     dayjs().format('YYYY-MM-DD')

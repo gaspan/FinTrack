@@ -4,6 +4,7 @@ import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useRouter, useFocusEffect } from 'expo-router';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { useBook } from '@/constants/books';
 import { CategoryQueries, WalletQueries, TransactionQueries, TagQueries, RecurringQueries } from '@/lib/queries';
 import { Category, Wallet, TransactionType } from '@/types';
 import { TransactionForm } from '@/components/forms/TransactionForm';
@@ -18,15 +19,16 @@ const PAYROLL_ENABLED_KEY = 'payroll_enabled';
 
 async function suggestRecurringSalary(
   db: SQLiteDatabase,
+  bookId: number,
   data: { type: TransactionType; amount: number; category_id: number; wallet_id: number; transaction_date: string; notes: string }
 ) {
   const enabled = await AsyncStorage.getItem(PAYROLL_ENABLED_KEY);
   if (enabled === 'false' || !enabled) return;
 
-  const salaryCategoryId = await findSalaryCategoryId(db, null);
+  const salaryCategoryId = await findSalaryCategoryId(db, bookId, null);
   if (!salaryCategoryId || data.category_id !== salaryCategoryId) return;
 
-  const existing = await new RecurringQueries(db).getAll();
+  const existing = await new RecurringQueries(db, bookId).getAll();
   if (existing.some(r => r.type === 'income' && r.is_active === 1)) return;
 
   Alert.alert(
@@ -38,7 +40,7 @@ async function suggestRecurringSalary(
         text: 'Ya, Atur',
         onPress: async () => {
           try {
-            await new RecurringQueries(db).create({
+            await new RecurringQueries(db, bookId).create({
               type: 'income',
               amount: data.amount,
               category_id: data.category_id,
@@ -62,6 +64,8 @@ export default function AddTransactionScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const db = useSQLiteContext();
+  const { activeBook, books } = useBook();
+  const bookId = activeBook?.id ?? 1;
   const router = useRouter();
   
   const [loading, setLoading] = useState(true);
@@ -73,8 +77,8 @@ export default function AddTransactionScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const categoryQueries = new CategoryQueries(db);
-      const walletQueries = new WalletQueries(db);
+      const categoryQueries = new CategoryQueries(db, bookId);
+      const walletQueries = new WalletQueries(db, bookId);
       
       const [cats, walls] = await Promise.all([
         categoryQueries.getAll(),
@@ -89,7 +93,7 @@ export default function AddTransactionScreen() {
     } finally {
       setLoading(false);
     }
-  }, [db]);
+  }, [db, bookId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -110,7 +114,7 @@ export default function AddTransactionScreen() {
   }) => {
     try {
       setSubmitting(true);
-      const txQueries = new TransactionQueries(db);
+      const txQueries = new TransactionQueries(db, bookId);
       
       const newId = await txQueries.create({
         type: data.type,
@@ -123,7 +127,7 @@ export default function AddTransactionScreen() {
       });
 
       if (data.tags.length > 0) {
-        const tagQueries = new TagQueries(db);
+        const tagQueries = new TagQueries(db, bookId);
         await tagQueries.setTransactionTags(newId, data.tags);
       }
 
@@ -135,9 +139,9 @@ export default function AddTransactionScreen() {
       setShowSuccess(true);
       
       if (data.type === 'expense') {
-        checkBudgetAlerts(db).catch(console.error);
+        checkBudgetAlerts(db, books).catch(console.error);
       } else {
-        suggestRecurringSalary(db, data).catch(console.error);
+        suggestRecurringSalary(db, bookId, data).catch(console.error);
       }
     } catch (error) {
       console.error(error);

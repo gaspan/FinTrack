@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "fintrack",
     "userInterfaceStyle": "dark",
+    "updates": {
+      "enabled": false
+    },
     "ios": {
       "supportsTablet": true
     },
