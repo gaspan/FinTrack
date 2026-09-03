@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { Card } from '@/components/ui/Card';
 
 interface Action {
   label: string;
@@ -24,41 +25,68 @@ export const QuickActions: React.FC = () => {
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   return (
-    <View style={styles.row}>
-      {ACTIONS.map((a) => {
-        const color = a.color(theme);
-        return (
-          <TouchableOpacity
-            key={a.label}
-            style={styles.item}
-            activeOpacity={0.7}
-            onPress={() => router.push(a.route as any)}
-            accessibilityRole="button"
-            accessibilityLabel={a.label}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: `${color}1F` }]}>
-              <Ionicons name={a.icon} size={22} color={color} />
-            </View>
-            <Text style={styles.label}>{a.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+    <Card style={styles.card}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Aksi cepat</Text>
+          <Text style={styles.subtitle}>Kelola uangmu dalam satu tap</Text>
+        </View>
+        <Ionicons name="flash-outline" size={18} color={theme.colors.warning} />
+      </View>
+      <View style={styles.row}>
+        {ACTIONS.map((a) => {
+          const color = a.color(theme);
+          return (
+            <TouchableOpacity
+              key={a.label}
+              style={styles.item}
+              activeOpacity={0.7}
+              onPress={() => router.push(a.route as any)}
+              accessibilityRole="button"
+              accessibilityLabel={a.label}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: `${color}1F` }]}>
+                <Ionicons name={a.icon} size={21} color={color} />
+              </View>
+              <Text style={styles.label}>{a.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </Card>
   );
 };
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
+  card: {
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
+  },
+  title: {
+    ...theme.typography.subtitle,
+    color: theme.colors.textPrimary,
+    fontWeight: '700',
+  },
+  subtitle: {
+    ...theme.typography.caption,
+    marginTop: 2,
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
   },
   item: { alignItems: 'center', flex: 1, gap: 6 },
   iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radius.md,
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },

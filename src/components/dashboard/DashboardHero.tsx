@@ -69,31 +69,35 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.balanceLabel}>Total Saldo</Text>
+      {activeBook && (
+        <TouchableOpacity
+          style={styles.bookSelector}
+          activeOpacity={0.75}
+          onPress={() => router.push('/books' as any)}
+          accessibilityRole="button"
+          accessibilityLabel={`Pembukuan aktif ${activeBook.name}`}
+        >
+          <View style={[styles.bookIcon, { backgroundColor: `${bookColor}26` }]}>
+            <Ionicons name={(activeBook.icon || 'book-outline') as any} size={18} color={bookColor} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.bookEyebrow}>PEMBUKUAN AKTIF</Text>
+            <Text style={styles.bookName} numberOfLines={1}>{activeBook.name}</Text>
+          </View>
+          <View style={styles.bookArrow}>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.textOnPrimary} />
+          </View>
+        </TouchableOpacity>
+      )}
+
+      <Text style={styles.balanceLabel}>Saldo seluruh dompet</Text>
       <Text style={styles.balanceValue} numberOfLines={1} adjustsFontSizeToFit>
         {formatRupiah(totalBalance)}
       </Text>
 
       <View style={styles.chipRow}>
-        {activeBook && (
-          <TouchableOpacity
-            style={styles.chip}
-            activeOpacity={0.7}
-            onPress={() => router.push('/books' as any)}
-          >
-            <Ionicons name={(activeBook.icon || 'book-outline') as any} size={12} color={bookColor} />
-            <Text style={[styles.chipText, { color: bookColor }]} numberOfLines={1}>
-              {activeBook.name}
-            </Text>
-            <Ionicons name="chevron-down" size={12} color={bookColor} />
-          </TouchableOpacity>
-        )}
         <View style={styles.chip}>
-          <Ionicons
-            name={trend.isUp ? 'trending-up' : 'trending-down'}
-            size={12}
-            color={theme.colors.textOnPrimary}
-          />
+          <View style={[styles.statusDot, { backgroundColor: trend.isUp ? theme.colors.income : theme.colors.expense }]} />
           <Text style={styles.chipText}>
             {trend.isUp ? '+' : '-'}{trend.pct}% {trendLabel}
           </Text>
@@ -111,7 +115,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
       <View style={styles.splitRow}>
         <View style={styles.splitCell}>
           <View style={styles.splitLabelRow}>
-            <Ionicons name="arrow-down-circle" size={13} color={theme.colors.textOnPrimary} />
+            <Ionicons name="arrow-down-circle" size={13} color={theme.colors.income} />
             <Text style={styles.splitLabel}>Pemasukan</Text>
           </View>
           <Text style={styles.splitValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -121,7 +125,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
         <View style={styles.splitDivider} />
         <View style={styles.splitCell}>
           <View style={styles.splitLabelRow}>
-            <Ionicons name="arrow-up-circle" size={13} color={theme.colors.textOnPrimary} />
+            <Ionicons name="arrow-up-circle" size={13} color={theme.colors.expense} />
             <Text style={styles.splitLabel}>Pengeluaran</Text>
           </View>
           <Text style={styles.splitValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -156,6 +160,47 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     opacity: 0.8,
     marginTop: 2,
   },
+  bookSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(0, 0, 0, 0.12)',
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
+    marginBottom: theme.spacing.lg,
+  },
+  bookIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  bookEyebrow: {
+    ...theme.typography.caption,
+    color: theme.colors.textOnPrimary,
+    opacity: 0.7,
+    fontSize: 9,
+    letterSpacing: 0.7,
+    fontWeight: '700',
+  },
+  bookName: {
+    ...theme.typography.body,
+    color: theme.colors.textOnPrimary,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  bookArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.glass,
+    marginLeft: theme.spacing.sm,
+  },
   iconBtn: {
     width: 36,
     height: 36,
@@ -170,11 +215,14 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     ...theme.typography.bodySmall,
     color: theme.colors.textOnPrimary,
     opacity: 0.85,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    fontSize: 10,
   },
   balanceValue: {
     ...theme.typography.amount,
     color: theme.colors.textOnPrimary,
-    marginTop: 2,
+    marginTop: 4,
   },
   chipRow: {
     flexDirection: 'row',
@@ -192,6 +240,11 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     backgroundColor: theme.colors.glass,
     borderWidth: 1,
     borderColor: theme.colors.glassBorder,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   chipText: {
     ...theme.typography.caption,

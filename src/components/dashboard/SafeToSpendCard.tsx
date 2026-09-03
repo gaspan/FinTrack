@@ -31,14 +31,20 @@ export const SafeToSpendCard: React.FC<SafeToSpendCardProps> = ({ data }) => {
       : 0;
 
   return (
-    <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/forecast' as any)}>
-      <Card style={[styles.card, { borderLeftColor: accent, borderLeftWidth: 4 }]}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => router.push('/forecast' as any)}
+      accessibilityRole="button"
+      accessibilityLabel="Lihat sisa aman hari ini"
+    >
+      <Card style={[styles.card, { borderLeftColor: accent, backgroundColor: `${accent}0A` }]}>
         <View style={styles.header}>
           <Ionicons name="shield-checkmark-outline" size={16} color={accent} />
           <Text style={styles.title}>Sisa Aman Hari Ini</Text>
           <View style={[styles.pill, { backgroundColor: `${accent}22` }]}>
             <Text style={[styles.status, { color: accent }]}>{statusLabel}</Text>
           </View>
+          <Ionicons name="chevron-forward" size={15} color={theme.colors.textMuted} />
         </View>
 
         <View style={styles.amountRow}>

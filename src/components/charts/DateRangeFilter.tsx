@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ViewStyle } from 'react-native';
 import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
@@ -14,9 +14,10 @@ interface DateRangeFilterProps {
   endDate: string;
   onChange: (start: string, end: string) => void;
   payrollPeriod?: { startDate: string; endDate: string } | null;
+  style?: ViewStyle;
 }
 
-export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, endDate, onChange, payrollPeriod }) => {
+export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, endDate, onChange, payrollPeriod, style }) => {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const defaultStyles = useDefaultStyles('light');
@@ -69,7 +70,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ startDate, end
   return (
     <>
       <TouchableOpacity 
-        style={styles.triggerButton} 
+        style={[styles.triggerButton, style]}
         onPress={() => {
           setRange({ startDate: dayjs(startDate), endDate: dayjs(endDate) });
           setModalVisible(true);

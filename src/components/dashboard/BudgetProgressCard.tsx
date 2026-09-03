@@ -50,7 +50,7 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
         actionLabel="Lihat Semua"
         onAction={() => router.push('/(tabs)/budget' as any)}
       />
-      <Card>
+      <Card style={styles.card}>
         {top.map((b, i) => {
           const effectiveLimit = b.monthly_limit + (b.rollover_amount || 0);
           const pct = effectiveLimit > 0 ? (b.spent / effectiveLimit) * 100 : 0;
@@ -58,7 +58,10 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
           return (
             <View key={b.id} style={i > 0 ? styles.rowSpaced : undefined}>
               <View style={styles.labelRow}>
-                <Text style={styles.name} numberOfLines={1}>{b.category_name}</Text>
+                <View style={styles.nameWrap}>
+                  <View style={[styles.categoryDot, { backgroundColor: b.color || theme.colors.primary }]} />
+                  <Text style={styles.name} numberOfLines={1}>{b.category_name}</Text>
+                </View>
                 <View style={styles.pctWrap}>
                   {pct >= 90 && (
                     <Ionicons
@@ -83,6 +86,7 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
 };
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
+  card: { backgroundColor: theme.colors.surfaceElevated },
   rowSpaced: { marginTop: theme.spacing.md },
   labelRow: {
     flexDirection: 'row',
@@ -90,7 +94,9 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  name: { ...theme.typography.body, fontWeight: '500', flex: 1, marginRight: theme.spacing.sm },
+  nameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: theme.spacing.sm },
+  categoryDot: { width: 8, height: 8, borderRadius: 4, marginRight: theme.spacing.sm },
+  name: { ...theme.typography.body, fontWeight: '600', flex: 1 },
   pctWrap: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   pct: { ...theme.typography.bodySmall, fontWeight: '700' },
   amount: { ...theme.typography.caption, marginTop: 5 },

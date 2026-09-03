@@ -266,6 +266,8 @@ export default function DashboardScreen() {
   }, [summary, lastMonthSummary]);
 
   const trendLabel = payrollPeriod ? 'dari periode gaji sebelumnya' : 'dari bulan lalu';
+  const isPeriodEmpty = summary.totalIncome === 0 && summary.totalExpense === 0 && recentTransactions.length === 0;
+  const cashFlowColor = cashFlow >= 0 ? theme.colors.income : theme.colors.expense;
 
   const handleExportPDF = useCallback(async () => {
     try {
@@ -299,6 +301,8 @@ export default function DashboardScreen() {
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
     >
       <DashboardHero
@@ -314,141 +318,245 @@ export default function DashboardScreen() {
         onExport={handleExportPDF}
       />
 
-      <QuickActions />
+      <View style={styles.contentColumn}>
+        <QuickActions />
 
-      <View style={styles.body}>
-        <View style={styles.filterRow}>
-          <DateRangeFilter
-            startDate={startDate}
-            endDate={endDate}
-            onChange={handleDateRangeChange}
-            payrollPeriod={payrollPeriod ?? undefined}
-          />
-          <View style={styles.cashFlowBadge}>
-            <Ionicons
-              name={cashFlow >= 0 ? 'trending-up' : 'trending-down'}
-              size={14}
-              color={cashFlow >= 0 ? theme.colors.income : theme.colors.expense}
-            />
-            <Text style={[styles.cashFlowText, { color: cashFlow >= 0 ? theme.colors.income : theme.colors.expense }]}>
-              {cashFlow >= 0 ? '+' : ''}{formatRupiah(cashFlow)}
-            </Text>
-          </View>
-        </View>
-
-        {primaryWallet && (
-          <Card style={styles.walletCard}>
-            <View style={[styles.pwIcon, { backgroundColor: (primaryWallet.color || theme.colors.primary) + '20' }]}>
-              <Ionicons
-                name={(primaryWallet.icon || 'wallet') as any}
-                size={18}
-                color={primaryWallet.color || theme.colors.primary}
+        <View style={styles.body}>
+          <Card style={styles.periodCard}>
+            <View style={styles.periodHeader}>
+              <View style={styles.flex}>
+                <Text style={styles.periodTitle}>Ringkasan periode</Text>
+                <Text style={styles.periodSubtitle}>Pantau arus kas buku aktif</Text>
+              </View>
+              <View style={[styles.cashFlowBadge, { borderColor: `${cashFlowColor}40` }]}>
+                <View style={[styles.cashFlowIcon, { backgroundColor: `${cashFlowColor}1A` }]}>
+                  <Ionicons
+                    name={cashFlow >= 0 ? 'trending-up' : 'trending-down'}
+                    size={14}
+                    color={cashFlowColor}
+                  />
+                </View>
+                <View>
+                  <Text style={styles.cashFlowLabel}>Arus kas</Text>
+                  <Text style={[styles.cashFlowText, { color: cashFlowColor }]}>
+                    {cashFlow >= 0 ? '+' : ''}{formatRupiah(cashFlow)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.periodFilter}>
+              <DateRangeFilter
+                startDate={startDate}
+                endDate={endDate}
+                onChange={handleDateRangeChange}
+                payrollPeriod={payrollPeriod ?? undefined}
+                style={styles.periodTrigger}
               />
             </View>
-            <View style={styles.flex}>
-              <Text style={styles.pwLabel}>Dompet Utama</Text>
-              <Text style={styles.pwName} numberOfLines={1}>{primaryWallet.name}</Text>
-            </View>
-            <Text style={styles.pwBalance}>{formatRp(primaryWallet.balance)}</Text>
           </Card>
-        )}
 
-        {safeToSpendEnabled && safeToSpendData && <SafeToSpendCard data={safeToSpendData} />}
+          {isPeriodEmpty && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push('/(tabs)/add' as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Catat transaksi pertama"
+            >
+              <Card style={styles.emptyCard}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="sparkles-outline" size={22} color={theme.colors.primary} />
+                </View>
+                <View style={styles.emptyCopy}>
+                  <Text style={styles.emptyTitle}>Belum ada transaksi</Text>
+                  <Text style={styles.emptyText}>Mulai catat pemasukan atau pengeluaran di periode ini.</Text>
+                </View>
+                <View style={styles.emptyArrow}>
+                  <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
+                </View>
+              </Card>
+            </TouchableOpacity>
+          )}
 
-        <BudgetProgressCard budgets={budgets} />
-
-        <GoalsStrip goals={goals} />
-
-        <View>
-          <SectionHeader title="Analisis Finansial" />
-          <AnalyticsCard
-            income={summary.totalIncome}
-            expense={summary.totalExpense}
-            chartData={chartData}
-            chartType={chartType}
-            onChartTypeChange={setChartType}
-            chartTotal={currentChartTotal}
-            trendData={trendData}
-          />
-        </View>
-
-        {netWorthData && (
-          <NetWorthSummaryCard
-            totalAssets={netWorthData.totalAssets}
-            totalLiabilities={netWorthData.totalLiabilities}
-            netWorth={netWorthData.netWorth}
-            history={netWorthHistory}
-          />
-        )}
-
-        {insightData.financialHealth && (
-          <View>
-            <SectionHeader title="Kesehatan Finansial" />
-            <FinancialTipsCard health={insightData.financialHealth} tips={insightData.financialTips} />
-          </View>
-        )}
-
-        <SpendingInsightCard comparisons={insightData.comparisons} alerts={insightData.alerts} />
-
-        {recentTransactions.length > 0 && (
-          <View>
-            <SectionHeader
-              title="Transaksi Terbaru"
-              actionLabel="Lihat Semua"
-              onAction={() => router.push('/(tabs)/transactions' as any)}
-            />
-            <Card>
-              {recentTransactions.map((tx, i) => (
-                <TouchableOpacity
-                  key={tx.id}
-                  style={[styles.recentItem, i > 0 && styles.recentItemBorder]}
-                  activeOpacity={0.7}
-                  onPress={() => router.push(`/transaction/${tx.id}` as any)}
-                >
-                  <View style={[styles.recentIcon, { backgroundColor: tx.category_color + '20' }]}>
-                    <Ionicons name={tx.category_icon as any} size={18} color={tx.category_color} />
-                  </View>
-                  <View style={styles.flex}>
-                    <Text style={styles.recentCat} numberOfLines={1}>{tx.category_name}</Text>
-                    <Text style={styles.recentMeta} numberOfLines={1}>{tx.notes || tx.wallet_name}</Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.recentAmount,
-                      { color: tx.type === 'income' ? theme.colors.income : theme.colors.textPrimary },
-                    ]}
-                  >
-                    {tx.type === 'income' ? '+' : '-'}{formatRp(tx.amount)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {primaryWallet && (
+            <Card
+              style={[
+                styles.walletCard,
+                { borderLeftColor: primaryWallet.color || theme.colors.primary },
+              ]}
+            >
+              <View style={[styles.pwIcon, { backgroundColor: (primaryWallet.color || theme.colors.primary) + '20' }]}>
+                <Ionicons
+                  name={(primaryWallet.icon || 'wallet') as any}
+                  size={18}
+                  color={primaryWallet.color || theme.colors.primary}
+                />
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.pwLabel}>Dompet utama</Text>
+                <Text style={styles.pwName} numberOfLines={1}>{primaryWallet.name}</Text>
+              </View>
+              <Text style={styles.pwBalance}>{formatRp(primaryWallet.balance)}</Text>
             </Card>
-          </View>
-        )}
-      </View>
+          )}
 
-      <View style={{ height: 96 }} />
+          {safeToSpendEnabled && safeToSpendData && <SafeToSpendCard data={safeToSpendData} />}
+
+          <BudgetProgressCard budgets={budgets} />
+
+          <GoalsStrip goals={goals} />
+
+          <View>
+            <SectionHeader title="Analisis finansial" />
+            <AnalyticsCard
+              income={summary.totalIncome}
+              expense={summary.totalExpense}
+              chartData={chartData}
+              chartType={chartType}
+              onChartTypeChange={setChartType}
+              chartTotal={currentChartTotal}
+              trendData={trendData}
+            />
+          </View>
+
+          {netWorthData && (
+            <NetWorthSummaryCard
+              totalAssets={netWorthData.totalAssets}
+              totalLiabilities={netWorthData.totalLiabilities}
+              netWorth={netWorthData.netWorth}
+              history={netWorthHistory}
+            />
+          )}
+
+          {insightData.financialHealth && (
+            <View>
+              <SectionHeader title="Kesehatan finansial" />
+              <FinancialTipsCard health={insightData.financialHealth} tips={insightData.financialTips} />
+            </View>
+          )}
+
+          <SpendingInsightCard comparisons={insightData.comparisons} alerts={insightData.alerts} />
+
+          {recentTransactions.length > 0 && (
+            <View>
+              <SectionHeader
+                title="Transaksi terbaru"
+                actionLabel="Lihat semua"
+                onAction={() => router.push('/(tabs)/transactions' as any)}
+              />
+              <Card>
+                {recentTransactions.map((tx, i) => (
+                  <TouchableOpacity
+                    key={tx.id}
+                    style={[styles.recentItem, i > 0 && styles.recentItemBorder]}
+                    activeOpacity={0.7}
+                    onPress={() => router.push(`/transaction/${tx.id}` as any)}
+                  >
+                    <View style={[styles.recentIcon, { backgroundColor: tx.category_color + '20' }]}>
+                      <Ionicons name={tx.category_icon as any} size={18} color={tx.category_color} />
+                    </View>
+                    <View style={styles.flex}>
+                      <Text style={styles.recentCat} numberOfLines={1}>{tx.category_name}</Text>
+                      <Text style={styles.recentMeta} numberOfLines={1}>{tx.notes || tx.wallet_name}</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.recentAmount,
+                        { color: tx.type === 'income' ? theme.colors.income : theme.colors.textPrimary },
+                      ]}
+                    >
+                      {tx.type === 'income' ? '+' : '-'}{formatRp(tx.amount)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </Card>
+            </View>
+          )}
+        </View>
+      </View>
     </ScrollView>
   );
 }
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
+  scrollContent: { paddingBottom: 112 },
+  contentColumn: { width: '100%', maxWidth: 820, alignSelf: 'center' },
   flex: { flex: 1 },
   body: {
     paddingHorizontal: theme.spacing.md,
     marginTop: theme.spacing.lg,
     gap: theme.spacing.lg,
   },
-  filterRow: {
+  periodCard: {
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  periodHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   },
-  cashFlowBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cashFlowText: { ...theme.typography.caption, fontWeight: '600' },
-  walletCard: { flexDirection: 'row', alignItems: 'center', padding: theme.spacing.sm },
+  periodTitle: {
+    ...theme.typography.subtitle,
+    color: theme.colors.textPrimary,
+    fontWeight: '700',
+  },
+  periodSubtitle: { ...theme.typography.caption, marginTop: 2 },
+  periodFilter: { alignItems: 'stretch' },
+  periodTrigger: { width: '100%', justifyContent: 'space-between' },
+  cashFlowBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+  },
+  cashFlowIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cashFlowLabel: { ...theme.typography.caption, fontSize: 9 },
+  cashFlowText: { ...theme.typography.bodySmall, fontWeight: '700' },
+  emptyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+    backgroundColor: `${theme.colors.primary}0D`,
+    borderColor: `${theme.colors.primary}35`,
+  },
+  emptyIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${theme.colors.primary}1A`,
+    marginRight: theme.spacing.sm,
+  },
+  emptyCopy: { flex: 1 },
+  emptyTitle: { ...theme.typography.body, fontWeight: '700', color: theme.colors.textPrimary },
+  emptyText: { ...theme.typography.caption, lineHeight: 16, marginTop: 2 },
+  emptyArrow: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${theme.colors.primary}1A`,
+    marginLeft: theme.spacing.sm,
+  },
+  walletCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.sm,
+    borderLeftWidth: 3,
+  },
   pwIcon: {
     width: 34,
     height: 34,

@@ -27,7 +27,7 @@ export const GoalsStrip: React.FC<GoalsStripProps> = ({ goals }) => {
         actionLabel="Lihat Semua"
         onAction={() => router.push('/goals' as any)}
       />
-      <Card>
+      <Card style={styles.card}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -62,8 +62,17 @@ export const GoalsStrip: React.FC<GoalsStripProps> = ({ goals }) => {
 };
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
-  strip: { gap: theme.spacing.lg, paddingHorizontal: theme.spacing.xs },
-  item: { alignItems: 'center', width: 76 },
+  card: { backgroundColor: theme.colors.surfaceElevated },
+  strip: { gap: theme.spacing.sm, paddingHorizontal: theme.spacing.xs },
+  item: {
+    alignItems: 'center',
+    width: 88,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   name: {
     ...theme.typography.bodySmall,
     color: theme.colors.textPrimary,
