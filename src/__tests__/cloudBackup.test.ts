@@ -96,7 +96,7 @@ describe('supabaseBackup', () => {
     const [usedPath, body, opts] = mockBucket.upload.mock.calls[0];
     expect(usedPath.startsWith('uid-1/')).toBe(true);
     expect(opts.contentType).toBe('application/json');
-    expect(JSON.parse(body).version).toBe(6);
+    expect(JSON.parse(body).version).toBe(7);
     expect(AsyncStorage.setItem).toHaveBeenCalledWith('last_cloud_backup_date', expect.any(String));
   });
 

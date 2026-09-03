@@ -46,19 +46,34 @@ describe('WalletQueries.delete', () => {
     const db = makeDb({
       getFirstAsync: jest.fn()
         .mockResolvedValueOnce({ is_primary: 1 })
+        .mockResolvedValueOnce({ c: 0 })
         .mockResolvedValueOnce({ id: 3 }),
     });
     await new WalletQueries(db, 1).delete(1);
 
     expect(db.runAsync).toHaveBeenCalledWith('DELETE FROM wallets WHERE id = ? AND book_id = ?', [1, 1]);
-    expect(db.runAsync).toHaveBeenCalledWith('UPDATE wallets SET is_primary = 1 WHERE id = ?', [3]);
+    expect(db.runAsync).toHaveBeenCalledWith('UPDATE wallets SET is_primary = 1 WHERE id = ? AND book_id = ?', [3, 1]);
   });
 
   it('tidak menunjuk dompet utama baru bila yang dihapus bukan utama', async () => {
-    const db = makeDb({ getFirstAsync: jest.fn().mockResolvedValue({ is_primary: 0 }) });
+    const db = makeDb({
+      getFirstAsync: jest.fn()
+        .mockResolvedValueOnce({ is_primary: 0 })
+        .mockResolvedValueOnce({ c: 0 }),
+    });
     await new WalletQueries(db, 1).delete(2);
 
     expect(db.runAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('menolak menghapus dompet yang masih memiliki transaksi', async () => {
+    const db = makeDb({
+      getFirstAsync: jest.fn()
+        .mockResolvedValueOnce({ is_primary: 0 })
+        .mockResolvedValueOnce({ c: 3 }),
+    });
+    await expect(new WalletQueries(db, 1).delete(2)).rejects.toThrow('memiliki transaksi');
+    expect(db.runAsync).not.toHaveBeenCalled();
   });
 });
 

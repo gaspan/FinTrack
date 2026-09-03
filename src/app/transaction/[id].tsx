@@ -7,7 +7,7 @@ import dayjs from 'dayjs';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { useBook } from '@/constants/books';
-import { TransactionQueries, TagQueries } from '@/lib/queries';
+import { TransactionQueries, TagQueries, TransferQueries } from '@/lib/queries';
 import { TransactionWithDetails, Tag, TransactionAttachment } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { formatRupiah } from '@/utils/format';
@@ -27,6 +27,7 @@ export default function TransactionDetailScreen() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [attachments, setAttachments] = useState<TransactionAttachment[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const transferId = transaction?.transfer_id;
 
   useFocusEffect(
     useCallback(() => {
@@ -36,18 +37,7 @@ export default function TransactionDetailScreen() {
           setLoading(true);
           const txId = parseInt(id, 10);
           if (isNaN(txId)) return;
-          const tx = await db.getFirstAsync<TransactionWithDetails>(`
-            SELECT 
-              t.*, 
-              c.name as category_name, 
-              c.icon as category_icon, 
-              c.color as category_color, 
-              w.name as wallet_name 
-            FROM transactions t
-            JOIN categories c ON t.category_id = c.id
-            JOIN wallets w ON t.wallet_id = w.id
-            WHERE t.id = ?
-          `, [txId]);
+           const tx = await new TransactionQueries(db, bookId).getByIdWithDetails(txId);
 
           if (mounted && tx) {
             setTransaction(tx);
@@ -85,8 +75,11 @@ export default function TransactionDetailScreen() {
           onPress: async () => {
             try {
               setDeleting(true);
-              const txQueries = new TransactionQueries(db, bookId);
-              await txQueries.delete(parseInt(id, 10));
+                if (transferId) {
+                 await new TransferQueries(db, bookId).deleteTransfer(transferId);
+               } else {
+                 await new TransactionQueries(db, bookId).delete(parseInt(id, 10));
+               }
               router.back();
             } catch (e) {
               console.error(e);
@@ -137,7 +130,9 @@ export default function TransactionDetailScreen() {
           <Button 
             title="Edit Transaksi" 
             variant="primary" 
-            onPress={() => router.push(`/transaction/edit/${transaction.id}`)}
+             onPress={() => transaction.transfer_id
+               ? router.push(`/transfer?transferId=${transaction.transfer_id}`)
+               : router.push(`/transaction/edit/${transaction.id}`)}
             fullWidth
           />
         </View>
@@ -164,7 +159,7 @@ export default function TransactionDetailScreen() {
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Tipe</Text>
           <Text style={styles.detailValue}>
-            {transaction.type === 'income' ? 'Pemasukan' : 'Pengeluaran'}
+           {transaction.transfer_id ? 'Transfer antar dompet' : transaction.type === 'income' ? 'Pemasukan' : 'Pengeluaran'}
           </Text>
         </View>
         {tags.length > 0 && (

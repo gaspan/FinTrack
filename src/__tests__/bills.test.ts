@@ -89,7 +89,7 @@ describe('BillReminderQueries.setPaid', () => {
     const { db } = makeDb(baseBill({ is_paid: 1, paid_transaction_id: 55 }));
     await new BillReminderQueries(db, 1).setPaid(1, false);
 
-    expect(db.runAsync).toHaveBeenCalledWith('DELETE FROM transactions WHERE id = ?', [55]);
+    expect(db.runAsync).toHaveBeenCalledWith('DELETE FROM transactions WHERE id = ? AND book_id = ?', [55, 1]);
     const clear = db.runAsync.mock.calls.find((c: any[]) => String(c[0]).includes('paid_transaction_id = NULL'));
     expect(clear).toBeTruthy();
   });

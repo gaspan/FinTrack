@@ -21,10 +21,10 @@ beforeEach(() => {
 });
 
 describe('backupRestore', () => {
-  it('gatherBackupData mengumpulkan seluruh tabel dengan versi 6', async () => {
+  it('gatherBackupData mengumpulkan seluruh tabel dengan versi 7', async () => {
     const data = await gatherBackupData(db);
 
-    expect(data.version).toBe(6);
+    expect(data.version).toBe(7);
     expect(data.books).toEqual([]);
     expect(data.wallets).toEqual([]);
     expect(data.transactions).toEqual([]);
@@ -33,6 +33,7 @@ describe('backupRestore', () => {
     expect(data.transaction_attachments).toEqual([]);
     expect(data.debts).toEqual([]);
     expect(data.debt_payments).toEqual([]);
+    expect(data.goal_contributions).toEqual([]);
     expect(data.settings).toBeDefined();
     expect(db.getAllAsync).toHaveBeenCalled();
   });

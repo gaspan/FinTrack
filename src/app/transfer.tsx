@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import dayjs from 'dayjs';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { useBook } from '@/constants/books';
-import { WalletQueries } from '@/lib/queries';
+import { TransferQueries, WalletQueries } from '@/lib/queries';
 import { Wallet } from '@/types';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Input } from '@/components/ui/Input';
@@ -21,17 +21,44 @@ export default function TransferScreen() {
   const { activeBook } = useBook();
   const bookId = activeBook?.id ?? 1;
   const router = useRouter();
+  const { transferId: transferIdParam } = useLocalSearchParams<{ transferId?: string }>();
+  const editingTransferId = typeof transferIdParam === 'string' ? Number(transferIdParam) : NaN;
 
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [sourceId, setSourceId] = useState<number | null>(null);
   const [targetId, setTargetId] = useState<number | null>(null);
   const [amount, setAmount] = useState(0);
+  const [date, setDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
   useFocusEffect(useCallback(() => {
-    new WalletQueries(db, bookId).getAll().then(setWallets).catch(console.error);
-  }, [db, bookId]));
+    let mounted = true;
+    const load = async () => {
+      try {
+        const walletRows = await new WalletQueries(db, bookId).getAll();
+        if (!mounted) return;
+        setWallets(walletRows);
+
+        if (Number.isInteger(editingTransferId) && editingTransferId > 0) {
+          const pair = await new TransferQueries(db, bookId).getPair(editingTransferId);
+          const source = pair.find(tx => tx.type === 'expense');
+          const target = pair.find(tx => tx.type === 'income');
+          if (source && target && mounted) {
+            setSourceId(source.wallet_id);
+            setTargetId(target.wallet_id);
+            setAmount(source.amount);
+            setDate(source.transaction_date);
+            setNotes((source.notes || '').replace(/^Transfer:\s*/, ''));
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [db, bookId, editingTransferId]));
 
   const handleTransfer = async () => {
     if (!sourceId || !targetId || amount <= 0) return;
@@ -41,53 +68,25 @@ export default function TransferScreen() {
     }
 
     const source = wallets.find(w => w.id === sourceId);
-    if (source && source.balance < amount) {
+    if (!Number.isInteger(editingTransferId) && source && source.balance < amount) {
       Alert.alert('Saldo Tidak Mencukupi', `Saldo "${source.name}" hanya ${formatRupiah(source.balance)}`);
       return;
     }
 
     try {
       setLoading(true);
-      let expenseCat = await db.getFirstAsync<{ id: number }>(
-        "SELECT id FROM categories WHERE type = 'expense' AND name = 'Lainnya' LIMIT 1"
-      );
-      if (!expenseCat) {
-        await db.runAsync(
-          "INSERT INTO categories (name, type, icon, color, sort_order) VALUES ('Lainnya', 'expense', 'swap-horizontal-outline', '#94A3B8', 999)"
-        );
-        expenseCat = await db.getFirstAsync<{ id: number }>(
-          "SELECT id FROM categories WHERE type = 'expense' AND name = 'Lainnya' LIMIT 1"
-        );
+      const transferQueries = new TransferQueries(db, bookId);
+      if (Number.isInteger(editingTransferId) && editingTransferId > 0) {
+        await transferQueries.updateTransfer(editingTransferId, { amount, date, notes: notes || null });
+      } else {
+        await transferQueries.createTransfer({
+          sourceWalletId: sourceId,
+          targetWalletId: targetId,
+          amount,
+          date,
+          notes: notes || null,
+        });
       }
-      let incomeCat = await db.getFirstAsync<{ id: number }>(
-        "SELECT id FROM categories WHERE type = 'income' AND name = 'Lainnya' LIMIT 1"
-      );
-      if (!incomeCat) {
-        await db.runAsync(
-          "INSERT INTO categories (name, type, icon, color, sort_order) VALUES ('Lainnya', 'income', 'swap-horizontal-outline', '#94A3B8', 999)"
-        );
-        incomeCat = await db.getFirstAsync<{ id: number }>(
-          "SELECT id FROM categories WHERE type = 'income' AND name = 'Lainnya' LIMIT 1"
-        );
-      }
-      if (!expenseCat || !incomeCat) throw new Error('Kategori tidak ditemukan');
-
-      const transferId = Date.now();
-      const txNote = notes ? `Transfer: ${notes}` : 'Transfer antar dompet';
-      const txDate = dayjs().format('YYYY-MM-DD');
-
-      await db.withTransactionAsync(async () => {
-        await db.runAsync('UPDATE wallets SET balance = balance - ? WHERE id = ?', [amount, sourceId]);
-        await db.runAsync('UPDATE wallets SET balance = balance + ? WHERE id = ?', [amount, targetId]);
-        await db.runAsync(
-          'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes, transfer_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          ['expense', amount, expenseCat.id, sourceId, txDate, txNote, transferId]
-        );
-        await db.runAsync(
-          'INSERT INTO transactions (type, amount, category_id, wallet_id, transaction_date, notes, transfer_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          ['income', amount, incomeCat.id, targetId, txDate, txNote, transferId]
-        );
-      });
       Alert.alert('Berhasil', 'Transfer berhasil dilakukan.', [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e) {
       console.error(e);
@@ -99,7 +98,7 @@ export default function TransferScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Transfer Antar Dompet</Text>
+      <Text style={styles.title}>{Number.isInteger(editingTransferId) ? 'Edit Transfer' : 'Transfer Antar Dompet'}</Text>
       <Text style={styles.subtitle}>Pindahkan saldo antar dompet Anda</Text>
 
       <Text style={styles.label}>Dompet Asal</Text>
@@ -140,6 +139,7 @@ export default function TransferScreen() {
         ))}
       </View>
 
+      <Input label="Tanggal (YYYY-MM-DD)" value={date} onChangeText={setDate} />
       <NumericInput label="Jumlah Transfer" value={amount} onChangeValue={setAmount} />
       <Input label="Catatan (Opsional)" placeholder="Biaya, keperluan, dll" value={notes} onChangeText={setNotes} />
 
@@ -153,7 +153,7 @@ export default function TransferScreen() {
       )}
 
       <Button
-        title="Transfer Sekarang"
+        title={Number.isInteger(editingTransferId) ? 'Simpan Perubahan' : 'Transfer Sekarang'}
         onPress={handleTransfer}
         disabled={!sourceId || !targetId || amount <= 0 || sourceId === targetId}
         loading={loading}

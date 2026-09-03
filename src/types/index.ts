@@ -41,6 +41,9 @@ export interface Transaction {
   notes: string | null;
   recurring_id: number | null;
   transfer_id?: number | null;
+  is_internal?: number;
+  goal_contribution_id?: number | null;
+  source_key?: string | null;
   created_at: string;
   book_id?: number;
 }
@@ -59,6 +62,23 @@ export interface TransactionAttachment {
   transaction_id: number;
   file_path: string;
   file_type: 'image' | 'document';
+  created_at: string;
+  book_id?: number;
+}
+
+export type GoalContributionKind = 'contribution' | 'reversal';
+
+export interface GoalContribution {
+  id: number;
+  book_id: number;
+  goal_id: number;
+  wallet_id: number;
+  amount: number;
+  contribution_date: string;
+  transaction_id: number | null;
+  kind: GoalContributionKind;
+  reversal_of_id: number | null;
+  notes: string | null;
   created_at: string;
 }
 
@@ -325,6 +345,26 @@ export interface ForecastPoint {
   projected_balance: number;
   income: number;
   expense: number;
+  events?: ForecastEvent[];
+}
+
+export type ForecastEventSource = 'recurring' | 'salary' | 'bill' | 'subscription' | 'debt' | 'savings_goal' | 'baseline';
+export type ForecastEventDirection = 'income' | 'expense' | 'informational';
+export type ForecastEventStatus = 'scheduled' | 'overdue' | 'manual' | 'informational';
+
+export interface ForecastEvent {
+  key: string;
+  source: ForecastEventSource;
+  sourceId: number | null;
+  date: string | null;
+  amount: number;
+  direction: ForecastEventDirection;
+  cashImpact: number;
+  affectsBalance: boolean;
+  status: ForecastEventStatus;
+  label: string;
+  walletId?: number | null;
+  categoryId?: number | null;
 }
 
 export interface CalendarDayData {

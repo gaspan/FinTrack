@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { calculateSafeToSpend, generateForecast } from '@/features/forecast/forecastEngine';
-import { WalletQueries, RecurringQueries, TransactionQueries, SavingsGoalQueries, BillReminderQueries, SubscriptionQueries } from '@/lib/queries';
+import { WalletQueries, RecurringQueries, TransactionQueries, SavingsGoalQueries, BillReminderQueries, SubscriptionQueries, DebtQueries } from '@/lib/queries';
 import { getSalaryProjection } from '@/utils/salary';
 
 jest.mock('@/utils/salary', () => ({
@@ -15,8 +15,10 @@ const walletGetAllSpy = jest.spyOn(WalletQueries.prototype, 'getAll');
 const recurringGetActiveSpy = jest.spyOn(RecurringQueries.prototype, 'getActive');
 const txGetByDateRangeSpy = jest.spyOn(TransactionQueries.prototype, 'getByDateRange');
 const subUpcomingSpy = jest.spyOn(SubscriptionQueries.prototype, 'getUpcomingRenewals');
+const subGetAllSpy = jest.spyOn(SubscriptionQueries.prototype, 'getAll');
 const reminderGetAllSpy = jest.spyOn(BillReminderQueries.prototype, 'getAll');
 const goalGetAllSpy = jest.spyOn(SavingsGoalQueries.prototype, 'getAll');
+const debtGetAllSpy = jest.spyOn(DebtQueries.prototype, 'getAll');
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -24,8 +26,10 @@ beforeEach(() => {
   recurringGetActiveSpy.mockResolvedValue([]);
   txGetByDateRangeSpy.mockResolvedValue([]);
   subUpcomingSpy.mockResolvedValue([]);
+  subGetAllSpy.mockResolvedValue([]);
   reminderGetAllSpy.mockResolvedValue([]);
   goalGetAllSpy.mockResolvedValue([]);
+  debtGetAllSpy.mockResolvedValue([]);
   salaryMock.mockResolvedValue(null);
 });
 
@@ -67,6 +71,63 @@ describe('generateForecast', () => {
 
     const atExpenseDay = points.find(p => p.date === expenseDate)!;
     expect(atExpenseDay.expense).toBe(50000);
+  });
+});
+
+describe('generateForecast — kewajiban terjadwal', () => {
+  it('memasukkan tagihan yang belum lunas pada tanggal jatuh tempo', async () => {
+    const billDate = dayjs().add(4, 'day').format('YYYY-MM-DD');
+    reminderGetAllSpy.mockResolvedValue([{
+      id: 1, name: 'Listrik', amount: 350000, due_date: billDate,
+      frequency: 'monthly', is_paid: 0, category_id: 5, wallet_id: 2,
+      notes: null, paid_transaction_id: null, book_id: 1,
+    } as any]);
+
+    const points = await generateForecast(db, 20, 1);
+
+    const atBill = points.find(p => p.date === billDate)!;
+    expect(atBill.expense).toBe(350000);
+  });
+
+  it('mengabaikan tagihan yang sudah lunas', async () => {
+    reminderGetAllSpy.mockResolvedValue([{
+      id: 1, name: 'Listrik', amount: 350000, due_date: dayjs().add(2, 'day').format('YYYY-MM-DD'),
+      frequency: 'one_time', is_paid: 1, category_id: 5, wallet_id: 2,
+      notes: null, paid_transaction_id: 99, book_id: 1,
+    } as any]);
+
+    const points = await generateForecast(db, 10, 1);
+    expect(points.some(p => p.expense > 0)).toBe(false);
+  });
+
+  it('memasukkan langganan aktif pada siklus berikutnya', async () => {
+    const nextBilling = dayjs().add(6, 'day').format('YYYY-MM-DD');
+    subGetAllSpy.mockResolvedValue([{
+      id: 1, name: 'Netflix', amount: 186000, billing_cycle: 'monthly',
+      next_billing_date: nextBilling, is_active: 1, auto_create: 1,
+      wallet_id: 2, category_id: 5, book_id: 1,
+    } as any]);
+
+    const points = await generateForecast(db, 30, 1);
+
+    const atBilling = points.find(p => p.date === nextBilling)!;
+    expect(atBilling.expense).toBe(186000);
+  });
+
+  it('debt dengan jatuh tempo hanya informasional dan tidak mengubah saldo proyeksi', async () => {
+    const due = dayjs().add(5, 'day').format('YYYY-MM-DD');
+    debtGetAllSpy.mockResolvedValue([{
+      id: 1, person_name: 'Budi', direction: 'receivable', amount: 1000000,
+      paid_amount: 0, due_date: due, wallet_id: 2, is_settled: 0, book_id: 1,
+    } as any]);
+
+    const points = await generateForecast(db, 15, 1);
+
+    const atDue = points.find(p => p.date === due)!;
+    expect(atDue.income).toBe(0);
+    expect(atDue.projected_balance).toBe(1000000);
+    const debtEvent = atDue.events?.find(e => e.source === 'debt');
+    expect(debtEvent?.affectsBalance).toBe(false);
   });
 });
 

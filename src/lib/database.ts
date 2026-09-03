@@ -4,7 +4,7 @@ import { DEFAULT_WALLETS } from '../constants/wallets';
 import { bootCheckpoint } from '../lib/bootLog';
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
-  const DATABASE_VERSION = 9;
+  const DATABASE_VERSION = 11;
 
   // Wait for locks instead of aborting with "database is locked" when
   // concurrent queries race with a write transaction (expo-sqlite on Android).
@@ -518,6 +518,65 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     });
 
     currentDbVersion = 9;
+  }
+
+  if (currentDbVersion === 9) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`ALTER TABLE transactions ADD COLUMN is_internal INTEGER NOT NULL DEFAULT 0;`);
+      await db.execAsync(`ALTER TABLE transactions ADD COLUMN goal_contribution_id INTEGER;`);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS goal_contributions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          book_id INTEGER NOT NULL DEFAULT 1,
+          goal_id INTEGER NOT NULL,
+          wallet_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          contribution_date TEXT NOT NULL,
+          transaction_id INTEGER,
+          kind TEXT NOT NULL DEFAULT 'contribution' CHECK(kind IN ('contribution', 'reversal')),
+          reversal_of_id INTEGER,
+          notes TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_goal_contrib_goal ON goal_contributions(book_id, goal_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_goal_contrib_reversal
+          ON goal_contributions(reversal_of_id) WHERE reversal_of_id IS NOT NULL;
+      `);
+
+      // Child rows created before multi-book support inherited the default book.
+      // Derive their scope from the parent whenever that relationship is reliable.
+      await db.execAsync(`
+        UPDATE transaction_tags
+        SET book_id = (SELECT book_id FROM transactions WHERE transactions.id = transaction_tags.transaction_id)
+        WHERE EXISTS (SELECT 1 FROM transactions WHERE transactions.id = transaction_tags.transaction_id);
+
+        UPDATE transaction_attachments
+        SET book_id = (SELECT book_id FROM transactions WHERE transactions.id = transaction_attachments.transaction_id)
+        WHERE EXISTS (SELECT 1 FROM transactions WHERE transactions.id = transaction_attachments.transaction_id);
+
+        UPDATE debt_payments
+        SET book_id = (SELECT book_id FROM debts WHERE debts.id = debt_payments.debt_id)
+        WHERE EXISTS (SELECT 1 FROM debts WHERE debts.id = debt_payments.debt_id);
+      `);
+    });
+
+    currentDbVersion = 10;
+  }
+
+  if (currentDbVersion === 10) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`ALTER TABLE transactions ADD COLUMN source_key TEXT;`);
+      await db.execAsync(`
+        DROP INDEX IF EXISTS idx_transactions_source;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_source
+          ON transactions(book_id, source_key) WHERE source_key IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_transactions_goal ON transactions(book_id, goal_contribution_id);
+      `);
+    });
+
+    currentDbVersion = 11;
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

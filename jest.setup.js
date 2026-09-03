@@ -110,7 +110,7 @@ jest.mock('expo-file-system/legacy', () => ({
 }));
 
 jest.mock('expo-document-picker', () => ({
-  getDocumentAsync: jest.fn().mockResolvedValue({ cancelled: false, assets: [] }),
+  getDocumentAsync: jest.fn().mockResolvedValue({ canceled: true, assets: null }),
 }));
 
 jest.mock('expo-secure-store', () => ({

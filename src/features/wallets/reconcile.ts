@@ -16,7 +16,7 @@ export async function reconcileWalletBalances(db: SQLiteDatabase): Promise<void>
     const current = Math.round(w.balance * 100) / 100;
 
     if (Math.abs(expected - current) > 0.01) {
-      await db.runAsync('UPDATE wallets SET balance = ? WHERE id = ?', [expected, w.id]);
+      await db.runAsync('UPDATE wallets SET balance = ? WHERE id = ? AND book_id = ?', [expected, w.id, w.book_id]);
     }
   }
 }

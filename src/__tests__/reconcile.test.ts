@@ -19,8 +19,8 @@ describe('reconcileWalletBalances', () => {
     );
     await reconcileWalletBalances(db);
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE wallets SET balance = ? WHERE id = ?',
-      [450000, 1]
+      'UPDATE wallets SET balance = ? WHERE id = ? AND book_id = ?',
+      [450000, 1, 1]
     );
   });
 
@@ -44,8 +44,8 @@ describe('reconcileWalletBalances', () => {
     await reconcileWalletBalances(db);
     expect(db.runAsync).toHaveBeenCalledTimes(1);
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE wallets SET balance = ? WHERE id = ?',
-      [110000, 1]
+      'UPDATE wallets SET balance = ? WHERE id = ? AND book_id = ?',
+      [110000, 1, 1]
     );
   });
   it('dompet baru dengan saldo awal tidak dinolkan (regresi bug initial_balance)', async () => {

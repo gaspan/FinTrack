@@ -1,52 +1,108 @@
 import { SQLiteDatabase } from 'expo-sqlite';
-import dayjs from 'dayjs';
-import { SafeToSpendData, ForecastPoint } from '@/types';
-import { WalletQueries, TransactionQueries, RecurringQueries, SavingsGoalQueries, BillReminderQueries, SubscriptionQueries } from '@/lib/queries';
+import dayjs, { Dayjs } from 'dayjs';
+import { SafeToSpendData, ForecastPoint, Transaction } from '@/types';
+import {
+  BillReminderQueries,
+  DebtQueries,
+  RecurringQueries,
+  SavingsGoalQueries,
+  SubscriptionQueries,
+  TransactionQueries,
+  WalletQueries,
+} from '@/lib/queries';
 import { getSalaryProjection } from '@/utils/salary';
+import {
+  buildForecastEvents,
+  ForecastSources,
+  getSavingsReservation,
+} from './forecastEvents';
 
-export async function calculateSafeToSpend(db: SQLiteDatabase, bookId: number): Promise<SafeToSpendData | null> {
-  const today = dayjs();
-  const endOfMonth = today.endOf('month');
-  const daysRemaining = endOfMonth.diff(today, 'day');
+interface ForecastData extends ForecastSources {
+  totalBalance: number;
+  hasWallets: boolean;
+  averageDailyExpense: number;
+}
 
+function isScheduledExpenseSource(source: string): boolean {
+  return source === 'recurring' || source === 'bill' || source === 'subscription';
+}
+
+function isKnownScheduledExpense(tx: Transaction): boolean {
+  return Boolean(
+    tx.recurring_id
+    || tx.source_key?.startsWith('bill:')
+    || tx.source_key?.startsWith('subscription:')
+    || tx.notes?.startsWith('Tagihan ')
+    || tx.notes?.startsWith('Langganan ')
+  );
+}
+
+async function loadForecastData(
+  db: SQLiteDatabase,
+  bookId: number,
+  rangeStart: Dayjs,
+  rangeEnd: Dayjs
+): Promise<ForecastData> {
   const walletQueries = new WalletQueries(db, bookId);
-  const wallets = await walletQueries.getAll();
-  if (wallets.length === 0) return null;
-  const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
-
-  const subQueries = new SubscriptionQueries(db, bookId);
-  const recurringQueries = new RecurringQueries(db, bookId);
-  const reminderQueries = new BillReminderQueries(db, bookId);
-  const goalQueries = new SavingsGoalQueries(db, bookId);
-
-  const [upcomingSubs, allRecurring, allReminders, goals, salary] = await Promise.all([
-    subQueries.getUpcomingRenewals(daysRemaining),
-    recurringQueries.getActive(),
-    reminderQueries.getAll(),
-    goalQueries.getAll(),
+  const transactionQueries = new TransactionQueries(db, bookId);
+  const [wallets, recurring, salary, bills, subscriptions, debts, goals, actualTransactions, history] = await Promise.all([
+    walletQueries.getAll(),
+    new RecurringQueries(db, bookId).getActive(),
     getSalaryProjection(db, bookId).catch(() => null),
+    new BillReminderQueries(db, bookId).getAll(),
+    new SubscriptionQueries(db, bookId).getAll(),
+    new DebtQueries(db, bookId).getAll(false),
+    new SavingsGoalQueries(db, bookId).getAll(),
+    transactionQueries.getByDateRange(rangeStart.format('YYYY-MM-DD'), rangeEnd.format('YYYY-MM-DD')),
+    transactionQueries.getByDateRange(
+      rangeStart.subtract(30, 'day').format('YYYY-MM-DD'),
+      rangeStart.subtract(1, 'day').format('YYYY-MM-DD'),
+      false
+    ),
   ]);
 
-  const upcomingBills =
-    allRecurring.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0) +
-    upcomingSubs.reduce((s, r) => s + r.amount, 0) +
-    allReminders.filter(r => !r.is_paid && r.due_date <= endOfMonth.format('YYYY-MM-DD')).reduce((s, r) => s + r.amount, 0);
+  const variableExpenses = history.filter(tx =>
+    tx.type === 'expense' && !isKnownScheduledExpense(tx) && tx.is_internal !== 1
+  );
+  const averageDailyExpense = variableExpenses.reduce((sum, tx) => sum + tx.amount, 0) / 30;
 
-  const upcomingIncome = salary && salary.nextDate <= endOfMonth.format('YYYY-MM-DD') ? salary.amount : 0;
+  return {
+    recurring,
+    salary,
+    bills,
+    subscriptions,
+    debts,
+    goals,
+    actualTransactions,
+    totalBalance: wallets.reduce((sum, wallet) => sum + wallet.balance, 0),
+    hasWallets: wallets.length > 0,
+    averageDailyExpense,
+  };
+}
 
-  const savingsTarget = goals
-    .filter(g => !g.is_completed)
-    .reduce((sum, g) => {
-      const remaining = g.target_amount - g.current_amount;
-      if (remaining <= 0) return sum;
-      const daysToDeadline = g.deadline
-        ? Math.max(dayjs(g.deadline).diff(today, 'day'), 1)
-        : 30;
-      return sum + (remaining / daysToDeadline) * daysRemaining;
-    }, 0);
+export async function calculateSafeToSpend(db: SQLiteDatabase, bookId: number): Promise<SafeToSpendData | null> {
+  const today = dayjs().startOf('day');
+  const endOfMonth = today.endOf('month').startOf('day');
+  const daysRemaining = endOfMonth.diff(today, 'day') + 1;
+  const data = await loadForecastData(db, bookId, today, endOfMonth);
+  if (!data.hasWallets) return null;
 
-  const effectiveBalance = totalBalance + upcomingIncome;
-  const remainingBalance = Math.max(0, effectiveBalance - upcomingBills - savingsTarget);
+  const events = buildForecastEvents(data, today.format('YYYY-MM-DD'), daysRemaining, {
+    averageDailyExpense: data.averageDailyExpense,
+  });
+  const upcomingIncome = events
+    .filter(item => item.cashImpact > 0)
+    .reduce((sum, item) => sum + item.cashImpact, 0);
+  const upcomingBills = events
+    .filter(item => item.cashImpact < 0 && isScheduledExpenseSource(item.source))
+    .reduce((sum, item) => sum - item.cashImpact, 0);
+  const estimatedVariableSpending = events
+    .filter(item => item.source === 'baseline')
+    .reduce((sum, item) => sum - item.cashImpact, 0);
+  const savingsTarget = getSavingsReservation(data.goals, today, endOfMonth);
+
+  const effectiveBalance = data.totalBalance + upcomingIncome;
+  const remainingBalance = Math.max(0, effectiveBalance - upcomingBills - estimatedVariableSpending - savingsTarget);
   const safeToSpend = remainingBalance;
   const safeToSpendDaily = daysRemaining > 0 ? safeToSpend / daysRemaining : safeToSpend;
 
@@ -63,69 +119,46 @@ export async function calculateSafeToSpend(db: SQLiteDatabase, bookId: number): 
   }
 
   return {
-    safeToSpend, safeToSpendDaily, totalBalance,
-    upcomingBills, savingsTarget, remainingBalance,
-    daysRemaining, color, status,
+    safeToSpend,
+    safeToSpendDaily,
+    totalBalance: data.totalBalance,
+    upcomingBills,
+    savingsTarget,
+    remainingBalance,
+    daysRemaining,
+    color,
+    status,
   };
 }
 
 export async function generateForecast(db: SQLiteDatabase, days: number = 30, bookId: number = 1): Promise<ForecastPoint[]> {
-  const today = dayjs();
+  if (days <= 0) return [];
+  const today = dayjs().startOf('day');
+  const end = today.add(days - 1, 'day');
+  const data = await loadForecastData(db, bookId, today, end);
+  const events = buildForecastEvents(data, today.format('YYYY-MM-DD'), days, {
+    averageDailyExpense: data.averageDailyExpense,
+  });
+  const eventsByDate = events.reduce((groups, item) => {
+    if (!item.date) return groups;
+    if (!groups[item.date]) groups[item.date] = [];
+    groups[item.date].push(item);
+    return groups;
+  }, {} as Record<string, typeof events>);
+
+  let currentBalance = data.totalBalance;
   const points: ForecastPoint[] = [];
-
-  const walletQueries = new WalletQueries(db, bookId);
-  const wallets = await walletQueries.getAll();
-  let currentBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
-
-  const recurringQueries = new RecurringQueries(db, bookId);
-  const [allRecurring, salary] = await Promise.all([
-    recurringQueries.getActive(),
-    getSalaryProjection(db, bookId).catch(() => null),
-  ]);
-  const hasRecurringIncome = allRecurring.some(r => r.type === 'income' && r.is_active === 1);
-
-  const txQueries = new TransactionQueries(db, bookId);
-  const last30Days = await txQueries.getByDateRange(
-    today.subtract(30, 'day').format('YYYY-MM-DD'),
-    today.format('YYYY-MM-DD')
-  );
-  const avgDailyExpense = last30Days.length > 0
-    ? last30Days.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0) / 30
-    : 0;
-
-  for (let i = 0; i < days; i++) {
-    const date = today.add(i, 'day');
-    const dateStr = date.format('YYYY-MM-DD');
-
-    let income = 0;
-    let expense = avgDailyExpense;
-
-    if (salary && !hasRecurringIncome && dateStr === salary.nextDate) {
-      income += salary.amount;
-    }
-
-    for (const rec of allRecurring) {
-      const start = dayjs(rec.next_date);
-      if (date.isBefore(start)) continue;
-      const daysDiff = date.diff(start, 'day');
-      let shouldOccur = false;
-
-      switch (rec.frequency) {
-        case 'daily': shouldOccur = true; break;
-        case 'weekly': shouldOccur = daysDiff % 7 === 0; break;
-        case 'monthly': shouldOccur = date.date() === start.date(); break;
-        case 'yearly': shouldOccur = date.format('MM-DD') === start.format('MM-DD'); break;
-      }
-
-      if (shouldOccur) {
-        if (rec.type === 'income') income += rec.amount;
-        else expense += rec.amount;
-      }
-    }
-
-    currentBalance = currentBalance + income - expense;
-    points.push({ date: dateStr, projected_balance: currentBalance, income, expense });
+  for (let index = 0; index < days; index++) {
+    const date = today.add(index, 'day').format('YYYY-MM-DD');
+    const dayEvents = eventsByDate[date] || [];
+    const income = dayEvents
+      .filter(item => item.cashImpact > 0)
+      .reduce((sum, item) => sum + item.cashImpact, 0);
+    const expense = dayEvents
+      .filter(item => item.cashImpact < 0)
+      .reduce((sum, item) => sum - item.cashImpact, 0);
+    currentBalance += income - expense;
+    points.push({ date, projected_balance: currentBalance, income, expense, events: dayEvents });
   }
-
   return points;
 }

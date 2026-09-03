@@ -90,17 +90,28 @@ export default function ForecastPage() {
 
         <Text style={styles.chartTitle}>Rincian Harian</Text>
         {forecast.slice(0, 14).map((f, idx) => (
-          <View key={idx} style={styles.forecastRow}>
-            <Text style={styles.forecastDate}>{f.date}</Text>
-            <Text style={[styles.forecastVal, { color: f.income > 0 ? '#10B981' : '#9CA3AF' }]}>
-              +{f.income ? formatRupiah(f.income) : '-'}
-            </Text>
-            <Text style={[styles.forecastVal, { color: f.expense > 0 ? '#EF4444' : '#9CA3AF' }]}>
-              -{f.expense ? formatRupiah(f.expense) : '-'}
-            </Text>
-            <Text style={[styles.forecastBalance, { color: f.projected_balance >= 0 ? '#10B981' : '#EF4444' }]}>
-              {formatRupiah(f.projected_balance)}
-            </Text>
+          <View key={idx}>
+            <View style={styles.forecastRow}>
+              <Text style={styles.forecastDate}>{f.date}</Text>
+              <Text style={[styles.forecastVal, { color: f.income > 0 ? '#10B981' : '#9CA3AF' }]}>
+                +{f.income ? formatRupiah(f.income) : '-'}
+              </Text>
+              <Text style={[styles.forecastVal, { color: f.expense > 0 ? '#EF4444' : '#9CA3AF' }]}>
+                -{f.expense ? formatRupiah(f.expense) : '-'}
+              </Text>
+              <Text style={[styles.forecastBalance, { color: f.projected_balance >= 0 ? '#10B981' : '#EF4444' }]}>
+                {formatRupiah(f.projected_balance)}
+              </Text>
+            </View>
+            {f.events && f.events.length > 0 && (
+              <View style={styles.eventList}>
+                {f.events.map(event => (
+                  <Text key={event.key} style={[styles.eventText, { color: event.affectsBalance ? (event.cashImpact >= 0 ? '#10B981' : '#EF4444') : theme.colors.textSecondary }]}>
+                    {event.affectsBalance ? (event.cashImpact >= 0 ? '+' : '-') : 'i'} {event.label}{event.status === 'overdue' ? ' (terlambat)' : ''}
+                  </Text>
+                ))}
+              </View>
+            )}
           </View>
         ))}
         <View style={{ height: 40 }} />
@@ -140,4 +151,6 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   forecastDate: { flex: 1, fontSize: 12, color: theme.colors.textSecondary },
   forecastVal: { width: 90, fontSize: 12, textAlign: 'right' },
   forecastBalance: { width: 110, fontSize: 12, textAlign: 'right', fontWeight: '600' },
+  eventList: { paddingLeft: theme.spacing.md, paddingBottom: theme.spacing.xs },
+  eventText: { ...theme.typography.caption, paddingVertical: 1 },
 });

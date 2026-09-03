@@ -36,24 +36,17 @@ export default function EditTransactionScreen() {
         const walletQueries = new WalletQueries(db, bookId);
 
         const [tx, cats, walls, tags, attachments] = await Promise.all([
-          db.getFirstAsync<TransactionWithDetails>(`
-            SELECT 
-              t.*, 
-              c.name as category_name, 
-              c.icon as category_icon, 
-              c.color as category_color, 
-              w.name as wallet_name 
-            FROM transactions t
-            JOIN categories c ON t.category_id = c.id
-            JOIN wallets w ON t.wallet_id = w.id
-            WHERE t.id = ?
-          `, [txId]),
+          new TransactionQueries(db, bookId).getByIdWithDetails(txId),
           categoryQueries.getAll(),
           walletQueries.getAll(),
           new TagQueries(db, bookId).getByTransaction(txId),
           new TransactionQueries(db, bookId).getAttachments(txId),
         ]);
 
+        if (tx?.transfer_id) {
+          router.replace(`/transfer?transferId=${tx.transfer_id}`);
+          return;
+        }
         if (tx) setTransaction(tx);
         setCategories(cats);
         setWallets(walls);
@@ -68,7 +61,7 @@ export default function EditTransactionScreen() {
     };
 
     loadData();
-  }, [id, db, bookId]);
+  }, [id, db, bookId, router]);
 
   const handleSubmit = async (data: {
     type: TransactionType;

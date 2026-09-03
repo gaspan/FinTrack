@@ -25,6 +25,7 @@ export interface BackupData {
   budgets: any[];
   recurring_transactions: any[];
   savings_goals?: any[];
+  goal_contributions?: any[];
   bill_reminders?: any[];
   assets?: any[];
   liabilities?: any[];
@@ -39,7 +40,7 @@ export interface BackupData {
 }
 
 export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> {
-  const [books, wallets, categories, transactions, budgets, recurring, goals, reminders, assets, liabilities, snapshots, subs, tags, tagLinks, attachments, debts, debtPayments] = await Promise.all([
+  const [books, wallets, categories, transactions, budgets, recurring, goals, goalContributions, reminders, assets, liabilities, snapshots, subs, tags, tagLinks, attachments, debts, debtPayments] = await Promise.all([
     db.getAllAsync('SELECT * FROM books'),
     db.getAllAsync('SELECT * FROM wallets'),
     db.getAllAsync('SELECT * FROM categories'),
@@ -47,6 +48,7 @@ export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> 
     db.getAllAsync('SELECT * FROM budgets'),
     db.getAllAsync('SELECT * FROM recurring_transactions'),
     db.getAllAsync('SELECT * FROM savings_goals'),
+    db.getAllAsync('SELECT * FROM goal_contributions'),
     db.getAllAsync('SELECT * FROM bill_reminders'),
     db.getAllAsync('SELECT * FROM assets'),
     db.getAllAsync('SELECT * FROM liabilities'),
@@ -65,12 +67,13 @@ export async function gatherBackupData(db: SQLiteDatabase): Promise<BackupData> 
   }
 
   return {
-    version: 6,
+    version: 7,
     exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     books,
     wallets, categories, transactions, budgets,
     recurring_transactions: recurring,
     savings_goals: goals,
+    goal_contributions: goalContributions,
     bill_reminders: reminders,
     assets, liabilities,
     net_worth_snapshots: snapshots,
@@ -129,6 +132,78 @@ export const importBackup = async (db: SQLiteDatabase): Promise<string> => {
   return applyBackupData(db, content);
 };
 
+export function validateBackupData(data: BackupData): void {
+  if (!data?.version || !Array.isArray(data.transactions) || !Array.isArray(data.categories) || !Array.isArray(data.wallets)) {
+    throw new Error('Format file backup tidak valid');
+  }
+
+  const books = data.books?.length
+    ? data.books
+    : [{ id: 1 }];
+  const bookIds = new Set(books.map(book => Number(book.id)));
+  if (bookIds.size !== books.length || [...bookIds].some(id => !Number.isInteger(id) || id <= 0)) {
+    throw new Error('Backup memiliki pembukuan yang tidak valid');
+  }
+
+  const scopedRows: [string, any[] | undefined][] = [
+    ['kategori', data.categories],
+    ['dompet', data.wallets],
+    ['transaksi', data.transactions],
+    ['target', data.savings_goals],
+    ['kontribusi target', data.goal_contributions],
+    ['tagihan', data.bill_reminders],
+    ['langganan', data.subscriptions],
+    ['utang', data.debts],
+    ['pembayaran utang', data.debt_payments],
+    ['aset', data.assets],
+    ['liabilitas', data.liabilities],
+    ['snapshot', data.net_worth_snapshots],
+    ['tag', data.tags],
+    ['relasi tag', data.transaction_tags],
+    ['lampiran', data.transaction_attachments],
+  ];
+  for (const [label, rows] of scopedRows) {
+    for (const row of rows || []) {
+      const rowBookId = Number(row.book_id ?? 1);
+      if (!bookIds.has(rowBookId)) throw new Error(`${label} mengarah ke pembukuan yang tidak ada`);
+    }
+  }
+
+  const walletIds = new Set((data.wallets || []).map(row => Number(row.id)));
+  const categoryIds = new Set((data.categories || []).map(row => Number(row.id)));
+  const transactionIds = new Set((data.transactions || []).map(row => Number(row.id)));
+  const goalIds = new Set((data.savings_goals || []).map(row => Number(row.id)));
+  const debtIds = new Set((data.debts || []).map(row => Number(row.id)));
+  const tagIds = new Set((data.tags || []).map(row => Number(row.id)));
+
+  for (const tx of data.transactions) {
+    if (!walletIds.has(Number(tx.wallet_id)) || !categoryIds.has(Number(tx.category_id))) {
+      throw new Error('Transaksi memiliki referensi wallet atau kategori yang tidak ada');
+    }
+  }
+  for (const contribution of data.goal_contributions || []) {
+    if (!goalIds.has(Number(contribution.goal_id)) || !walletIds.has(Number(contribution.wallet_id))) {
+      throw new Error('Kontribusi target memiliki referensi yang tidak ada');
+    }
+    if (contribution.transaction_id != null && !transactionIds.has(Number(contribution.transaction_id))) {
+      throw new Error('Kontribusi target memiliki transaksi yang tidak ada');
+    }
+  }
+  for (const payment of data.debt_payments || []) {
+    if (!debtIds.has(Number(payment.debt_id))) throw new Error('Pembayaran utang memiliki utang yang tidak ada');
+  }
+  for (const link of data.transaction_tags || []) {
+    if (!transactionIds.has(Number(link.transaction_id)) || !tagIds.has(Number(link.tag_id))) {
+      throw new Error('Relasi tag memiliki referensi yang tidak ada');
+    }
+  }
+  for (const attachment of data.transaction_attachments || []) {
+    if (!transactionIds.has(Number(attachment.transaction_id))) {
+      throw new Error('Lampiran memiliki transaksi yang tidak ada');
+    }
+  }
+}
+
 export const applyBackupData = async (
   db: SQLiteDatabase,
   source: string | BackupData
@@ -140,14 +215,13 @@ export const applyBackupData = async (
     throw new Error('Format file backup tidak valid');
   }
 
-  if (!data?.version || !data.transactions || !data.categories || !data.wallets) {
-    throw new Error('Format file backup tidak valid');
-  }
+  validateBackupData(data);
 
   await db.withTransactionAsync(async () => {
     await db.execAsync('DELETE FROM transaction_tags');
     await db.execAsync('DELETE FROM tags');
     await db.execAsync('DELETE FROM transaction_attachments');
+    await db.execAsync('DELETE FROM goal_contributions');
     await db.execAsync('DELETE FROM debt_payments');
     await db.execAsync('DELETE FROM debts');
     await db.execAsync('DELETE FROM subscriptions');
@@ -211,8 +285,8 @@ export const applyBackupData = async (
     }
     for (const tx of data.transactions) {
       await db.runAsync(
-        'INSERT INTO transactions (id, book_id, type, amount, category_id, wallet_id, transaction_date, notes, recurring_id, transfer_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [tx.id, tx.book_id ?? 1, tx.type, tx.amount, tx.category_id, tx.wallet_id, tx.transaction_date, tx.notes, tx.recurring_id, tx.transfer_id || null, tx.created_at]
+        'INSERT INTO transactions (id, book_id, type, amount, category_id, wallet_id, transaction_date, notes, recurring_id, transfer_id, is_internal, goal_contribution_id, source_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [tx.id, tx.book_id ?? 1, tx.type, tx.amount, tx.category_id, tx.wallet_id, tx.transaction_date, tx.notes, tx.recurring_id, tx.transfer_id || null, tx.is_internal ?? 0, tx.goal_contribution_id ?? null, tx.source_key ?? null, tx.created_at]
       );
     }
     for (const b of data.budgets || []) {
@@ -233,6 +307,17 @@ export const applyBackupData = async (
         [g.id, g.book_id ?? 1, g.name, g.target_amount, g.current_amount, g.deadline, g.wallet_id, g.icon, g.color, g.is_completed, g.created_at]
       );
     }
+    for (const contribution of data.goal_contributions || []) {
+      await db.runAsync(
+        `INSERT INTO goal_contributions
+          (id, book_id, goal_id, wallet_id, amount, contribution_date, transaction_id, kind, reversal_of_id, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [contribution.id, contribution.book_id ?? 1, contribution.goal_id, contribution.wallet_id,
+          contribution.amount, contribution.contribution_date, contribution.transaction_id ?? null,
+          contribution.kind || 'contribution', contribution.reversal_of_id ?? null, contribution.notes ?? null,
+          contribution.created_at]
+      );
+    }
     for (const r of data.bill_reminders || []) {
       await db.runAsync(
         'INSERT INTO bill_reminders (id, book_id, name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes, calendar_event_id, paid_transaction_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -247,8 +332,8 @@ export const applyBackupData = async (
     }
     for (const p of data.debt_payments || []) {
       await db.runAsync(
-        'INSERT INTO debt_payments (id, debt_id, amount, payment_date, transaction_id, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [p.id, p.debt_id, p.amount, p.payment_date, p.transaction_id, p.notes, p.created_at]
+        'INSERT INTO debt_payments (id, book_id, debt_id, amount, payment_date, transaction_id, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [p.id, p.book_id ?? 1, p.debt_id, p.amount, p.payment_date, p.transaction_id, p.notes, p.created_at]
       );
     }
     for (const t of data.tags || []) {
@@ -259,14 +344,14 @@ export const applyBackupData = async (
     }
     for (const tt of data.transaction_tags || []) {
       await db.runAsync(
-        'INSERT INTO transaction_tags (id, transaction_id, tag_id) VALUES (?, ?, ?)',
-        [tt.id, tt.transaction_id, tt.tag_id]
+        'INSERT INTO transaction_tags (id, book_id, transaction_id, tag_id) VALUES (?, ?, ?, ?)',
+        [tt.id, tt.book_id ?? 1, tt.transaction_id, tt.tag_id]
       );
     }
     for (const att of data.transaction_attachments || []) {
       await db.runAsync(
-        'INSERT INTO transaction_attachments (id, transaction_id, file_path, file_type, created_at) VALUES (?, ?, ?, ?, ?)',
-        [att.id, att.transaction_id, att.file_path, att.file_type, att.created_at]
+        'INSERT INTO transaction_attachments (id, book_id, transaction_id, file_path, file_type, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [att.id, att.book_id ?? 1, att.transaction_id, att.file_path, att.file_type, att.created_at]
       );
     }
   });

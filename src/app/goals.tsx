@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme, type Theme } from '@/constants/theme';
 import { useBook } from '@/constants/books';
 import { SavingsGoalQueries, WalletQueries } from '@/lib/queries';
-import { SavingsGoal, Wallet } from '@/types';
+import { GoalContribution, SavingsGoal, Wallet } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { NumericInput } from '@/components/ui/NumericInput';
@@ -26,14 +26,15 @@ export default function GoalsScreen() {
   const db = useSQLiteContext();
   const { activeBook } = useBook();
   const bookId = activeBook?.id ?? 1;
-  const router = useRouter();
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [contributions, setContributions] = useState<Record<number, GoalContribution[]>>({});
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [fundGoalId, setFundGoalId] = useState<number | null>(null);
   const [fundAmount, setFundAmount] = useState(0);
+  const [fundWalletId, setFundWalletId] = useState<number | null>(null);
   const [formName, setFormName] = useState('');
   const [formTarget, setFormTarget] = useState(0);
   const [formDeadline, setFormDeadline] = useState('');
@@ -47,8 +48,14 @@ export default function GoalsScreen() {
         new SavingsGoalQueries(db, bookId).getAll(),
         new WalletQueries(db, bookId).getAll(),
       ]);
+      const contributionRows = await Promise.all(
+        g.map(goal => new SavingsGoalQueries(db, bookId).getContributions(goal.id))
+      );
+      const contributionMap: Record<number, GoalContribution[]> = {};
+      g.forEach((goal, index) => { contributionMap[goal.id] = contributionRows[index]; });
       setGoals(g);
       setWallets(w);
+      setContributions(contributionMap);
     } catch (e) { console.error(e); }
   }, [db, bookId]);
 
@@ -83,8 +90,12 @@ export default function GoalsScreen() {
     Alert.alert('Hapus Target', 'Yakin ingin menghapus target ini?', [
       { text: 'Batal', style: 'cancel' },
       { text: 'Hapus', style: 'destructive', onPress: async () => {
-        await new SavingsGoalQueries(db, bookId).delete(id);
-        loadData();
+        try {
+          await new SavingsGoalQueries(db, bookId).delete(id);
+          loadData();
+        } catch (e) {
+          Alert.alert('Tidak dapat menghapus', e instanceof Error ? e.message : 'Target memiliki histori transaksi');
+        }
       }},
     ]);
   };
@@ -96,19 +107,13 @@ export default function GoalsScreen() {
       const goal = goals.find(g => g.id === fundGoalId);
       if (!goal) return;
 
-      await new SavingsGoalQueries(db, bookId).addFunds(goal.id, fundAmount);
-      if (goal.wallet_id) {
-        await db.runAsync('UPDATE wallets SET balance = balance - ? WHERE id = ?', [fundAmount, goal.wallet_id]);
-      }
-      const newTotal = goal.current_amount + fundAmount;
-      if (newTotal >= goal.target_amount) {
-        await new SavingsGoalQueries(db, bookId).markCompleted(goal.id, true);
-      }
+      await new SavingsGoalQueries(db, bookId).contribute(goal.id, fundAmount, fundWalletId);
       Alert.alert('Berhasil', `Dana sebesar ${formatRupiah(fundAmount)} berhasil ditambahkan.`);
       setFundGoalId(null);
       setFundAmount(0);
+      setFundWalletId(null);
       loadData();
-    } catch (e) { Alert.alert('Error', 'Gagal menambah dana'); }
+    } catch (e) { Alert.alert('Gagal menambah dana', e instanceof Error ? e.message : 'Coba lagi'); }
   };
 
   const progress = (current: number, target: number) => Math.min((current / target) * 100, 100);
@@ -170,7 +175,7 @@ export default function GoalsScreen() {
 
               <View style={styles.cardActions}>
                 {!isComplete && (
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => { setFundGoalId(g.id); setFundAmount(0); }}>
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => { setFundGoalId(g.id); setFundAmount(0); setFundWalletId(g.wallet_id ?? wallets[0]?.id ?? null); }}>
                     <Ionicons name="add-circle-outline" size={16} color={theme.colors.primary} />
                     <Text style={[styles.actionText, { color: theme.colors.primary }]}>Tambah Dana</Text>
                   </TouchableOpacity>
@@ -180,6 +185,19 @@ export default function GoalsScreen() {
                   <Text style={[styles.actionText, { color: theme.colors.danger }]}>Hapus</Text>
                 </TouchableOpacity>
               </View>
+              {(contributions[g.id] || []).length > 0 && (
+                <View style={styles.history}>
+                  <Text style={styles.historyTitle}>Riwayat dana</Text>
+                  {(contributions[g.id] || []).slice(0, 3).map(item => (
+                    <View key={item.id} style={styles.historyRow}>
+                      <Text style={styles.historyDate}>{dayjs(item.contribution_date).format('DD MMM YYYY')}</Text>
+                      <Text style={[styles.historyAmount, { color: item.kind === 'reversal' ? theme.colors.danger : theme.colors.income }]}>
+                        {item.kind === 'reversal' ? '-' : '+'}{formatRupiah(item.amount)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           );
         })
@@ -235,10 +253,18 @@ export default function GoalsScreen() {
       <Modal visible={fundGoalId !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setFundGoalId(null)}>
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>Tambah Dana</Text>
+          <Text style={styles.fieldLabel}>Dompet sumber</Text>
+          <View style={styles.walletRow}>
+            {wallets.map(w => (
+              <TouchableOpacity key={w.id} style={[styles.walletChip, fundWalletId === w.id && styles.walletChipActive]} onPress={() => setFundWalletId(w.id)}>
+                <Text style={[styles.chipWalletText, fundWalletId === w.id && { color: '#FFF' }]}>{w.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <NumericInput label="Jumlah dana" value={fundAmount} onChangeValue={setFundAmount} />
           <View style={styles.formButtons}>
             <Button title="Batal" variant="ghost" onPress={() => { setFundGoalId(null); setFundAmount(0); }} style={{ flex: 1 }} />
-            <Button title="Tambah" onPress={handleAddFunds} disabled={fundAmount <= 0} style={{ flex: 1 }} />
+            <Button title="Tambah" onPress={handleAddFunds} disabled={fundAmount <= 0 || !fundWalletId} style={{ flex: 1 }} />
           </View>
         </View>
       </Modal>
@@ -270,6 +296,11 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   collectedText: { ...theme.typography.caption, marginTop: 4 },
   deadlineText: { ...theme.typography.caption, color: theme.colors.warning, marginTop: 2 },
   walletText: { ...theme.typography.caption, marginTop: 2 },
+  history: { marginTop: theme.spacing.sm, paddingTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  historyTitle: { ...theme.typography.caption, color: theme.colors.textSecondary, marginBottom: 2 },
+  historyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
+  historyDate: { ...theme.typography.caption, color: theme.colors.textSecondary },
+  historyAmount: { ...theme.typography.caption, fontWeight: '600' },
   cardActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: theme.spacing.sm, gap: theme.spacing.md },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionText: { ...theme.typography.caption },

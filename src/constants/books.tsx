@@ -92,31 +92,36 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
   const deleteBook = useCallback(async (id: number) => {
     if (books.length <= 1) return;
+    const isActive = activeBook?.id === id;
     await db.withTransactionAsync(async () => {
-      const isActive = activeBook && activeBook.id === id;
-      await db.execAsync(`
-        DELETE FROM transactions WHERE book_id = ${id};
-        DELETE FROM budgets WHERE book_id = ${id};
-        DELETE FROM recurring_transactions WHERE book_id = ${id};
-        DELETE FROM savings_goals WHERE book_id = ${id};
-        DELETE FROM bill_reminders WHERE book_id = ${id};
-        DELETE FROM debts WHERE book_id = ${id};
-        DELETE FROM subscriptions WHERE book_id = ${id};
-        DELETE FROM assets WHERE book_id = ${id};
-        DELETE FROM liabilities WHERE book_id = ${id};
-        DELETE FROM net_worth_snapshots WHERE book_id = ${id};
-        DELETE FROM tags WHERE book_id = ${id};
-        DELETE FROM wallets WHERE book_id = ${id};
-        DELETE FROM categories WHERE book_id = ${id};
-        DELETE FROM books WHERE id = ${id};
-      `);
-      if (isActive) {
-        const remaining = await db.getFirstAsync<{ id: number }>(
-          'SELECT id FROM books WHERE is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 1'
-        );
-        if (remaining) await setActiveBook(remaining.id);
-      }
+      const childDeletes = [
+        'DELETE FROM transaction_tags WHERE book_id = ?',
+        'DELETE FROM transaction_attachments WHERE book_id = ?',
+        'DELETE FROM goal_contributions WHERE book_id = ?',
+        'DELETE FROM debt_payments WHERE book_id = ?',
+        'DELETE FROM transactions WHERE book_id = ?',
+        'DELETE FROM budgets WHERE book_id = ?',
+        'DELETE FROM recurring_transactions WHERE book_id = ?',
+        'DELETE FROM savings_goals WHERE book_id = ?',
+        'DELETE FROM bill_reminders WHERE book_id = ?',
+        'DELETE FROM debts WHERE book_id = ?',
+        'DELETE FROM subscriptions WHERE book_id = ?',
+        'DELETE FROM assets WHERE book_id = ?',
+        'DELETE FROM liabilities WHERE book_id = ?',
+        'DELETE FROM net_worth_snapshots WHERE book_id = ?',
+        'DELETE FROM tags WHERE book_id = ?',
+        'DELETE FROM wallets WHERE book_id = ?',
+        'DELETE FROM categories WHERE book_id = ?',
+      ];
+      for (const sql of childDeletes) await db.runAsync(sql, [id]);
+      await db.runAsync('DELETE FROM books WHERE id = ?', [id]);
     });
+    if (isActive) {
+      const remaining = await db.getFirstAsync<{ id: number }>(
+        'SELECT id FROM books WHERE is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 1'
+      );
+      if (remaining) await setActiveBook(remaining.id);
+    }
     await loadBooks();
   }, [db, loadBooks, books.length, activeBook, setActiveBook]);
 
