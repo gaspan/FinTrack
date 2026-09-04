@@ -100,7 +100,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
             style={[styles.colorButton, { backgroundColor: c }, color === c && styles.colorButtonActive]}
             onPress={() => setColor(c)}
           >
-            {color === c && <Ionicons name="checkmark" size={16} color="#FFF" />}
+            {color === c && <Ionicons name="checkmark" size={16} color={theme.colors.textOnPrimary} />}
           </TouchableOpacity>
         ))}
       </View>
@@ -128,7 +128,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   typeActive: { backgroundColor: theme.colors.expense, borderColor: theme.colors.expense },
   typeActiveIncome: { backgroundColor: theme.colors.income, borderColor: theme.colors.income },
   typeText: { ...theme.typography.body, color: theme.colors.textSecondary },
-  typeTextActive: { color: '#FFF', fontWeight: 'bold' },
+  typeTextActive: { color: theme.colors.textOnPrimary, fontWeight: 'bold' },
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: theme.spacing.md },
   iconButton: {
     width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: 'transparent',
@@ -137,10 +137,10 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: theme.spacing.xl },
   colorButton: {
-    width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center',
+    width: 36, height: 36, borderRadius: theme.radius.round, justifyContent: 'center', alignItems: 'center',
     marginRight: theme.spacing.sm, marginBottom: theme.spacing.sm,
   },
-  colorButtonActive: { borderWidth: 2, borderColor: '#FFF' },
+  colorButtonActive: { borderWidth: 2, borderColor: theme.colors.textOnPrimary },
   buttonRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: theme.spacing.md },
   button: { marginLeft: theme.spacing.sm },
 });

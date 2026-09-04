@@ -71,7 +71,7 @@ export const WalletForm: React.FC<WalletFormProps> = ({
             style={[styles.colorButton, { backgroundColor: c }, color === c && styles.colorButtonActive]}
             onPress={() => setColor(c)}
           >
-            {color === c && <Ionicons name="checkmark" size={16} color="#FFF" />}
+            {color === c && <Ionicons name="checkmark" size={16} color={theme.colors.textOnPrimary} />}
           </TouchableOpacity>
         ))}
       </View>
@@ -116,7 +116,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   iconButton: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: theme.radius.round,
     borderWidth: 2,
     borderColor: 'transparent',
     backgroundColor: theme.colors.surface,
@@ -131,14 +131,14 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   colorButton: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: theme.radius.round,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.sm,
   },
   colorButtonActive: {
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: theme.colors.textOnPrimary,
   },
   buttonRow: {
     flexDirection: 'row',

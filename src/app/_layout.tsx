@@ -23,6 +23,7 @@ SplashScreen.preventAutoHideAsync();
 // This component mounts INSIDE SQLiteProvider, meaning the DB is 100% ready.
 // It handles the boot logic (pin check, onboarding check) and safe navigation.
 function AppBootstrapper() {
+  const { theme } = useTheme();
   const rootNavigationState = useRootNavigationState();
   const [bootState, setBootState] = useState<'loading' | 'onboarding' | 'lock' | 'tabs'>('loading');
 
@@ -77,8 +78,8 @@ function AppBootstrapper() {
 
   if (bootState === 'loading' || !rootNavigationState?.key) {
     return (
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e', zIndex: 999 }}>
-        <ActivityIndicator size="large" color="#4ADE80" />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background, zIndex: 999 }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }

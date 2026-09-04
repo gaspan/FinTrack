@@ -13,7 +13,9 @@ import { Category } from '@/types';
 import { BudgetForm } from '@/components/forms/BudgetForm';
 import { RolloverEngine } from '@/features/rollover/rolloverEngine';
 import { formatRupiah } from '@/utils/format';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { hapticSuccess } from '@/utils/haptic';
+import { staggerDelay, shouldReduceMotion } from '@/utils/motion';
 
 export default function BudgetScreen() {
   const { theme } = useTheme();
@@ -111,7 +113,7 @@ export default function BudgetScreen() {
 
       {/* Category Budgets */}
       <View style={styles.list}>
-        {overall.items.map((item) => {
+        {overall.items.map((item, idx) => {
           const { category, budget, rollover } = item;
           const effectiveLimit = budget.monthly_limit + (budget.rollover_amount || 0);
           const pct = effectiveLimit > 0 ? (budget.spent / effectiveLimit) * 100 : 0;
@@ -121,8 +123,11 @@ export default function BudgetScreen() {
           const capped = Math.min(pct, 100);
 
           return (
+            <Animated.View
+              key={category.id}
+              entering={shouldReduceMotion() ? undefined : FadeInDown.duration(250).delay(staggerDelay(idx))}
+            >
             <TouchableOpacity 
-              key={category.id} 
               style={styles.budgetItem}
               activeOpacity={0.7}
               onPress={() => { setSelectedCategory(category); setCurrentLimit(budget.monthly_limit); setCurrentRollover(!!budget.rollover_enabled); setShowForm(true); }}
@@ -154,6 +159,7 @@ export default function BudgetScreen() {
                 </>
               )}
             </TouchableOpacity>
+            </Animated.View>
           );
         })}
       </View>
@@ -204,7 +210,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm },
   categoryInfo: { flexDirection: 'row', alignItems: 'center' },
-  iconContainer: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.sm },
+  iconContainer: { width: 36, height: 36, borderRadius: theme.radius.round, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.sm },
   categoryName: { ...theme.typography.body, fontWeight: '600' },
   budgetAmountInfo: { alignItems: 'flex-end' },
   spentAmount: { ...theme.typography.body, fontWeight: 'bold' },
@@ -212,6 +218,6 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   progressBarContainer: { height: 8, backgroundColor: theme.colors.surface, borderRadius: 4, overflow: 'hidden', marginTop: theme.spacing.xs },
   progressBar: { height: '100%', borderRadius: 4 },
   rolloverText: { ...theme.typography.caption, color: theme.colors.income, marginTop: theme.spacing.xs },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: theme.spacing.md },
+  modalOverlay: { flex: 1, backgroundColor: theme.colors.overlay, justifyContent: 'center', padding: theme.spacing.md },
   modalContent: { backgroundColor: theme.colors.surfaceElevated, borderRadius: theme.radius.lg, padding: theme.spacing.sm },
 });

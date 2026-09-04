@@ -367,7 +367,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   chip: { paddingHorizontal: theme.spacing.sm, paddingVertical: 7, borderRadius: theme.radius.round, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
   chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   chipText: { ...theme.typography.caption, color: theme.colors.textSecondary },
-  chipTextActive: { color: '#FFF', fontWeight: '600' },
+  chipTextActive: { color: theme.colors.textOnPrimary, fontWeight: '600' },
   previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   warningText: { ...theme.typography.caption, color: theme.colors.warning, marginTop: 4 },
   errorText: { ...theme.typography.caption, color: theme.colors.danger, marginTop: 2 },

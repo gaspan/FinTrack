@@ -232,7 +232,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   iconContainer: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: theme.radius.round,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.md,

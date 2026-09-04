@@ -19,6 +19,7 @@ import {
 } from '@/features/notifications/localNotifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CategoryQueries } from '@/lib/queries';
+import { hapticError, hapticLight, hapticSuccess } from '@/utils/haptic';
 import { Category, PayrollSettings } from '@/types';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
@@ -93,10 +94,12 @@ export default function SettingsScreen() {
   }, [db, bookId]));
 
   const handleThemeCycle = useCallback(() => {
+    hapticLight();
     cycleTheme();
   }, [cycleTheme]);
 
   const shiftReminderTime = useCallback((deltaMinutes: number) => {
+    hapticLight();
     setDailyReminderTime((prev) => {
       const [h, m] = prev.split(':').map(Number);
       const total = (h * 60 + m + deltaMinutes + 1440) % 1440;
@@ -109,6 +112,7 @@ export default function SettingsScreen() {
   }, [db]);
 
   const updatePayrollSetting = useCallback(<K extends keyof PayrollSettings>(key: K, value: PayrollSettings[K]) => {
+    hapticLight();
     setPayrollSettings(prev => {
       const next = { ...prev, [key]: value };
       if (key === 'enabled') AsyncStorage.setItem(PAYROLL_ENABLED_KEY, next.enabled ? 'true' : 'false');
@@ -149,8 +153,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/books' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#6366F120' }]}>
-              <Ionicons name="book-outline" size={20} color="#6366F1" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Ionicons name="book-outline" size={20} color={theme.colors.accent} />
             </View>
             <Text style={styles.itemTitle}>Pembukuan</Text>
           </View>
@@ -180,8 +184,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/recurring' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#6366F120' }]}>
-              <Ionicons name="sync-outline" size={20} color="#6366F1" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Ionicons name="sync-outline" size={20} color={theme.colors.accent} />
             </View>
             <Text style={styles.itemTitle}>Transaksi Berulang</Text>
           </View>
@@ -192,8 +196,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/transfer' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#38BDF820' }]}>
-              <Ionicons name="swap-horizontal-outline" size={20} color="#38BDF8" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.info + '20' }]}>
+              <Ionicons name="swap-horizontal-outline" size={20} color={theme.colors.info} />
             </View>
             <Text style={styles.itemTitle}>Transfer Antar Dompet</Text>
           </View>
@@ -228,8 +232,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/export' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#F59E0B20' }]}>
-              <Ionicons name="download-outline" size={20} color="#F59E0B" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.warning + '20' }]}>
+              <Ionicons name="download-outline" size={20} color={theme.colors.warning} />
             </View>
             <Text style={styles.itemTitle}>Ekspor Laporan (Excel)</Text>
           </View>
@@ -240,8 +244,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/annual' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
-              <Ionicons name="bar-chart-outline" size={20} color="#8B5CF6" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Ionicons name="bar-chart-outline" size={20} color={theme.colors.accent} />
             </View>
             <Text style={styles.itemTitle}>Laporan Tahunan</Text>
           </View>
@@ -252,8 +256,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/net-worth' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#10B98120' }]}>
-              <Ionicons name="wallet-outline" size={20} color="#10B981" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.success + '20' }]}>
+              <Ionicons name="wallet-outline" size={20} color={theme.colors.success} />
             </View>
             <Text style={styles.itemTitle}>Kekayaan Bersih</Text>
           </View>
@@ -264,8 +268,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/subscriptions' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
-              <Ionicons name="card-outline" size={20} color="#8B5CF6" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Ionicons name="card-outline" size={20} color={theme.colors.accent} />
             </View>
             <Text style={styles.itemTitle}>Langganan</Text>
           </View>
@@ -288,8 +292,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/forecast' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#0EA5E920' }]}>
-              <Ionicons name="trending-up-outline" size={20} color="#0EA5E9" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.info + '20' }]}>
+              <Ionicons name="trending-up-outline" size={20} color={theme.colors.info} />
             </View>
             <Text style={styles.itemTitle}>Proyeksi 30 Hari</Text>
           </View>
@@ -300,8 +304,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/transactions/calendar' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#A855F720' }]}>
-              <Ionicons name="calendar-outline" size={20} color="#A855F7" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Ionicons name="calendar-outline" size={20} color={theme.colors.accent} />
             </View>
             <Text style={styles.itemTitle}>Kalender Transaksi</Text>
           </View>
@@ -311,16 +315,17 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.item} onPress={() => {
+          hapticLight();
           const newVal = !safeToSpendEnabled;
           setSafeToSpendEnabled(newVal);
           AsyncStorage.setItem(SAFE_TO_SPEND_KEY, newVal ? 'true' : 'false');
         }}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#38BDF820' }]}>
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.info + '20' }]}>
               <Ionicons 
                 name={safeToSpendEnabled ? 'checkbox' : 'square-outline'} 
                 size={20} 
-                color="#38BDF8" 
+                color={theme.colors.info} 
               />
             </View>
             <Text style={styles.itemTitle}>Sisa Budget Harian</Text>
@@ -330,8 +335,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/import' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#10B98120' }]}>
-              <Ionicons name="cloud-upload-outline" size={20} color="#10B981" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.success + '20' }]}>
+              <Ionicons name="cloud-upload-outline" size={20} color={theme.colors.success} />
             </View>
             <Text style={styles.itemTitle}>Impor CSV Rekening Koran</Text>
           </View>
@@ -350,8 +355,8 @@ export default function SettingsScreen() {
           onPress={() => updatePayrollSetting('enabled', !payrollSettings.enabled)}
         >
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#10B98120' }]}>
-              <Ionicons name="cash-outline" size={20} color="#10B981" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.success + '20' }]}>
+              <Ionicons name="cash-outline" size={20} color={theme.colors.success} />
             </View>
             <View>
               <Text style={styles.itemTitle}>Hitung Dashboard per Gaji</Text>
@@ -420,6 +425,7 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={styles.item}
           onPress={async () => {
+            hapticLight();
             const newVal = !notifEnabled;
             setNotifEnabled(newVal);
             await AsyncStorage.setItem(NOTIF_ENABLED_KEY, newVal ? 'true' : 'false');
@@ -432,8 +438,8 @@ export default function SettingsScreen() {
           }}
         >
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#F59E0B20' }]}>
-              <Ionicons name={notifEnabled ? 'notifications' : 'notifications-off-outline'} size={20} color="#F59E0B" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.warning + '20' }]}>
+              <Ionicons name={notifEnabled ? 'notifications' : 'notifications-off-outline'} size={20} color={theme.colors.warning} />
             </View>
             <Text style={styles.itemTitle}>Notifikasi</Text>
           </View>
@@ -445,6 +451,7 @@ export default function SettingsScreen() {
             <TouchableOpacity
               style={styles.item}
               onPress={async () => {
+                hapticLight();
                 const newVal = !dailyReminder;
                 setDailyReminder(newVal);
                 await AsyncStorage.setItem(DAILY_REMINDER_KEY, newVal ? 'true' : 'false');
@@ -452,8 +459,8 @@ export default function SettingsScreen() {
               }}
             >
               <View style={styles.itemLeft}>
-                <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
-                  <Ionicons name={dailyReminder ? 'checkbox' : 'square-outline'} size={20} color="#8B5CF6" />
+                <View style={[styles.iconBg, { backgroundColor: theme.colors.accent + '20' }]}>
+                  <Ionicons name={dailyReminder ? 'checkbox' : 'square-outline'} size={20} color={theme.colors.accent} />
                 </View>
                 <Text style={styles.itemTitle}>Pengingat Harian</Text>
               </View>
@@ -463,8 +470,8 @@ export default function SettingsScreen() {
             {dailyReminder && (
               <View style={styles.item}>
                 <View style={styles.itemLeft}>
-                  <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
-                    <Ionicons name="time-outline" size={20} color="#8B5CF6" />
+                  <View style={[styles.iconBg, { backgroundColor: theme.colors.accent + '20' }]}>
+                    <Ionicons name="time-outline" size={20} color={theme.colors.accent} />
                   </View>
                   <Text style={styles.itemTitle}>Jam pengingat</Text>
                 </View>
@@ -489,8 +496,8 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={() => router.push('/lock' as any)}>
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#6366F120' }]}>
-              <Ionicons name="lock-closed-outline" size={20} color="#6366F1" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Ionicons name="lock-closed-outline" size={20} color={theme.colors.accent} />
             </View>
             <Text style={styles.itemTitle}>Kunci Aplikasi</Text>
           </View>
@@ -530,7 +537,7 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.item} onPress={async () => {
           setBackingUp(true);
-          try { await exportBackup(db); } catch (e: any) { if (e?.message !== 'Pembatalan') Alert.alert('Error', 'Gagal backup'); }
+          try { await exportBackup(db); hapticSuccess(); } catch (e: any) { if (e?.message !== 'Pembatalan') { hapticError(); Alert.alert('Error', 'Gagal backup'); } }
           finally { setBackingUp(false); }
         }} disabled={backingUp}>
           <View style={styles.itemLeft}>
@@ -546,9 +553,10 @@ export default function SettingsScreen() {
           setImporting(true);
           try {
             const msg = await importBackup(db);
+            hapticSuccess();
             Alert.alert('Restore Berhasil', msg);
           } catch (e: any) {
-            if (e?.message !== 'Pembatalan') Alert.alert('Error', e?.message || 'Gagal restore');
+            if (e?.message !== 'Pembatalan') { hapticError(); Alert.alert('Error', e?.message || 'Gagal restore'); }
           }
           finally { setImporting(false); }
         }} disabled={importing}>
@@ -582,14 +590,15 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={styles.item}
           onPress={() => {
+            hapticLight();
             const newVal = !autoBackupEnabled;
             setAutoBackupEnabled(newVal);
             AsyncStorage.setItem(AUTO_BACKUP_ENABLED_KEY, newVal ? 'true' : 'false');
           }}
         >
           <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#38BDF820' }]}>
-              <Ionicons name="refresh-circle-outline" size={20} color="#38BDF8" />
+            <View style={[styles.iconBg, { backgroundColor: theme.colors.info + '20' }]}>
+              <Ionicons name="refresh-circle-outline" size={20} color={theme.colors.info} />
             </View>
             <View>
               <Text style={styles.itemTitle}>Backup Otomatis</Text>
@@ -619,6 +628,7 @@ export default function SettingsScreen() {
                     backupInterval === opt.days && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
                   ]}
                   onPress={() => {
+                    hapticLight();
                     setBackupInterval(opt.days);
                     AsyncStorage.setItem(BACKUP_INTERVAL_KEY, String(opt.days));
                   }}
@@ -666,7 +676,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   itemLeft: { flexDirection: 'row', alignItems: 'center' },
   itemRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  iconBg: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
+  iconBg: { width: 36, height: 36, borderRadius: theme.radius.round, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   itemTitle: { ...theme.typography.body, fontWeight: '500' },
   itemSub: { ...theme.typography.caption },
   payrollConfig: {

@@ -285,8 +285,8 @@ export default function RecurringScreen() {
                   style={[styles.walletChip, formWallet === w.id && styles.walletChipActive]}
                   onPress={() => setFormWallet(w.id)}
                 >
-                  {w.icon && <Ionicons name={w.icon as any} size={16} color={formWallet === w.id ? '#FFF' : w.color || theme.colors.textSecondary} style={{ marginRight: 4 }} />}
-                  <Text style={[styles.walletText, formWallet === w.id && { color: '#FFF' }]}>{w.name}</Text>
+                  {w.icon && <Ionicons name={w.icon as any} size={16} color={formWallet === w.id ? theme.colors.textOnPrimary : w.color || theme.colors.textSecondary} style={{ marginRight: 4 }} />}
+                  <Text style={[styles.walletText, formWallet === w.id && { color: theme.colors.textOnPrimary }]}>{w.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -342,16 +342,16 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   typeExpense: { backgroundColor: theme.colors.expense },
   typeIncome: { backgroundColor: theme.colors.income },
   typeTabText: { ...theme.typography.body, color: theme.colors.textSecondary },
-  typeTabTextActive: { color: '#FFF', fontWeight: 'bold' },
+  typeTabTextActive: { color: theme.colors.textOnPrimary, fontWeight: 'bold' },
   fieldLabel: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginBottom: theme.spacing.sm, marginTop: theme.spacing.sm },
   freqRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
   freqChip: { paddingVertical: 8, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.round, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
   freqChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   freqText: { ...theme.typography.bodySmall, color: theme.colors.textSecondary },
-  freqTextActive: { color: '#FFF', fontWeight: '600' },
+  freqTextActive: { color: theme.colors.textOnPrimary, fontWeight: '600' },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: theme.spacing.md, marginHorizontal: -4 },
   catItem: { width: '25%', alignItems: 'center', padding: 4, marginBottom: theme.spacing.sm, borderWidth: 1, borderColor: 'transparent', borderRadius: theme.radius.sm },
-  catIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  catIcon: { width: 44, height: 44, borderRadius: theme.radius.round, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
   catName: { ...theme.typography.caption, textAlign: 'center' },
   walletRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
   walletChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm, borderRadius: theme.radius.round },

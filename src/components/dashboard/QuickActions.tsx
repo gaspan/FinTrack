@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import Animated from 'react-native-reanimated';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { hapticLight } from '@/utils/haptic';
 import { Card } from '@/components/ui/Card';
 
 interface Action {
@@ -20,6 +22,49 @@ const ACTIONS: Action[] = [
   { label: 'Target', icon: 'flag', color: (t) => t.colors.accent, route: '/goals' },
 ];
 
+const QuickActionItem: React.FC<{
+  action: Action;
+  color: string;
+  itemStyle: object;
+  touchStyle: object;
+  iconWrapStyle: object;
+  labelStyle: object;
+}> = ({ action, color, itemStyle, touchStyle, iconWrapStyle, labelStyle }) => {
+  const [pressed, setPressed] = useState(false);
+
+  return (
+    <Animated.View
+      style={[
+        itemStyle,
+        {
+          transform: [{ scale: pressed ? 0.9 : 1 }],
+          transitionProperty: 'transform',
+          transitionDuration: 150,
+          transitionTimingFunction: 'ease',
+        },
+      ]}
+    >
+      <TouchableOpacity
+        style={touchStyle}
+        activeOpacity={0.7}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        onPress={() => {
+          hapticLight();
+          router.push(action.route as any);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={action.label}
+      >
+        <View style={[iconWrapStyle, { backgroundColor: `${color}1F` }]}>
+          <Ionicons name={action.icon} size={21} color={color} />
+        </View>
+        <Text style={labelStyle}>{action.label}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export const QuickActions: React.FC = () => {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -34,24 +79,17 @@ export const QuickActions: React.FC = () => {
         <Ionicons name="flash-outline" size={18} color={theme.colors.warning} />
       </View>
       <View style={styles.row}>
-        {ACTIONS.map((a) => {
-          const color = a.color(theme);
-          return (
-            <TouchableOpacity
-              key={a.label}
-              style={styles.item}
-              activeOpacity={0.7}
-              onPress={() => router.push(a.route as any)}
-              accessibilityRole="button"
-              accessibilityLabel={a.label}
-            >
-              <View style={[styles.iconWrap, { backgroundColor: `${color}1F` }]}>
-                <Ionicons name={a.icon} size={21} color={color} />
-              </View>
-              <Text style={styles.label}>{a.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        {ACTIONS.map((a) => (
+          <QuickActionItem
+            key={a.label}
+            action={a}
+            color={a.color(theme)}
+            itemStyle={styles.item}
+            touchStyle={styles.touch}
+            iconWrapStyle={styles.iconWrap}
+            labelStyle={styles.label}
+          />
+        ))}
       </View>
     </Card>
   );
@@ -82,7 +120,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  item: { alignItems: 'center', flex: 1, gap: 6 },
+  item: { flex: 1 },
+  touch: { alignItems: 'center', gap: 6 },
   iconWrap: {
     width: 44,
     height: 44,

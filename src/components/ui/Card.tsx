@@ -33,10 +33,6 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   elevated: {
     backgroundColor: theme.colors.surfaceElevated,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...theme.shadow.md,
   }
 });

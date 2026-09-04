@@ -70,6 +70,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const filteredCategories = categories.filter(c => c.type === type);
 
   const handleTypeChange = (newType: TransactionType) => {
+    if (newType === type) return;
+    hapticLight();
     setType(newType);
     const newFiltered = categories.filter(c => c.type === newType);
     if (newFiltered.length > 0) {
@@ -177,7 +179,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               <TouchableOpacity
                 key={q}
                 style={[styles.quickChip, amount === q && styles.quickChipActive]}
-                onPress={() => setAmount(q)}
+                onPress={() => { setAmount(q); hapticLight(); }}
               >
                 <Text style={[styles.quickChipText, amount === q && styles.quickChipTextActive]}>
                   {q >= 1000 ? `${(q / 1000).toLocaleString('id')}K` : String(q)}
@@ -224,7 +226,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   <Ionicons 
                     name={cat.icon as any} 
                     size={24} 
-                    color={categoryId === cat.id ? '#FFF' : cat.color} 
+                    color={categoryId === cat.id ? theme.colors.textOnPrimary : cat.color} 
                   />
                 </View>
                 <Text style={[
@@ -250,13 +252,13 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   styles.walletChip,
                   walletId === wallet.id && styles.walletChipActive
                 ]}
-                onPress={() => setWalletId(wallet.id)}
+                onPress={() => { setWalletId(wallet.id); hapticLight(); }}
               >
                 {wallet.icon && (
                   <Ionicons 
                     name={wallet.icon as any} 
                     size={16} 
-                    color={walletId === wallet.id ? '#FFF' : wallet.color || theme.colors.textSecondary}
+                    color={walletId === wallet.id ? theme.colors.textOnPrimary : wallet.color || theme.colors.textSecondary}
                     style={{ marginRight: 6 }}
                   />
                 )}
@@ -302,7 +304,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     style={styles.attachmentRemove}
                     onPress={() => removeAttachment(idx)}
                   >
-                    <Ionicons name="close-circle" size={20} color="#EF4444" />
+                    <Ionicons name="close-circle" size={20} color={theme.colors.danger} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -360,20 +362,20 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 }}
                 styles={{
                   ...defaultStyles,
-                  header: { backgroundColor: '#4A90D9', borderBottomWidth: 0 },
-                  month_selector_label: { color: '#FFFFFF', fontWeight: '600' },
-                  year_selector_label: { color: '#FFFFFF', fontWeight: '600' },
-                  button_prev_image: { tintColor: '#FFFFFF' },
-                  button_next_image: { tintColor: '#FFFFFF' },
-                  weekdays: { backgroundColor: '#F0F4FF' },
-                  weekday_label: { color: '#4A90D9', fontWeight: '600' },
-                  day: { backgroundColor: '#FFFFFF' },
-                  day_label: { color: '#1A1A2E' },
-                  selected: { backgroundColor: '#4A90D9', borderRadius: 8 },
-                  selected_label: { color: '#FFFFFF', fontWeight: '700' },
-                  today: { borderColor: '#4A90D9', borderWidth: 2, borderRadius: 8 },
-                  today_label: { color: '#4A90D9', fontWeight: '700' },
-                  days: { backgroundColor: '#F8FAFF' },
+                  header: { backgroundColor: theme.colors.primary, borderBottomWidth: 0 },
+                  month_selector_label: { color: theme.colors.textOnPrimary, fontWeight: '600' },
+                  year_selector_label: { color: theme.colors.textOnPrimary, fontWeight: '600' },
+                  button_prev_image: { tintColor: theme.colors.textOnPrimary },
+                  button_next_image: { tintColor: theme.colors.textOnPrimary },
+                  weekdays: { backgroundColor: theme.colors.surfaceElevated },
+                  weekday_label: { color: theme.colors.primary, fontWeight: '600' },
+                  day: { backgroundColor: theme.colors.surface },
+                  day_label: { color: theme.colors.textPrimary },
+                  selected: { backgroundColor: theme.colors.primary, borderRadius: 8 },
+                  selected_label: { color: theme.colors.textOnPrimary, fontWeight: '700' },
+                  today: { borderColor: theme.colors.primary, borderWidth: 2, borderRadius: 8 },
+                  today_label: { color: theme.colors.primary, fontWeight: '700' },
+                  days: { backgroundColor: theme.colors.surface },
                 }}
               />
             </View>
@@ -415,7 +417,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '500',
   },
   typeTextActive: {
-    color: '#FFF',
+    color: theme.colors.textOnPrimary,
     fontWeight: 'bold',
   },
   scrollContent: {
@@ -436,7 +438,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   quickChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   quickChipText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '600' },
-  quickChipTextActive: { color: '#FFF' },
+  quickChipTextActive: { color: theme.colors.textOnPrimary },
   section: {
     marginBottom: theme.spacing.xl,
   },
@@ -475,7 +477,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   categoryIconContainer: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: theme.radius.round,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.xs,
@@ -511,7 +513,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '500',
   },
   walletChipTextActive: {
-    color: '#FFF',
+    color: theme.colors.textOnPrimary,
     fontWeight: 'bold',
   },
   footer: {
@@ -523,7 +525,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {

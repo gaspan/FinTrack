@@ -502,7 +502,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   itemHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   itemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   icon: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 36, height: 36, borderRadius: theme.radius.round,
     justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.sm,
   },
   itemName: { ...theme.typography.body, fontWeight: '600' },

@@ -5,6 +5,7 @@ import { useFocusEffect, router } from 'expo-router';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { useBook } from '@/constants/books';
@@ -27,6 +28,7 @@ import { AnalyticsCard } from '@/components/dashboard/AnalyticsCard';
 import { BudgetProgressCard, type BudgetRow } from '@/components/dashboard/BudgetProgressCard';
 import { GoalsStrip } from '@/components/dashboard/GoalsStrip';
 import { loadInsights } from '@/features/insights';
+import { staggerDelay, shouldReduceMotion } from '@/utils/motion';
 import { calculateSafeToSpend } from '@/features/forecast/forecastEngine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -445,8 +447,11 @@ export default function DashboardScreen() {
               />
               <Card>
                 {recentTransactions.map((tx, i) => (
-                  <TouchableOpacity
+                  <Animated.View
                     key={tx.id}
+                    entering={shouldReduceMotion() ? undefined : FadeInDown.duration(250).delay(staggerDelay(i))}
+                  >
+                  <TouchableOpacity
                     style={[styles.recentItem, i > 0 && styles.recentItemBorder]}
                     activeOpacity={0.7}
                     onPress={() => router.push(`/transaction/${tx.id}` as any)}
@@ -467,6 +472,7 @@ export default function DashboardScreen() {
                       {tx.type === 'income' ? '+' : '-'}{formatRp(tx.amount)}
                     </Text>
                   </TouchableOpacity>
+                  </Animated.View>
                 ))}
               </Card>
             </View>
@@ -533,7 +539,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   emptyIcon: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: theme.radius.round,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: `${theme.colors.primary}1A`,
@@ -545,7 +551,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   emptyArrow: {
     width: 30,
     height: 30,
-    borderRadius: 15,
+    borderRadius: theme.radius.round,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: `${theme.colors.primary}1A`,
@@ -560,7 +566,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   pwIcon: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: theme.radius.round,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.sm,
@@ -577,7 +583,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   recentIcon: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: theme.radius.round,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.sm,

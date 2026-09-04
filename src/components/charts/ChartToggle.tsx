@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme, type Theme } from '@/constants/theme';
+import { hapticLight } from '@/utils/haptic';
 
 interface ChartToggleProps {
   options: { label: string; value: string }[];
@@ -19,7 +20,12 @@ export const ChartToggle: React.FC<ChartToggleProps> = ({ options, value, onChan
           <TouchableOpacity
             key={option.value}
             activeOpacity={0.8}
-            onPress={() => onChange(option.value)}
+            onPress={() => {
+              if (option.value !== value) {
+                hapticLight();
+                onChange(option.value);
+              }
+            }}
             style={[
               styles.option,
               isSelected && styles.optionSelected,
@@ -71,7 +77,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '500',
   },
   textSelected: {
-    color: '#FFF',
+    color: theme.colors.textOnPrimary,
     fontWeight: 'bold',
   },
 });

@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { useTheme, type Theme } from '@/constants/theme';
+import { hapticLight } from '@/utils/haptic';
 import { Card } from '@/components/ui/Card';
 import { ChartToggle } from '@/components/charts/ChartToggle';
 import { OverviewDonutChart } from '@/components/charts/OverviewDonutChart';
@@ -49,7 +51,10 @@ export const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
             <TouchableOpacity
               key={t.key}
               style={[styles.segmentItem, active && styles.segmentItemActive]}
-              onPress={() => setTab(t.key)}
+              onPress={() => {
+                if (t.key !== tab) hapticLight();
+                setTab(t.key);
+              }}
               activeOpacity={0.8}
             >
               <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{t.label}</Text>
@@ -59,11 +64,13 @@ export const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
       </View>
 
       {tab === 'ringkas' && (
-        <OverviewDonutChart income={income} expense={expense} />
+        <Animated.View key="ringkas" entering={FadeIn.duration(200)}>
+          <OverviewDonutChart income={income} expense={expense} />
+        </Animated.View>
       )}
 
       {tab === 'kategori' && (
-        <>
+        <Animated.View key={`kategori-${chartType}`} entering={FadeIn.duration(200)}>
           <ChartToggle
             options={[
               { label: 'Pemasukan', value: 'income' },
@@ -76,10 +83,14 @@ export const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
           <View style={styles.divider} />
           <Text style={styles.subTitle}>Komparasi Nominal</Text>
           <CategoryBarChart data={chartData} />
-        </>
+        </Animated.View>
       )}
 
-      {tab === 'tren' && <MonthlyTrendChart data={trendData} />}
+      {tab === 'tren' && (
+        <Animated.View key="tren" entering={FadeIn.duration(200)}>
+          <MonthlyTrendChart data={trendData} />
+        </Animated.View>
+      )}
     </Card>
   );
 };

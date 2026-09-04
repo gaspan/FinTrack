@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import Animated, { useSharedValue, useAnimatedProps, withTiming } from 'react-native-reanimated';
 import { useTheme } from '@/constants/theme';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface ProgressRingProps {
   progress: number;
@@ -26,6 +29,15 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - pct / 100);
   const ringColor = color ?? theme.colors.primary;
+  const offsetSV = useSharedValue(offset);
+
+  useEffect(() => {
+    offsetSV.value = withTiming(offset, { duration: 500 });
+  }, [offset, offsetSV]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: offsetSV.value,
+  }));
 
   return (
     <View style={{ width: size, height: size }}>
@@ -38,7 +50,7 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
           strokeWidth={strokeWidth}
           fill="none"
         />
-        <Circle
+        <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
           r={radius}
@@ -46,9 +58,9 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={offset}
           fill="none"
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          animatedProps={animatedProps}
         />
       </Svg>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">

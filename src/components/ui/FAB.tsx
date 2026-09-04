@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 import { useTheme } from '@/constants/theme';
 import { hapticLight } from '@/utils/haptic';
 
@@ -13,41 +14,53 @@ export const FAB = () => {
   const segments = useSegments();
 
   const hidden = HIDDEN_ON.includes(segments[segments.length - 1] as string);
+  const [pressed, setPressed] = useState(false);
 
   const styles = useMemo(() => StyleSheet.create({
-    fab: {
+    fabWrap: {
       position: 'absolute',
       right: theme.spacing.lg,
       bottom: Platform.OS === 'ios' ? 96 : 80,
+      zIndex: 100,
+    },
+    fab: {
       width: 56,
       height: 56,
-      borderRadius: 28,
+      borderRadius: theme.radius.round,
       backgroundColor: theme.colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 100,
-      elevation: 6,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
+      ...theme.shadow.md,
     },
   }), [theme]);
 
   if (hidden) return null;
 
   return (
-    <TouchableOpacity
-      style={styles.fab}
-      activeOpacity={0.85}
-      accessibilityRole="button"
-      accessibilityLabel="Tambah transaksi"
-      onPress={() => {
-        hapticLight();
-        router.push('/(tabs)/add' as any);
-      }}
-    >
-      <Ionicons name="add" size={26} color="#FFF" />
-    </TouchableOpacity>
+    <Animated.View style={styles.fabWrap} entering={ZoomIn.duration(300)}>
+      <Animated.View
+        style={{
+          transform: [{ scale: pressed ? 0.88 : 1 }],
+          transitionProperty: 'transform',
+          transitionDuration: 150,
+          transitionTimingFunction: 'ease',
+        }}
+      >
+        <TouchableOpacity
+          style={styles.fab}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Tambah transaksi"
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+          onPress={() => {
+            hapticLight();
+            router.push('/(tabs)/add' as any);
+          }}
+        >
+          <Ionicons name="add" size={26} color={theme.colors.textOnPrimary} />
+        </TouchableOpacity>
+      </Animated.View>
+    </Animated.View>
   );
 };

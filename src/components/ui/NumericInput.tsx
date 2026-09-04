@@ -34,9 +34,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
       marginBottom: theme.spacing.md,
     },
     label: {
-      fontSize: 12,
-      fontWeight: '400',
-      color: theme.colors.textSecondary,
+      ...theme.typography.bodySmall,
       marginBottom: theme.spacing.xs,
     },
     inputContainer: {
@@ -56,21 +54,17 @@ export const NumericInput: React.FC<NumericInputProps> = ({
       borderColor: theme.colors.danger,
     },
     prefix: {
-      fontSize: 24,
-      fontWeight: 'bold',
+      ...theme.typography.h2,
       color: theme.colors.textSecondary,
       marginRight: theme.spacing.sm,
     },
     input: {
+      ...theme.typography.h2,
       flex: 1,
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: theme.colors.textPrimary,
       paddingVertical: 0,
     },
     errorText: {
-      fontSize: 10,
-      fontWeight: '400',
+      ...theme.typography.caption,
       color: theme.colors.danger,
       marginTop: theme.spacing.xs,
     },

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, TouchableOpacityProps, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/constants/theme';
+import { useTheme, fonts } from '@/constants/theme';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -58,12 +58,12 @@ export const Button: React.FC<ButtonProps> = ({
       borderColor: theme.colors.border,
     },
     text: {
-      fontSize: 14,
-      fontWeight: '600',
+      ...theme.typography.body,
+      fontFamily: fonts.semibold,
       color: theme.colors.primary,
     },
     textPrimary: {
-      color: '#FFF',
+      color: theme.colors.textOnPrimary,
     },
     textDanger: {
       color: theme.colors.danger,
@@ -76,7 +76,7 @@ export const Button: React.FC<ButtonProps> = ({
   const content = (
     <View style={styles.content}>
       {loading ? (
-        <ActivityIndicator color={isPrimary ? '#FFF' : theme.colors.primary} />
+        <ActivityIndicator color={isPrimary ? theme.colors.textOnPrimary : theme.colors.primary} />
       ) : (
         <Text style={[
           styles.text, 

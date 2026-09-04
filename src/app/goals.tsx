@@ -216,12 +216,12 @@ export default function GoalsScreen() {
           <Text style={styles.fieldLabel}>Dompet (opsional)</Text>
           <View style={styles.walletRow}>
             <TouchableOpacity style={[styles.walletChip, formWallet === null && styles.walletChipActive]} onPress={() => setFormWallet(null)}>
-              <Text style={[styles.chipWalletText, formWallet === null && { color: '#FFF' }]}>Tidak ada</Text>
+              <Text style={[styles.chipWalletText, formWallet === null && { color: theme.colors.textOnPrimary }]}>Tidak ada</Text>
             </TouchableOpacity>
             {wallets.map(w => (
               <TouchableOpacity key={w.id} style={[styles.walletChip, formWallet === w.id && styles.walletChipActive]} onPress={() => setFormWallet(w.id)}>
-                {w.icon && <Ionicons name={w.icon as any} size={16} color={formWallet === w.id ? '#FFF' : w.color || theme.colors.textSecondary} style={{ marginRight: 4 }} />}
-                <Text style={[styles.chipWalletText, formWallet === w.id && { color: '#FFF' }]}>{w.name}</Text>
+                {w.icon && <Ionicons name={w.icon as any} size={16} color={formWallet === w.id ? theme.colors.textOnPrimary : w.color || theme.colors.textSecondary} style={{ marginRight: 4 }} />}
+                <Text style={[styles.chipWalletText, formWallet === w.id && { color: theme.colors.textOnPrimary }]}>{w.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -257,7 +257,7 @@ export default function GoalsScreen() {
           <View style={styles.walletRow}>
             {wallets.map(w => (
               <TouchableOpacity key={w.id} style={[styles.walletChip, fundWalletId === w.id && styles.walletChipActive]} onPress={() => setFundWalletId(w.id)}>
-                <Text style={[styles.chipWalletText, fundWalletId === w.id && { color: '#FFF' }]}>{w.name}</Text>
+                <Text style={[styles.chipWalletText, fundWalletId === w.id && { color: theme.colors.textOnPrimary }]}>{w.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -285,7 +285,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   cardComplete: { opacity: 0.7 },
   cardHeader: { flexDirection: 'row', alignItems: 'center' },
-  goalIcon: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
+  goalIcon: { width: 48, height: 48, borderRadius: theme.radius.round, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   goalInfo: { flex: 1 },
   goalName: { ...theme.typography.body, fontWeight: '600' },
   goalTarget: { ...theme.typography.bodySmall },
@@ -315,6 +315,6 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   iconItem: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
   colorItem: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
-  colorActive: { borderColor: '#FFF' },
+  colorActive: { borderColor: theme.colors.textOnPrimary },
   formButtons: { flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.xl, marginBottom: 40 },
 });

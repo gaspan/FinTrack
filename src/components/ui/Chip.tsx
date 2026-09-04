@@ -35,7 +35,7 @@ export const Chip: React.FC<ChipProps> = ({
         <Ionicons 
           name={icon} 
           size={16} 
-          color={selected ? '#FFF' : theme.colors.textSecondary} 
+          color={selected ? theme.colors.textOnPrimary : theme.colors.textSecondary} 
           style={styles.icon} 
         />
       )}
@@ -74,7 +74,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '500',
   },
   selectedLabel: {
-    color: '#FFF',
+    color: theme.colors.textOnPrimary,
     fontWeight: '600',
   }
 });

@@ -13,7 +13,9 @@ import { TransactionWithDetails, Category, Wallet, Tag } from '@/types';
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatRupiah } from '@/utils/format';
-import { hapticMedium } from '@/utils/haptic';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { hapticHeavy, hapticMedium } from '@/utils/haptic';
+import { staggerDelay, shouldReduceMotion } from '@/utils/motion';
 import { ListSkeleton } from '@/components/ui/Skeleton';
 
 dayjs.locale('id');
@@ -143,13 +145,14 @@ export default function TransactionsScreen() {
 
   const handleDeleteTx = async (id: number) => {
     try {
+      hapticHeavy();
       await new TransactionQueries(db, bookId).delete(id);
-      hapticMedium();
       loadInitialData();
     } catch (e) { console.error(e); }
   };
 
-  const renderItem = ({ item }: { item: TransactionWithDetails }) => (
+  const renderItem = ({ item, index }: { item: TransactionWithDetails; index: number }) => (
+    <Animated.View entering={shouldReduceMotion() ? undefined : FadeInDown.duration(250).delay(staggerDelay(index))}>
     <TouchableOpacity 
       style={styles.txItem}
       activeOpacity={0.7}
@@ -194,6 +197,7 @@ export default function TransactionsScreen() {
         </Text>
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
 
   const renderFooter = () => {
@@ -207,7 +211,6 @@ export default function TransactionsScreen() {
   };
 
   const renderEmpty = () => {
-    if (initialLoading) return <ListSkeleton />;
     return (
       <EmptyState 
         title={hasActiveFilter ? "Tidak Ada Hasil" : "Belum Ada Transaksi"}
@@ -264,7 +267,7 @@ export default function TransactionsScreen() {
               style={[styles.filterChip, filterCategory === cat.id && styles.filterChipActive]}
               onPress={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
             >
-              <Ionicons name={cat.icon as any} size={14} color={filterCategory === cat.id ? '#FFF' : cat.color} style={{ marginRight: 4 }} />
+              <Ionicons name={cat.icon as any} size={14} color={filterCategory === cat.id ? theme.colors.textOnPrimary : cat.color} style={{ marginRight: 4 }} />
               <Text style={[styles.filterChipText, filterCategory === cat.id && styles.filterChipTextActive]}>{cat.name}</Text>
             </TouchableOpacity>
           ))}
@@ -274,7 +277,7 @@ export default function TransactionsScreen() {
               style={[styles.filterChip, filterWallet === w.id && styles.filterChipActive]}
               onPress={() => setFilterWallet(filterWallet === w.id ? null : w.id)}
             >
-              {w.icon && <Ionicons name={w.icon as any} size={14} color={filterWallet === w.id ? '#FFF' : w.color || theme.colors.textSecondary} style={{ marginRight: 4 }} />}
+              {w.icon && <Ionicons name={w.icon as any} size={14} color={filterWallet === w.id ? theme.colors.textOnPrimary : w.color || theme.colors.textSecondary} style={{ marginRight: 4 }} />}
               <Text style={[styles.filterChipText, filterWallet === w.id && styles.filterChipTextActive]}>{w.name}</Text>
             </TouchableOpacity>
           ))}
@@ -361,7 +364,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   filterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   filterChipText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '500' },
-  filterChipTextActive: { color: '#FFF' },
+  filterChipTextActive: { color: theme.colors.textOnPrimary },
   clearBtn: { alignSelf: 'center', marginBottom: theme.spacing.xs },
   clearBtnText: { ...theme.typography.caption, color: theme.colors.primary, textDecorationLine: 'underline' },
   summaryBar: {
@@ -382,7 +385,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
   },
   iconContainer: {
-    width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center',
+    width: 48, height: 48, borderRadius: theme.radius.round, justifyContent: 'center', alignItems: 'center',
     marginRight: theme.spacing.md,
   },
   txDetails: { flex: 1 },

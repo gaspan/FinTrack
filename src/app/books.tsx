@@ -213,7 +213,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center',
     backgroundColor: theme.colors.surfaceElevated, borderWidth: 1, borderColor: theme.colors.border,
   },
-  colorOption: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  colorOption: { width: 36, height: 36, borderRadius: theme.radius.round, justifyContent: 'center', alignItems: 'center' },
   colorSelected: { borderWidth: 3, borderColor: theme.colors.textPrimary },
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.md, marginTop: theme.spacing.lg },
   btn: { flex: 1, paddingVertical: theme.spacing.md, borderRadius: theme.radius.md, alignItems: 'center' },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { Text, ScrollView, StyleSheet, Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Props { children: React.ReactNode }
@@ -18,6 +18,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      // Above ThemeProvider, so follow the OS color scheme directly.
+      const dark = Appearance.getColorScheme() !== 'light';
+      const styles = makeStyles(dark);
       return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
           <Text style={styles.title}>Terjadi kesalahan</Text>
@@ -30,10 +33,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+const makeStyles = (dark: boolean) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: dark ? '#0A0E1A' : '#F8F9FA' },
   content: { padding: 24, paddingTop: 80 },
-  title: { color: '#EF4444', fontSize: 20, fontWeight: '700', marginBottom: 12 },
-  message: { color: '#fff', fontSize: 15, marginBottom: 16 },
-  stack: { color: '#94A3B8', fontSize: 11, fontFamily: 'Courier' },
+  title: { color: '#FF4C4C', fontSize: 20, fontWeight: '700', marginBottom: 12 },
+  message: { color: dark ? '#FFFFFF' : '#1A1A2E', fontSize: 15, marginBottom: 16 },
+  stack: { color: dark ? '#8B95B0' : '#6B7280', fontSize: 11, fontFamily: 'monospace' },
 });

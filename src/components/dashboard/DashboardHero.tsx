@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -91,9 +92,15 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
       )}
 
       <Text style={styles.balanceLabel}>Saldo seluruh dompet</Text>
-      <Text style={styles.balanceValue} numberOfLines={1} adjustsFontSizeToFit>
+      <Animated.Text
+        key={totalBalance}
+        entering={FadeIn.duration(300)}
+        style={styles.balanceValue}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
         {formatRupiah(totalBalance)}
-      </Text>
+      </Animated.Text>
 
       <View style={styles.chipRow}>
         <View style={styles.chip}>
@@ -118,9 +125,15 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
             <Ionicons name="arrow-down-circle" size={13} color={theme.colors.income} />
             <Text style={styles.splitLabel}>Pemasukan</Text>
           </View>
-          <Text style={styles.splitValue} numberOfLines={1} adjustsFontSizeToFit>
+          <Animated.Text
+            key={income}
+            entering={FadeIn.duration(300)}
+            style={styles.splitValue}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             {formatRupiah(income)}
-          </Text>
+          </Animated.Text>
         </View>
         <View style={styles.splitDivider} />
         <View style={styles.splitCell}>
@@ -128,9 +141,15 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
             <Ionicons name="arrow-up-circle" size={13} color={theme.colors.expense} />
             <Text style={styles.splitLabel}>Pengeluaran</Text>
           </View>
-          <Text style={styles.splitValue} numberOfLines={1} adjustsFontSizeToFit>
+          <Animated.Text
+            key={expense}
+            entering={FadeIn.duration(300)}
+            style={styles.splitValue}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             {formatRupiah(expense)}
-          </Text>
+          </Animated.Text>
         </View>
       </View>
     </LinearGradient>
@@ -195,7 +214,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   bookArrow: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: theme.radius.round,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.glass,

@@ -49,7 +49,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(10, 14, 26, 0.7)',
+    backgroundColor: theme.colors.overlay,
     zIndex: 999,
   },
   box: { alignItems: 'center' },

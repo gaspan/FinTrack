@@ -66,7 +66,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({ value, onChange }) => 
             style={[styles.colorButton, { backgroundColor: c }, value === c && styles.colorActive]}
             onPress={() => onChange(c)}
           >
-            {value === c && <Ionicons name="checkmark" size={16} color="#FFF" />}
+            {value === c && <Ionicons name="checkmark" size={16} color={theme.colors.textOnPrimary} />}
           </TouchableOpacity>
         ))}
       </View>
@@ -103,17 +103,13 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   colorButton: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: theme.radius.round,
     justifyContent: 'center',
     alignItems: 'center',
   },
   colorActive: {
     borderWidth: 3,
-    borderColor: '#FFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
+    borderColor: theme.colors.textOnPrimary,
+    ...theme.shadow.sm,
   },
 });

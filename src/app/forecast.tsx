@@ -54,8 +54,8 @@ export default function ForecastPage() {
             <View style={styles.divider} />
             <View style={styles.metrics}>
               <Metric label="Saldo Total" value={formatRupiah(safeData.totalBalance)} />
-              <Metric label="Tagihan Mendatang" value={formatRupiah(safeData.upcomingBills)} color="#EF4444" />
-              <Metric label="Alokasi Tabungan" value={formatRupiah(safeData.savingsTarget)} color="#F59E0B" />
+              <Metric label="Tagihan Mendatang" value={formatRupiah(safeData.upcomingBills)} color={theme.colors.danger} />
+              <Metric label="Alokasi Tabungan" value={formatRupiah(safeData.savingsTarget)} color={theme.colors.warning} />
               <Metric label="Sisa untuk Bulan Ini" value={formatRupiah(Math.round(safeData.safeToSpend))} />
             </View>
           </Card>
@@ -66,13 +66,13 @@ export default function ForecastPage() {
           {chartData.length > 0 && (
             <LineChart
               data={chartData}
-              color="#6366F1"
+              color={theme.colors.accent}
               thickness={2}
-              startFillColor="#6366F1"
-              endFillColor="#6366F1"
+              startFillColor={theme.colors.accent}
+              endFillColor={theme.colors.accent}
               startOpacity={0.15}
               endOpacity={0.03}
-              dataPointsColor="#6366F1"
+              dataPointsColor={theme.colors.accent}
               dataPointsRadius={3}
               textFontSize={10}
               textColor={theme.colors.textSecondary}
@@ -93,20 +93,20 @@ export default function ForecastPage() {
           <View key={idx}>
             <View style={styles.forecastRow}>
               <Text style={styles.forecastDate}>{f.date}</Text>
-              <Text style={[styles.forecastVal, { color: f.income > 0 ? '#10B981' : '#9CA3AF' }]}>
+              <Text style={[styles.forecastVal, { color: f.income > 0 ? theme.colors.success : theme.colors.textMuted }]}>
                 +{f.income ? formatRupiah(f.income) : '-'}
               </Text>
-              <Text style={[styles.forecastVal, { color: f.expense > 0 ? '#EF4444' : '#9CA3AF' }]}>
+              <Text style={[styles.forecastVal, { color: f.expense > 0 ? theme.colors.danger : theme.colors.textMuted }]}>
                 -{f.expense ? formatRupiah(f.expense) : '-'}
               </Text>
-              <Text style={[styles.forecastBalance, { color: f.projected_balance >= 0 ? '#10B981' : '#EF4444' }]}>
+              <Text style={[styles.forecastBalance, { color: f.projected_balance >= 0 ? theme.colors.success : theme.colors.danger }]}>
                 {formatRupiah(f.projected_balance)}
               </Text>
             </View>
             {f.events && f.events.length > 0 && (
               <View style={styles.eventList}>
                 {f.events.map(event => (
-                  <Text key={event.key} style={[styles.eventText, { color: event.affectsBalance ? (event.cashImpact >= 0 ? '#10B981' : '#EF4444') : theme.colors.textSecondary }]}>
+                    <Text key={event.key} style={[styles.eventText, { color: event.affectsBalance ? (event.cashImpact >= 0 ? theme.colors.success : theme.colors.danger) : theme.colors.textSecondary }]}>
                     {event.affectsBalance ? (event.cashImpact >= 0 ? '+' : '-') : 'i'} {event.label}{event.status === 'overdue' ? ' (terlambat)' : ''}
                   </Text>
                 ))}
@@ -120,18 +120,15 @@ export default function ForecastPage() {
   );
 }
 
-const Metric = ({ label, value, color }: { label: string; value: string; color?: string }) => (
-  <View style={metricStyles.row}>
-    <Text style={metricStyles.label}>{label}</Text>
-    <Text style={[metricStyles.value, color ? { color } : undefined]}>{value}</Text>
-  </View>
-);
-
-const metricStyles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  label: { fontSize: 13, color: '#9CA3AF' },
-  value: { fontSize: 13, fontWeight: '600' },
-});
+const Metric = ({ label, value, color }: { label: string; value: string; color?: string }) => {
+  const { theme } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+      <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{label}</Text>
+      <Text style={[{ fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary }, color ? { color } : undefined]}>{value}</Text>
+    </View>
+  );
+};
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },

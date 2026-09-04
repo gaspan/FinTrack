@@ -154,7 +154,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   filterBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: theme.colors.surface },
   filterActive: { backgroundColor: theme.colors.primary },
   filterText: { fontSize: 13, color: theme.colors.textSecondary },
-  filterTextActive: { color: '#FFF', fontWeight: '600' },
+  filterTextActive: { color: theme.colors.textOnPrimary, fontWeight: '600' },
   list: { paddingHorizontal: theme.spacing.lg },
   empty: { textAlign: 'center', color: theme.colors.textSecondary, marginTop: 40, fontStyle: 'italic' },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: theme.colors.surface, borderRadius: 12, marginBottom: 8 },
