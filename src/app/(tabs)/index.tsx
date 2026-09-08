@@ -23,7 +23,7 @@ import { getPayrollPeriod, getPreviousPayrollPeriod, findSalaryCategoryId } from
 import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
 import { Card } from '@/components/ui/Card';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { TransactionWithDetails, Wallet, SafeToSpendData, CategoryInsight, SpendingAlert, FinancialHealthScore, FinancialTip, SavingsGoal } from '@/types';
+import { TransactionWithDetails, Wallet, SafeToSpendData, CategoryInsight, SpendingAlert, FinancialHealthScore, FinancialTip, SavingsGoal, ChartDataPoint } from '@/types';
 import { formatRupiah, formatRupiahShort } from '@/utils/format';
 import { generateAndSharePDF } from '@/features/export/pdfGenerator';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
@@ -35,6 +35,7 @@ import { DashboardHero } from '@/components/dashboard/DashboardHero';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { AnalyticsCard } from '@/components/dashboard/AnalyticsCard';
 import { GoldPriceCard } from '@/components/dashboard/GoldPriceCard';
+import { MonthBarsCard } from '@/components/dashboard/MonthBarsCard';
 import { UsdIdrCard } from '@/components/dashboard/UsdIdrCard';
 import { EconNewsCarousel } from '@/components/dashboard/EconNewsCarousel';
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection';
@@ -82,6 +83,8 @@ export default function DashboardScreen() {
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0 });
   const [lastMonthSummary, setLastMonthSummary] = useState({ totalIncome: 0, totalExpense: 0 });
   const [chartData, setChartData] = useState<any[]>([]);
+  const [monthExpense, setMonthExpense] = useState<ChartDataPoint[]>([]);
+  const [monthIncome, setMonthIncome] = useState<ChartDataPoint[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<TransactionWithDetails[]>([]);
   const [trendData, setTrendData] = useState<{ month: string; income: number; expense: number }[]>([]);
   const [primaryWallet, setPrimaryWallet] = useState<Wallet | null>(null);
@@ -235,6 +238,20 @@ export default function DashboardScreen() {
         label: item.category_name,
         color: item.color,
       })));
+
+      const monthStart = dayjs().startOf('month').format('YYYY-MM-DD');
+      const monthEnd = dayjs().endOf('month').format('YYYY-MM-DD');
+      const [monthExp, monthInc] = await Promise.all([
+        chartQueries.getCategoryBreakdown(monthStart, monthEnd, 'expense'),
+        chartQueries.getCategoryBreakdown(monthStart, monthEnd, 'income'),
+      ]);
+      const toPoint = (item: { total: number; category_name: string; color: string }): ChartDataPoint => ({
+        value: item.total,
+        label: item.category_name,
+        color: item.color,
+      });
+      setMonthExpense(monthExp.map(toPoint));
+      setMonthIncome(monthInc.map(toPoint));
 
       const txs = await txQueries.getByDateRange(currentStartDate, currentEndDate);
       setRecentTransactions(txs.slice(0, 5));
@@ -440,6 +457,7 @@ export default function DashboardScreen() {
                   onPress={() => router.push('/(tabs)/add' as any)}
                   accessibilityRole="button"
                   accessibilityLabel="Catat transaksi pertama"
+                  style={{ borderRadius: 24 }}
                 >
                   <Card style={styles.emptyCard}>
                     <Animated.View style={[styles.emptyIcon, gentleFloat]}>
@@ -465,15 +483,17 @@ export default function DashboardScreen() {
                     { borderLeftColor: primaryWallet.color || theme.colors.primary },
                   ]}
                 >
-                  <LinearGradient
-                    colors={[
-                      `${primaryWallet.color || theme.colors.primary}16`,
-                      `${primaryWallet.color || theme.colors.primary}04`,
-                    ]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
+                  <View style={[StyleSheet.absoluteFill, { borderRadius: 28, overflow: 'hidden' }]}>
+                    <LinearGradient
+                      colors={[
+                        `${primaryWallet.color || theme.colors.primary}16`,
+                        `${primaryWallet.color || theme.colors.primary}04`,
+                      ]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  </View>
                   <View style={[styles.pwIcon, { backgroundColor: (primaryWallet.color || theme.colors.primary) + '20' }]}>
                     <Ionicons
                       name={(primaryWallet.icon || 'wallet') as any}
@@ -519,32 +539,41 @@ export default function DashboardScreen() {
               </View>
             </AnimatedSection>
 
-            <AnimatedSection index={6}>
+            {(monthExpense.length > 0 || monthIncome.length > 0) && (
+              <AnimatedSection index={6}>
+                <View>
+                  <SectionHeader title={`Bulan Ini · ${dayjs().format('MMMM')}`} icon="bar-chart-outline" />
+                  <MonthBarsCard expense={monthExpense} income={monthIncome} />
+                </View>
+              </AnimatedSection>
+            )}
+
+            <AnimatedSection index={7}>
               <CollapsibleSection title="Harga Emas" subtitle="Emas per gram (Rp)" icon="diamond-outline" iconColor="#EAB308">
                 <GoldPriceCard />
               </CollapsibleSection>
             </AnimatedSection>
 
-            <AnimatedSection index={7}>
+            <AnimatedSection index={8}>
               <CollapsibleSection title="Dolar ke Rupiah" subtitle="Kurs tengah USD → IDR" icon="cash-outline" iconColor={theme.colors.info}>
                 <UsdIdrCard />
               </CollapsibleSection>
             </AnimatedSection>
 
-            <AnimatedSection index={8}>
+            <AnimatedSection index={9}>
               <CollapsibleSection title="Ekonomi Nasional" subtitle="Ekonomi Indonesia terkini" icon="newspaper-outline" iconColor={theme.colors.accent}>
                 <EconNewsCarousel kind="national" />
               </CollapsibleSection>
             </AnimatedSection>
 
-            <AnimatedSection index={9}>
+            <AnimatedSection index={10}>
               <CollapsibleSection title="Ekonomi Internasional" subtitle="Global economy highlights" icon="globe-outline" iconColor={theme.colors.info}>
                 <EconNewsCarousel kind="international" />
               </CollapsibleSection>
             </AnimatedSection>
 
             {netWorthData && (
-              <AnimatedSection index={10}>
+              <AnimatedSection index={11}>
                 <NetWorthSummaryCard
                   totalAssets={netWorthData.totalAssets}
                   totalLiabilities={netWorthData.totalLiabilities}
@@ -555,7 +584,7 @@ export default function DashboardScreen() {
             )}
 
             {insightData.financialHealth && (
-              <AnimatedSection index={11}>
+              <AnimatedSection index={12}>
                 <View>
                   <SectionHeader title="Kesehatan finansial" icon="heart-outline" iconColor={theme.colors.success} />
                   <FinancialTipsCard health={insightData.financialHealth} tips={insightData.financialTips} />
@@ -563,12 +592,12 @@ export default function DashboardScreen() {
               </AnimatedSection>
             )}
 
-            <AnimatedSection index={12}>
+            <AnimatedSection index={13}>
               <SpendingInsightCard comparisons={insightData.comparisons} alerts={insightData.alerts} />
             </AnimatedSection>
 
             {recentTransactions.length > 0 && (
-              <AnimatedSection index={13}>
+              <AnimatedSection index={14}>
                 <View>
                   <SectionHeader
                     title="Transaksi terbaru"
@@ -637,18 +666,20 @@ export default function DashboardScreen() {
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  scrollContent: { paddingBottom: 112 },
+  scrollContent: { paddingBottom: 130 },
   contentColumn: { width: '100%', maxWidth: 820, alignSelf: 'center' },
   flex: { flex: 1 },
   body: {
-    paddingHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
-    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
+    gap: theme.spacing.lg,
   },
   periodCard: {
-    padding: theme.spacing.md,
+    padding: theme.spacing.xl,
     backgroundColor: theme.colors.surfaceElevated,
-    borderRadius: theme.radius.xl,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     ...theme.shadow.sm,
   },
   periodHeader: {
@@ -699,22 +730,24 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   emptyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    backgroundColor: `${theme.colors.primary}0D`,
-    borderColor: `${theme.colors.primary}35`,
+    padding: theme.spacing.lg,
+    borderRadius: 24,
+    backgroundColor: `${theme.colors.primary}12`,
+    borderColor: `${theme.colors.primary}30`,
+    borderWidth: 1,
   },
   emptyIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: theme.radius.round,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: `${theme.colors.primary}1A`,
-    marginRight: theme.spacing.sm,
+    backgroundColor: `${theme.colors.primary}20`,
+    marginRight: theme.spacing.md,
   },
   emptyCopy: { flex: 1 },
-  emptyTitle: { ...theme.typography.body, fontWeight: '700', color: theme.colors.textPrimary },
-  emptyText: { ...theme.typography.caption, lineHeight: 16, marginTop: 2 },
+  emptyTitle: { ...theme.typography.body, fontWeight: '700', color: theme.colors.primary },
+  emptyText: { ...theme.typography.caption, color: theme.colors.primary, opacity: 0.8, lineHeight: 18, marginTop: 4 },
   emptyArrow: {
     width: 30,
     height: 30,
@@ -727,12 +760,11 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   walletCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    borderLeftWidth: 4,
-    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    borderRadius: 28,
     backgroundColor: theme.colors.surfaceElevated,
-    overflow: 'hidden',
-    ...theme.shadow.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   pwIcon: {
     width: 34,
@@ -763,7 +795,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   recentMeta: { ...theme.typography.caption },
   recentCard: {
     borderRadius: theme.radius.xl,
-    ...theme.shadow.sm,
+    ...theme.shadow.md,
   },
   recentAmountWrap: { alignItems: 'flex-end', gap: 4, marginLeft: theme.spacing.sm },
   recentAmount: { ...theme.typography.body, fontWeight: 'bold' },
@@ -775,6 +807,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     right: 0,
     alignItems: 'center',
     zIndex: 10,
+    paddingBottom: 20,
   },
   stickyPill: {
     flexDirection: 'row',

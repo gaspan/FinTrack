@@ -169,7 +169,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
         <View style={styles.splitCell}>
           <View style={styles.splitLabelRow}>
             <View style={styles.inBadge}>
-              <Ionicons name="arrow-down" size={12} color={theme.colors.income} />
+              <Ionicons name="arrow-down" size={14} color="#FFFFFF" />
             </View>
             <Text style={styles.splitLabel}>Pemasukan</Text>
           </View>
@@ -185,7 +185,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
         <View style={styles.splitCell}>
           <View style={styles.splitLabelRow}>
             <View style={styles.outBadge}>
-              <Ionicons name="arrow-up" size={12} color="#FF8A8A" />
+              <Ionicons name="arrow-up" size={14} color="#FFFFFF" />
             </View>
             <Text style={styles.splitLabel}>Pengeluaran</Text>
           </View>
@@ -204,10 +204,10 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   hero: {
-    paddingHorizontal: theme.spacing.md,
-    paddingBottom: theme.spacing.xl + 28,
-    borderBottomLeftRadius: theme.radius.xl,
-    borderBottomRightRadius: theme.radius.xl,
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl + 100, // Massive padding to allow QuickActions to float over it
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
     overflow: 'hidden',
   },
   decoWrap: {
@@ -215,31 +215,31 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   decoCircleA: {
     position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    top: -90,
-    right: -70,
-    backgroundColor: 'rgba(255,255,255,0.13)',
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    top: -120,
+    right: -100,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   decoCircleB: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    top: 40,
-    left: -60,
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    top: 60,
+    left: -80,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   decoRing: {
     position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    bottom: -190,
-    right: 40,
-    borderWidth: 28,
-    borderColor: 'rgba(255,255,255,0.07)',
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    bottom: -250,
+    right: 20,
+    borderWidth: 40,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   flex: { flex: 1 },
   topRow: {
@@ -263,10 +263,10 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center',
     padding: theme.spacing.sm,
     paddingRight: theme.spacing.sm,
-    borderRadius: theme.radius.lg,
-    backgroundColor: 'rgba(0, 0, 0, 0.16)',
+    borderRadius: theme.radius.xl,
+    backgroundColor: 'rgba(255, 255, 255, 0.20)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.35)',
     marginBottom: theme.spacing.md,
   },
   bookIcon: {
@@ -297,18 +297,18 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: theme.radius.round,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
     marginLeft: theme.spacing.sm,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: theme.radius.round,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.22)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderColor: 'rgba(255,255,255,0.4)',
   },
   balanceLabel: {
     ...theme.typography.bodySmall,
@@ -322,11 +322,12 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   balanceValue: {
     ...theme.typography.amount,
     color: theme.colors.textOnPrimary,
-    marginTop: 4,
-    fontSize: 36,
-    textShadowColor: 'rgba(0,0,0,0.18)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    marginTop: 8,
+    fontSize: 52,
+    letterSpacing: -2,
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 6 },
+    textShadowRadius: 16,
   },
   chipRow: {
     flexDirection: 'row',
@@ -337,13 +338,13 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 6,
+    gap: 6,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
     borderRadius: theme.radius.round,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.22)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.26)',
+    borderColor: 'rgba(255,255,255,0.35)',
   },
   statusDot: {
     width: 6,
@@ -359,12 +360,12 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   splitRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    marginTop: theme.spacing.md,
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    marginTop: theme.spacing.xl,
+    padding: theme.spacing.lg,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.24)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   splitCell: { flex: 1, paddingHorizontal: theme.spacing.xs },
   splitDivider: {
@@ -374,22 +375,20 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   splitLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   inBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   outBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   splitLabel: {
     ...theme.typography.caption,

@@ -42,10 +42,11 @@ export const GoalsStrip: React.FC<GoalsStripProps> = ({ goals }) => {
             return (
               <Animated.View
                 key={g.id}
+                style={styles.item}
                 entering={shouldReduceMotion() ? undefined : FadeInDown.duration(300).delay(staggerDelay(i, 60))}
               >
               <TouchableOpacity
-                style={styles.item}
+                style={styles.touch}
                 activeOpacity={0.7}
                 onPress={() => router.push('/goals' as any)}
               >
@@ -77,15 +78,18 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   strip: { gap: theme.spacing.sm, paddingHorizontal: theme.spacing.xs },
   item: {
-    alignItems: 'center',
     width: 92,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xs,
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
     ...theme.shadow.sm,
+  },
+  touch: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xs,
+    borderRadius: theme.radius.lg,
   },
   name: {
     ...theme.typography.bodySmall,

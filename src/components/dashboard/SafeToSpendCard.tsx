@@ -39,14 +39,17 @@ export const SafeToSpendCard: React.FC<SafeToSpendCardProps> = ({ data }) => {
       onPress={() => router.push('/forecast' as any)}
       accessibilityRole="button"
       accessibilityLabel="Lihat sisa aman hari ini"
+      style={{ borderRadius: theme.radius.xl }}
     >
       <Card style={[styles.card, { borderLeftColor: accent }]}>
-        <LinearGradient
-          colors={[`${accent}1A`, `${accent}05`]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <View style={[StyleSheet.absoluteFill, { borderRadius: theme.radius.xl, overflow: 'hidden' }]}>
+          <LinearGradient
+            colors={[`${accent}1A`, `${accent}05`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
         <View style={styles.header}>
           <View style={[styles.shieldBadge, { backgroundColor: `${accent}1F` }]}>
             <Ionicons name="shield-checkmark" size={15} color={accent} />
@@ -84,7 +87,6 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     backgroundColor: theme.colors.surfaceElevated,
     borderLeftWidth: 4,
     borderRadius: theme.radius.xl,
-    overflow: 'hidden',
     ...theme.shadow.sm,
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },

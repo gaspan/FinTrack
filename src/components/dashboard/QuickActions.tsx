@@ -102,14 +102,10 @@ export const QuickActions: React.FC = () => {
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   card: {
-    marginHorizontal: theme.spacing.md,
-    marginTop: -52,
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadow.md,
+    marginHorizontal: theme.spacing.lg,
+    marginTop: -80, // Moved up to float over the deep gradient hero
+    paddingHorizontal: 0,
+    paddingVertical: theme.spacing.lg,
   },
   header: {
     flexDirection: 'row',
@@ -138,15 +134,17 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
   },
-  item: { flex: 1 },
+  item: {
+    flex: 1,
+    borderRadius: 24,
+    backgroundColor: theme.colors.surfaceElevated,
+    ...theme.shadow.sm,
+  },
   touch: {
     alignItems: 'center',
-    gap: 2,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    gap: 6,
+    paddingVertical: theme.spacing.lg,
+    borderRadius: 24,
   },
   iconWrap: {
     width: 46,
@@ -158,9 +156,9 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   label: {
     ...theme.typography.bodySmall,
-    fontSize: 12,
+    fontSize: 13,
     color: theme.colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   hint: {
     ...theme.typography.caption,

@@ -13,6 +13,7 @@ export const AnimatedSection: React.FC<AnimatedSectionProps> = ({ index = 0, ste
   return (
     <Animated.View
       entering={FadeInDown.duration(380).delay(staggerDelay(index, step)).springify().damping(20).stiffness(160)}
+      style={{ padding: 16, margin: -16 }} // Expands bounding box to prevent shadow clipping on Android
     >
       {children}
     </Animated.View>
