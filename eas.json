@@ -10,6 +10,9 @@
     "preview": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "NODE_BINARY": "/opt/homebrew/bin/node"
       }
     },
     "production": {}
