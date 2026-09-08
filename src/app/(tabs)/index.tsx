@@ -1,11 +1,20 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  Extrapolation,
+  FadeInDown,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  LinearTransition,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { useBook } from '@/constants/books';
@@ -15,7 +24,7 @@ import { DateRangeFilter } from '@/components/charts/DateRangeFilter';
 import { Card } from '@/components/ui/Card';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { TransactionWithDetails, Wallet, SafeToSpendData, CategoryInsight, SpendingAlert, FinancialHealthScore, FinancialTip, SavingsGoal } from '@/types';
-import { formatRupiah } from '@/utils/format';
+import { formatRupiah, formatRupiahShort } from '@/utils/format';
 import { generateAndSharePDF } from '@/features/export/pdfGenerator';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { SpendingInsightCard } from '@/features/insights/SpendingInsightCard';
@@ -25,10 +34,17 @@ import { SafeToSpendCard } from '@/components/dashboard/SafeToSpendCard';
 import { DashboardHero } from '@/components/dashboard/DashboardHero';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { AnalyticsCard } from '@/components/dashboard/AnalyticsCard';
+import { GoldPriceCard } from '@/components/dashboard/GoldPriceCard';
+import { UsdIdrCard } from '@/components/dashboard/UsdIdrCard';
+import { EconNewsCarousel } from '@/components/dashboard/EconNewsCarousel';
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection';
 import { BudgetProgressCard, type BudgetRow } from '@/components/dashboard/BudgetProgressCard';
 import { GoalsStrip } from '@/components/dashboard/GoalsStrip';
 import { loadInsights } from '@/features/insights';
 import { staggerDelay, shouldReduceMotion } from '@/utils/motion';
+import { AnimatedSection } from '@/components/dashboard/AnimatedSection';
+import { Sparkline } from '@/components/ui/Sparkline';
+import { LinearGradient } from 'expo-linear-gradient';
 import { calculateSafeToSpend } from '@/features/forecast/forecastEngine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -77,6 +93,34 @@ export default function DashboardScreen() {
   const [budgets, setBudgets] = useState<BudgetRow[]>([]);
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [netWorthHistory, setNetWorthHistory] = useState<number[]>([]);
+
+  const insets = useSafeAreaInsets();
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+  const heroParallaxStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: scrollY.value * 0.28 }],
+    opacity: interpolate(scrollY.value, [0, 320], [1, 0.55], Extrapolation.CLAMP),
+  }));
+  const stickyHeaderStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [150, 230], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateY: interpolate(scrollY.value, [150, 230], [-10, 0], Extrapolation.CLAMP) },
+    ],
+  }));
+  const gentleFloat = shouldReduceMotion()
+    ? undefined
+    : {
+        animationName: {
+          from: { transform: [{ translateY: 0 }] },
+          to: { transform: [{ translateY: -6 }] },
+        },
+        animationDuration: '2.2s',
+        animationIterationCount: 'infinite' as const,
+        animationDirection: 'alternate' as const,
+        animationTimingFunction: 'ease-in-out' as const,
+      };
 
   const initPayrollPeriod = useCallback(async () => {
     if (isManualDateRange) return null;
@@ -301,30 +345,36 @@ export default function DashboardScreen() {
   if (initialLoad) return <DashboardSkeleton />;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-    >
-      <DashboardHero
-        greeting={getGreeting()}
-        dateText={dayjs().format('dddd, DD MMMM YYYY')}
-        totalBalance={totalBalance}
-        income={summary.totalIncome}
-        expense={summary.totalExpense}
-        trend={trend}
-        trendLabel={trendLabel}
-        payrollLabel={payrollPeriod?.label}
-        exporting={exporting}
-        onExport={handleExportPDF}
-      />
+    <View style={styles.container}>
+      <Animated.ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
+      >
+        <Animated.View style={heroParallaxStyle}>
+          <DashboardHero
+            greeting={getGreeting()}
+            dateText={dayjs().format('dddd, DD MMMM YYYY')}
+            totalBalance={totalBalance}
+            income={summary.totalIncome}
+            expense={summary.totalExpense}
+            trend={trend}
+            trendLabel={trendLabel}
+            payrollLabel={payrollPeriod?.label}
+            exporting={exporting}
+            onExport={handleExportPDF}
+          />
+        </Animated.View>
 
-      <View style={styles.contentColumn}>
-        <QuickActions />
+        <View style={styles.contentColumn}>
+          <QuickActions />
 
-        <View style={styles.body}>
-          <Card style={styles.periodCard}>
+          <View style={styles.body}>
+            <AnimatedSection index={0}>
+              <Card style={styles.periodCard}>
             <View style={styles.periodHeader}>
               <View style={styles.flex}>
                 <Text style={styles.periodTitle}>Ringkasan periode</Text>
@@ -355,131 +405,233 @@ export default function DashboardScreen() {
                 style={styles.periodTrigger}
               />
             </View>
-          </Card>
-
-          {isPeriodEmpty && (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => router.push('/(tabs)/add' as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Catat transaksi pertama"
-            >
-              <Card style={styles.emptyCard}>
-                <View style={styles.emptyIcon}>
-                  <Ionicons name="sparkles-outline" size={22} color={theme.colors.primary} />
+            {trendData.length > 1 && (
+              <View style={styles.trendRow}>
+                <Sparkline
+                  data={trendData.map((t) => t.income - t.expense)}
+                  width={104}
+                  height={34}
+                  color={
+                    trendData[trendData.length - 1].income - trendData[trendData.length - 1].expense >= 0
+                      ? theme.colors.income
+                      : theme.colors.expense
+                  }
+                />
+                <View style={styles.flex}>
+                  <Text style={styles.trendTitle}>Tren bersih 6 bulan</Text>
+                  <Text style={styles.trendValue}>
+                    {(() => {
+                      const last = trendData[trendData.length - 1];
+                      const net = Math.round(last.income - last.expense);
+                      return `${net >= 0 ? '+' : '-'}${formatRupiah(Math.abs(net))} bln lalu`;
+                    })()}
+                  </Text>
                 </View>
-                <View style={styles.emptyCopy}>
-                  <Text style={styles.emptyTitle}>Belum ada transaksi</Text>
-                  <Text style={styles.emptyText}>Mulai catat pemasukan atau pengeluaran di periode ini.</Text>
-                </View>
-                <View style={styles.emptyArrow}>
-                  <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
-                </View>
+                <Ionicons name="stats-chart-outline" size={16} color={theme.colors.textMuted} />
+              </View>
+            )}
               </Card>
-            </TouchableOpacity>
-          )}
+            </AnimatedSection>
 
-          {primaryWallet && (
-            <Card
-              style={[
-                styles.walletCard,
-                { borderLeftColor: primaryWallet.color || theme.colors.primary },
-              ]}
-            >
-              <View style={[styles.pwIcon, { backgroundColor: (primaryWallet.color || theme.colors.primary) + '20' }]}>
-                <Ionicons
-                  name={(primaryWallet.icon || 'wallet') as any}
-                  size={18}
-                  color={primaryWallet.color || theme.colors.primary}
+            {isPeriodEmpty && (
+              <AnimatedSection index={1}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => router.push('/(tabs)/add' as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Catat transaksi pertama"
+                >
+                  <Card style={styles.emptyCard}>
+                    <Animated.View style={[styles.emptyIcon, gentleFloat]}>
+                      <Ionicons name="sparkles-outline" size={22} color={theme.colors.primary} />
+                    </Animated.View>
+                    <View style={styles.emptyCopy}>
+                      <Text style={styles.emptyTitle}>Belum ada transaksi</Text>
+                      <Text style={styles.emptyText}>Mulai catat pemasukan atau pengeluaran di periode ini.</Text>
+                    </View>
+                    <View style={styles.emptyArrow}>
+                      <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              </AnimatedSection>
+            )}
+
+            {primaryWallet && (
+              <AnimatedSection index={1}>
+                <Card
+                  style={[
+                    styles.walletCard,
+                    { borderLeftColor: primaryWallet.color || theme.colors.primary },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={[
+                      `${primaryWallet.color || theme.colors.primary}16`,
+                      `${primaryWallet.color || theme.colors.primary}04`,
+                    ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={[styles.pwIcon, { backgroundColor: (primaryWallet.color || theme.colors.primary) + '20' }]}>
+                    <Ionicons
+                      name={(primaryWallet.icon || 'wallet') as any}
+                      size={18}
+                      color={primaryWallet.color || theme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.pwLabel}>Dompet utama</Text>
+                    <Text style={styles.pwName} numberOfLines={1}>{primaryWallet.name}</Text>
+                  </View>
+                  <Text style={styles.pwBalance}>{formatRp(primaryWallet.balance)}</Text>
+                </Card>
+              </AnimatedSection>
+            )}
+
+            {safeToSpendEnabled && safeToSpendData && (
+              <AnimatedSection index={2}>
+                <SafeToSpendCard data={safeToSpendData} />
+              </AnimatedSection>
+            )}
+
+            <AnimatedSection index={3}>
+              <BudgetProgressCard budgets={budgets} />
+            </AnimatedSection>
+
+            <AnimatedSection index={4}>
+              <GoalsStrip goals={goals} />
+            </AnimatedSection>
+
+            <AnimatedSection index={5}>
+              <View>
+                <SectionHeader title="Analisis finansial" icon="analytics-outline" />
+                <AnalyticsCard
+                  income={summary.totalIncome}
+                  expense={summary.totalExpense}
+                  chartData={chartData}
+                  chartType={chartType}
+                  onChartTypeChange={setChartType}
+                  chartTotal={currentChartTotal}
+                  trendData={trendData}
                 />
               </View>
-              <View style={styles.flex}>
-                <Text style={styles.pwLabel}>Dompet utama</Text>
-                <Text style={styles.pwName} numberOfLines={1}>{primaryWallet.name}</Text>
-              </View>
-              <Text style={styles.pwBalance}>{formatRp(primaryWallet.balance)}</Text>
-            </Card>
-          )}
+            </AnimatedSection>
 
-          {safeToSpendEnabled && safeToSpendData && <SafeToSpendCard data={safeToSpendData} />}
+            <AnimatedSection index={6}>
+              <CollapsibleSection title="Harga Emas" subtitle="Emas per gram (Rp)" icon="diamond-outline" iconColor="#EAB308">
+                <GoldPriceCard />
+              </CollapsibleSection>
+            </AnimatedSection>
 
-          <BudgetProgressCard budgets={budgets} />
+            <AnimatedSection index={7}>
+              <CollapsibleSection title="Dolar ke Rupiah" subtitle="Kurs tengah USD → IDR" icon="cash-outline" iconColor={theme.colors.info}>
+                <UsdIdrCard />
+              </CollapsibleSection>
+            </AnimatedSection>
 
-          <GoalsStrip goals={goals} />
+            <AnimatedSection index={8}>
+              <CollapsibleSection title="Ekonomi Nasional" subtitle="Ekonomi Indonesia terkini" icon="newspaper-outline" iconColor={theme.colors.accent}>
+                <EconNewsCarousel kind="national" />
+              </CollapsibleSection>
+            </AnimatedSection>
 
-          <View>
-            <SectionHeader title="Analisis finansial" />
-            <AnalyticsCard
-              income={summary.totalIncome}
-              expense={summary.totalExpense}
-              chartData={chartData}
-              chartType={chartType}
-              onChartTypeChange={setChartType}
-              chartTotal={currentChartTotal}
-              trendData={trendData}
-            />
+            <AnimatedSection index={9}>
+              <CollapsibleSection title="Ekonomi Internasional" subtitle="Global economy highlights" icon="globe-outline" iconColor={theme.colors.info}>
+                <EconNewsCarousel kind="international" />
+              </CollapsibleSection>
+            </AnimatedSection>
+
+            {netWorthData && (
+              <AnimatedSection index={10}>
+                <NetWorthSummaryCard
+                  totalAssets={netWorthData.totalAssets}
+                  totalLiabilities={netWorthData.totalLiabilities}
+                  netWorth={netWorthData.netWorth}
+                  history={netWorthHistory}
+                />
+              </AnimatedSection>
+            )}
+
+            {insightData.financialHealth && (
+              <AnimatedSection index={11}>
+                <View>
+                  <SectionHeader title="Kesehatan finansial" icon="heart-outline" iconColor={theme.colors.success} />
+                  <FinancialTipsCard health={insightData.financialHealth} tips={insightData.financialTips} />
+                </View>
+              </AnimatedSection>
+            )}
+
+            <AnimatedSection index={12}>
+              <SpendingInsightCard comparisons={insightData.comparisons} alerts={insightData.alerts} />
+            </AnimatedSection>
+
+            {recentTransactions.length > 0 && (
+              <AnimatedSection index={13}>
+                <View>
+                  <SectionHeader
+                    title="Transaksi terbaru"
+                    icon="receipt-outline"
+                    actionLabel="Lihat semua"
+                    onAction={() => router.push('/(tabs)/transactions' as any)}
+                  />
+                  <Card style={styles.recentCard}>
+                    {recentTransactions.map((tx, i) => (
+                      <Animated.View
+                        key={tx.id}
+                        layout={shouldReduceMotion() ? undefined : LinearTransition.springify().damping(20)}
+                        entering={shouldReduceMotion() ? undefined : FadeInDown.duration(280).delay(staggerDelay(i, 40))}
+                      >
+                        <TouchableOpacity
+                          style={[styles.recentItem, i > 0 && styles.recentItemBorder]}
+                          activeOpacity={0.7}
+                          onPress={() => router.push(`/transaction/${tx.id}` as any)}
+                        >
+                          <View style={[styles.recentIcon, { backgroundColor: tx.category_color + '22' }]}>
+                            <Ionicons name={tx.category_icon as any} size={18} color={tx.category_color} />
+                          </View>
+                          <View style={styles.flex}>
+                            <Text style={styles.recentCat} numberOfLines={1}>{tx.category_name}</Text>
+                            <Text style={styles.recentMeta} numberOfLines={1}>{tx.notes || tx.wallet_name}</Text>
+                          </View>
+                          <View style={styles.recentAmountWrap}>
+                            <Text
+                              style={[
+                                styles.recentAmount,
+                                { color: tx.type === 'income' ? theme.colors.income : theme.colors.textPrimary },
+                              ]}
+                            >
+                              {tx.type === 'income' ? '+' : '-'}{formatRp(tx.amount)}
+                            </Text>
+                            <View style={[styles.txDot, { backgroundColor: tx.type === 'income' ? theme.colors.income : theme.colors.expense }]} />
+                          </View>
+                        </TouchableOpacity>
+                      </Animated.View>
+                    ))}
+                  </Card>
+                </View>
+              </AnimatedSection>
+            )}
           </View>
-
-          {netWorthData && (
-            <NetWorthSummaryCard
-              totalAssets={netWorthData.totalAssets}
-              totalLiabilities={netWorthData.totalLiabilities}
-              netWorth={netWorthData.netWorth}
-              history={netWorthHistory}
-            />
-          )}
-
-          {insightData.financialHealth && (
-            <View>
-              <SectionHeader title="Kesehatan finansial" />
-              <FinancialTipsCard health={insightData.financialHealth} tips={insightData.financialTips} />
-            </View>
-          )}
-
-          <SpendingInsightCard comparisons={insightData.comparisons} alerts={insightData.alerts} />
-
-          {recentTransactions.length > 0 && (
-            <View>
-              <SectionHeader
-                title="Transaksi terbaru"
-                actionLabel="Lihat semua"
-                onAction={() => router.push('/(tabs)/transactions' as any)}
-              />
-              <Card>
-                {recentTransactions.map((tx, i) => (
-                  <Animated.View
-                    key={tx.id}
-                    entering={shouldReduceMotion() ? undefined : FadeInDown.duration(250).delay(staggerDelay(i))}
-                  >
-                  <TouchableOpacity
-                    style={[styles.recentItem, i > 0 && styles.recentItemBorder]}
-                    activeOpacity={0.7}
-                    onPress={() => router.push(`/transaction/${tx.id}` as any)}
-                  >
-                    <View style={[styles.recentIcon, { backgroundColor: tx.category_color + '20' }]}>
-                      <Ionicons name={tx.category_icon as any} size={18} color={tx.category_color} />
-                    </View>
-                    <View style={styles.flex}>
-                      <Text style={styles.recentCat} numberOfLines={1}>{tx.category_name}</Text>
-                      <Text style={styles.recentMeta} numberOfLines={1}>{tx.notes || tx.wallet_name}</Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.recentAmount,
-                        { color: tx.type === 'income' ? theme.colors.income : theme.colors.textPrimary },
-                      ]}
-                    >
-                      {tx.type === 'income' ? '+' : '-'}{formatRp(tx.amount)}
-                    </Text>
-                  </TouchableOpacity>
-                  </Animated.View>
-                ))}
-              </Card>
-            </View>
-          )}
         </View>
-      </View>
-    </ScrollView>
+      </Animated.ScrollView>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.stickyHeader, { paddingTop: insets.top + 10 }, stickyHeaderStyle]}
+      >
+        <View style={styles.stickyPill}>
+          <View style={styles.stickyDot} />
+          <Text style={styles.stickyBalance} numberOfLines={1}>
+            {formatRupiahShort(totalBalance)}
+          </Text>
+          <Text style={[styles.stickyTrend, { color: trend.isUp ? theme.colors.income : theme.colors.expense }]}>
+            {trend.isUp ? '▲' : '▼'} {trend.pct}%
+          </Text>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -490,12 +642,14 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   flex: { flex: 1 },
   body: {
     paddingHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.lg,
-    gap: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.md,
   },
   periodCard: {
     padding: theme.spacing.md,
     backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radius.xl,
+    ...theme.shadow.sm,
   },
   periodHeader: {
     flexDirection: 'row',
@@ -511,6 +665,19 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   periodSubtitle: { ...theme.typography.caption, marginTop: 2 },
   periodFilter: { alignItems: 'stretch' },
   periodTrigger: { width: '100%', justifyContent: 'space-between' },
+  trendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  trendTitle: { ...theme.typography.caption, fontWeight: '600', color: theme.colors.textPrimary },
+  trendValue: { ...theme.typography.caption, marginTop: 2 },
   cashFlowBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -560,8 +727,12 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   walletCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.sm,
-    borderLeftWidth: 3,
+    padding: theme.spacing.md,
+    borderLeftWidth: 4,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.surfaceElevated,
+    overflow: 'hidden',
+    ...theme.shadow.sm,
   },
   pwIcon: {
     width: 34,
@@ -590,5 +761,43 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   recentCat: { ...theme.typography.body, fontWeight: '600' },
   recentMeta: { ...theme.typography.caption },
-  recentAmount: { ...theme.typography.body, fontWeight: 'bold', marginLeft: theme.spacing.sm },
+  recentCard: {
+    borderRadius: theme.radius.xl,
+    ...theme.shadow.sm,
+  },
+  recentAmountWrap: { alignItems: 'flex-end', gap: 4, marginLeft: theme.spacing.sm },
+  recentAmount: { ...theme.typography.body, fontWeight: 'bold' },
+  txDot: { width: 6, height: 6, borderRadius: 3 },
+  stickyHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  stickyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.round,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadow.md,
+  },
+  stickyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.primary,
+  },
+  stickyBalance: {
+    ...theme.typography.body,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+  },
+  stickyTrend: { ...theme.typography.caption, fontWeight: '700' },
 });

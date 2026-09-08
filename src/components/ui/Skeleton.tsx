@@ -39,8 +39,8 @@ export const DashboardSkeleton = () => {
         style={{
           paddingTop: 64,
           paddingHorizontal: theme.spacing.md,
-          paddingBottom: theme.spacing.lg,
-          backgroundColor: theme.colors.surfaceElevated,
+          paddingBottom: theme.spacing.xl + 52,
+          backgroundColor: theme.colors.primary,
           borderBottomLeftRadius: theme.radius.xl,
           borderBottomRightRadius: theme.radius.xl,
         }}
@@ -68,8 +68,8 @@ export const DashboardSkeleton = () => {
         </View>
       </View>
 
-      <View style={{ paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, gap: theme.spacing.md }}>
-        <View style={{ padding: theme.spacing.md, borderRadius: theme.radius.lg, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border }}>
+      <View style={{ paddingHorizontal: theme.spacing.md, gap: theme.spacing.md }}>
+        <View style={{ marginTop: -52, padding: theme.spacing.md, borderRadius: theme.radius.xl, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border }}>
           <Skeleton height={16} width="34%" style={{ marginBottom: theme.spacing.md }} />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             {[1, 2, 3, 4].map(i => (

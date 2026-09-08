@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { shouldReduceMotion, staggerDelay } from '@/utils/motion';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { Card } from '@/components/ui/Card';
@@ -24,6 +26,8 @@ export const GoalsStrip: React.FC<GoalsStripProps> = ({ goals }) => {
     <View>
       <SectionHeader
         title="Target Menabung"
+        icon="flag-outline"
+        iconColor={theme.colors.accent}
         actionLabel="Lihat Semua"
         onAction={() => router.push('/goals' as any)}
       />
@@ -33,11 +37,14 @@ export const GoalsStrip: React.FC<GoalsStripProps> = ({ goals }) => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.strip}
         >
-          {active.map((g) => {
+          {active.map((g, i) => {
             const pct = g.target_amount > 0 ? (g.current_amount / g.target_amount) * 100 : 0;
             return (
-              <TouchableOpacity
+              <Animated.View
                 key={g.id}
+                entering={shouldReduceMotion() ? undefined : FadeInDown.duration(300).delay(staggerDelay(i, 60))}
+              >
+              <TouchableOpacity
                 style={styles.item}
                 activeOpacity={0.7}
                 onPress={() => router.push('/goals' as any)}
@@ -53,6 +60,7 @@ export const GoalsStrip: React.FC<GoalsStripProps> = ({ goals }) => {
                   {formatRupiahShort(g.current_amount)}
                 </Text>
               </TouchableOpacity>
+              </Animated.View>
             );
           })}
         </ScrollView>
@@ -62,16 +70,22 @@ export const GoalsStrip: React.FC<GoalsStripProps> = ({ goals }) => {
 };
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
-  card: { backgroundColor: theme.colors.surfaceElevated },
+  card: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radius.xl,
+    ...theme.shadow.sm,
+  },
   strip: { gap: theme.spacing.sm, paddingHorizontal: theme.spacing.xs },
   item: {
     alignItems: 'center',
-    width: 88,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.md,
+    width: 92,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xs,
+    borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    ...theme.shadow.sm,
   },
   name: {
     ...theme.typography.bodySmall,

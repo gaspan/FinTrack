@@ -8,15 +8,25 @@ interface SectionHeaderProps {
   actionLabel?: string;
   onAction?: () => void;
   style?: ViewStyle;
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
 }
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, actionLabel, onAction, style }) => {
+export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, actionLabel, onAction, style, icon, iconColor }) => {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const tint = iconColor ?? theme.colors.primary;
 
   return (
     <View style={[styles.row, style]}>
-      <Text style={styles.title}>{title}</Text>
+      <View style={styles.titleWrap}>
+        {icon != null && (
+          <View style={[styles.iconBadge, { backgroundColor: `${tint}1F` }]}>
+            <Ionicons name={icon} size={14} color={tint} />
+          </View>
+        )}
+        <Text style={styles.title}>{title}</Text>
+      </View>
       {actionLabel != null && onAction != null && (
         <TouchableOpacity style={styles.action} onPress={onAction} activeOpacity={0.7}>
           <Text style={styles.actionText}>{actionLabel}</Text>
@@ -33,6 +43,20 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: theme.spacing.sm,
+  },
+  titleWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginRight: theme.spacing.sm,
+  },
+  iconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     ...theme.typography.h3,

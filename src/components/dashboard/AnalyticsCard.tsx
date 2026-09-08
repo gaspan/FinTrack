@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import { shouldReduceMotion } from '@/utils/motion';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { hapticLight } from '@/utils/haptic';
@@ -42,35 +43,42 @@ export const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [tab, setTab] = useState<Tab>('ringkas');
 
+  const layoutAnim = shouldReduceMotion() ? undefined : LinearTransition.springify().damping(22).stiffness(220);
+
   return (
-    <Card>
+    <Card style={styles.card}>
       <View style={styles.segment}>
         {TABS.map((t) => {
           const active = t.key === tab;
           return (
-            <TouchableOpacity
-              key={t.key}
-              style={[styles.segmentItem, active && styles.segmentItemActive]}
-              onPress={() => {
-                if (t.key !== tab) hapticLight();
-                setTab(t.key);
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{t.label}</Text>
-            </TouchableOpacity>
+            <Animated.View key={t.key} style={styles.segmentFlex} layout={layoutAnim}>
+              <TouchableOpacity
+                style={[styles.segmentItem, active && styles.segmentItemActive]}
+                onPress={() => {
+                  if (t.key !== tab) hapticLight();
+                  setTab(t.key);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{t.label}</Text>
+              </TouchableOpacity>
+            </Animated.View>
           );
         })}
       </View>
 
       {tab === 'ringkas' && (
-        <Animated.View key="ringkas" entering={FadeIn.duration(200)}>
+        <Animated.View key="ringkas" entering={shouldReduceMotion() ? undefined : FadeIn.duration(250)} layout={layoutAnim}>
           <OverviewDonutChart income={income} expense={expense} />
         </Animated.View>
       )}
 
       {tab === 'kategori' && (
-        <Animated.View key={`kategori-${chartType}`} entering={FadeIn.duration(200)}>
+        <Animated.View
+          key={`kategori-${chartType}`}
+          entering={shouldReduceMotion() ? undefined : FadeIn.duration(250)}
+          layout={layoutAnim}
+        >
           <ChartToggle
             options={[
               { label: 'Pemasukan', value: 'income' },
@@ -87,7 +95,11 @@ export const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
       )}
 
       {tab === 'tren' && (
-        <Animated.View key="tren" entering={FadeIn.duration(200)}>
+        <Animated.View
+          key="tren"
+          entering={shouldReduceMotion() ? undefined : FadeIn.duration(250)}
+          layout={layoutAnim}
+        >
           <MonthlyTrendChart data={trendData} />
         </Animated.View>
       )}
@@ -96,6 +108,10 @@ export const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
 };
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
+  card: {
+    borderRadius: theme.radius.xl,
+    ...theme.shadow.sm,
+  },
   segment: {
     flexDirection: 'row',
     backgroundColor: theme.colors.surfaceElevated,
@@ -103,13 +119,17 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     padding: 4,
     marginBottom: theme.spacing.md,
   },
+  segmentFlex: { flex: 1 },
   segmentItem: {
     flex: 1,
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: theme.radius.round,
   },
-  segmentItemActive: { backgroundColor: theme.colors.primary },
+  segmentItemActive: {
+    backgroundColor: theme.colors.primary,
+    ...theme.shadow.sm,
+  },
   segmentText: {
     ...theme.typography.bodySmall,
     color: theme.colors.textSecondary,

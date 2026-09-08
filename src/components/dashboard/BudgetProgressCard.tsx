@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { shouldReduceMotion, staggerDelay } from '@/utils/motion';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { Card } from '@/components/ui/Card';
@@ -47,6 +49,7 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
     <View>
       <SectionHeader
         title="Anggaran Bulan Ini"
+        icon="wallet-outline"
         actionLabel="Lihat Semua"
         onAction={() => router.push('/(tabs)/budget' as any)}
       />
@@ -56,7 +59,11 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
           const pct = effectiveLimit > 0 ? (b.spent / effectiveLimit) * 100 : 0;
           const color = statusColor(pct);
           return (
-            <View key={b.id} style={i > 0 ? styles.rowSpaced : undefined}>
+            <Animated.View
+              key={b.id}
+              style={i > 0 ? styles.rowSpaced : undefined}
+              entering={shouldReduceMotion() ? undefined : FadeInDown.duration(300).delay(staggerDelay(i, 60))}
+            >
               <View style={styles.labelRow}>
                 <View style={styles.nameWrap}>
                   <View style={[styles.categoryDot, { backgroundColor: b.color || theme.colors.primary }]} />
@@ -77,7 +84,7 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
               <Text style={styles.amount}>
                 {formatRupiah(b.spent)} / {formatRupiah(effectiveLimit)}
               </Text>
-            </View>
+            </Animated.View>
           );
         })}
       </Card>
@@ -86,7 +93,11 @@ export const BudgetProgressCard: React.FC<BudgetProgressCardProps> = ({ budgets 
 };
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
-  card: { backgroundColor: theme.colors.surfaceElevated },
+  card: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radius.xl,
+    ...theme.shadow.sm,
+  },
   rowSpaced: { marginTop: theme.spacing.md },
   labelRow: {
     flexDirection: 'row',

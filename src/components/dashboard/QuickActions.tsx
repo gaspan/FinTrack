@@ -1,54 +1,64 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { hapticLight } from '@/utils/haptic';
-import { Card } from '@/components/ui/Card';
+import { shouldReduceMotion, staggerDelay } from '@/utils/motion';
 
 interface Action {
   label: string;
+  hint: string;
   icon: keyof typeof Ionicons.glyphMap;
-  color: (t: Theme) => string;
+  tint: string;
+  bg: string;
   route: string;
 }
 
 const ACTIONS: Action[] = [
-  { label: 'Tambah', icon: 'add-circle', color: (t) => t.colors.primary, route: '/(tabs)/add' },
-  { label: 'Transfer', icon: 'swap-horizontal', color: (t) => t.colors.info, route: '/transfer' },
-  { label: 'Anggaran', icon: 'pie-chart', color: (t) => t.colors.warning, route: '/(tabs)/budget' },
-  { label: 'Target', icon: 'flag', color: (t) => t.colors.accent, route: '/goals' },
+  { label: 'Tambah', hint: 'Catat', icon: 'add', tint: '#00D09C', bg: 'rgba(0,208,156,0.14)', route: '/(tabs)/add' },
+  { label: 'Transfer', hint: 'Pindah', icon: 'swap-horizontal', tint: '#38BDF8', bg: 'rgba(56,189,248,0.14)', route: '/transfer' },
+  { label: 'Anggaran', hint: 'Batas', icon: 'pie-chart', tint: '#FBBF24', bg: 'rgba(251,191,36,0.16)', route: '/(tabs)/budget' },
+  { label: 'Target', hint: 'Goal', icon: 'flag', tint: '#818CF8', bg: 'rgba(129,140,248,0.16)', route: '/goals' },
 ];
 
-const QuickActionItem: React.FC<{
-  action: Action;
-  color: string;
-  itemStyle: object;
-  touchStyle: object;
-  iconWrapStyle: object;
-  labelStyle: object;
-}> = ({ action, color, itemStyle, touchStyle, iconWrapStyle, labelStyle }) => {
-  const [pressed, setPressed] = useState(false);
+const QuickActionItem: React.FC<{ action: Action; index: number }> = ({ action, index }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const scale = useSharedValue(1);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const pressIn = () => {
+    'worklet';
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value (UI thread)
+    scale.value = withSpring(0.88, { damping: 14, stiffness: 320 });
+  };
+  const pressOut = () => {
+    'worklet';
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value (UI thread)
+    scale.value = withSpring(1, { damping: 14, stiffness: 320 });
+  };
 
   return (
     <Animated.View
-      style={[
-        itemStyle,
-        {
-          transform: [{ scale: pressed ? 0.9 : 1 }],
-          transitionProperty: 'transform',
-          transitionDuration: 150,
-          transitionTimingFunction: 'ease',
-        },
-      ]}
+      style={[styles.item, animStyle]}
+      entering={shouldReduceMotion() ? undefined : FadeInDown.duration(360).delay(staggerDelay(index, 55)).springify().damping(20)}
     >
       <TouchableOpacity
-        style={touchStyle}
-        activeOpacity={0.7}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
+        style={styles.touch}
+        activeOpacity={0.75}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
         onPress={() => {
           hapticLight();
           router.push(action.route as any);
@@ -56,10 +66,11 @@ const QuickActionItem: React.FC<{
         accessibilityRole="button"
         accessibilityLabel={action.label}
       >
-        <View style={[iconWrapStyle, { backgroundColor: `${color}1F` }]}>
-          <Ionicons name={action.icon} size={21} color={color} />
+        <View style={[styles.iconWrap, { backgroundColor: action.bg }]}>
+          <Ionicons name={action.icon} size={22} color={action.tint} />
         </View>
-        <Text style={labelStyle}>{action.label}</Text>
+        <Text style={styles.label}>{action.label}</Text>
+        <Text style={styles.hint}>{action.hint}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -70,36 +81,35 @@ export const QuickActions: React.FC = () => {
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   return (
-    <Card style={styles.card}>
+    <View style={styles.card}>
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Aksi cepat</Text>
           <Text style={styles.subtitle}>Kelola uangmu dalam satu tap</Text>
         </View>
-        <Ionicons name="flash-outline" size={18} color={theme.colors.warning} />
+        <View style={styles.flashBadge}>
+          <Ionicons name="flash" size={14} color={theme.colors.warning} />
+        </View>
       </View>
       <View style={styles.row}>
-        {ACTIONS.map((a) => (
-          <QuickActionItem
-            key={a.label}
-            action={a}
-            color={a.color(theme)}
-            itemStyle={styles.item}
-            touchStyle={styles.touch}
-            iconWrapStyle={styles.iconWrap}
-            labelStyle={styles.label}
-          />
+        {ACTIONS.map((a, i) => (
+          <QuickActionItem key={a.label} action={a} index={i} />
         ))}
       </View>
-    </Card>
+    </View>
   );
 };
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   card: {
     marginHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
+    marginTop: -52,
     padding: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadow.md,
   },
   header: {
     flexDirection: 'row',
@@ -116,23 +126,45 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     ...theme.typography.caption,
     marginTop: 2,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  item: { flex: 1 },
-  touch: { alignItems: 'center', gap: 6 },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radius.lg,
+  flashBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: `${theme.colors.warning}1F`,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  item: { flex: 1 },
+  touch: {
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  iconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   label: {
+    ...theme.typography.bodySmall,
+    fontSize: 12,
+    color: theme.colors.textPrimary,
+    fontWeight: '700',
+  },
+  hint: {
     ...theme.typography.caption,
-    fontSize: 11,
+    fontSize: 10,
     color: theme.colors.textSecondary,
-    fontWeight: '500',
   },
 });

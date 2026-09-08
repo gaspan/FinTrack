@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
 import Animated, { ZoomIn } from 'react-native-reanimated';
@@ -19,15 +19,16 @@ export const FAB = () => {
   const styles = useMemo(() => StyleSheet.create({
     fabWrap: {
       position: 'absolute',
-      right: theme.spacing.lg,
-      bottom: Platform.OS === 'ios' ? 96 : 80,
+      left: theme.spacing.md,
+      top: '50%',
+      marginTop: -28,
       zIndex: 100,
     },
     fab: {
       width: 56,
       height: 56,
       borderRadius: theme.radius.round,
-      backgroundColor: theme.colors.primary,
+      backgroundColor: `${theme.colors.primary}99`,
       justifyContent: 'center',
       alignItems: 'center',
       ...theme.shadow.md,
