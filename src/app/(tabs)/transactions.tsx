@@ -339,6 +339,7 @@ export default function TransactionsScreen() {
           stickySectionHeadersEnabled={true}
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
+          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: theme.colors.border, marginLeft: 84 }} />}
           ListFooterComponent={renderFooter}
         />
       )}
@@ -376,20 +377,23 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   summaryDivider: { width: 1, height: 12, backgroundColor: theme.colors.border },
   listContent: { paddingBottom: theme.spacing.xl },
   sectionHeader: {
-    backgroundColor: theme.colors.surfaceElevated, paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated + 'E6', // 90% opacity for glass effect, adapts to theme
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  sectionTitle: { ...theme.typography.caption, fontWeight: 'bold', textTransform: 'uppercase' },
+  sectionTitle: { ...theme.typography.caption, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, color: theme.colors.primary },
   txItem: {
-    flexDirection: 'row', alignItems: 'center', padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
+    flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
   },
   iconContainer: {
-    width: 48, height: 48, borderRadius: theme.radius.round, justifyContent: 'center', alignItems: 'center',
+    width: 52, height: 52, borderRadius: theme.radius.xl, justifyContent: 'center', alignItems: 'center',
     marginRight: theme.spacing.md,
   },
   txDetails: { flex: 1 },
-  txCategory: { ...theme.typography.body, fontWeight: '600', marginBottom: 2 },
+  txCategory: { ...theme.typography.body, fontWeight: '700', marginBottom: 4, fontSize: 15 },
   txNotes: { ...theme.typography.bodySmall },
   itemTagRow: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4,
@@ -404,8 +408,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   itemTagMore: {
     fontSize: 10, color: theme.colors.textSecondary,
   },
-  txAmountContainer: { alignItems: 'flex-end' },
-  txAmount: { ...theme.typography.subtitle, fontWeight: 'bold' },
+  txAmountContainer: { alignItems: 'flex-end', marginLeft: theme.spacing.sm },
+  txAmount: { ...theme.typography.subtitle, fontWeight: '800', fontFamily: theme.typography.h1.fontFamily },
   footerLoader: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     paddingVertical: theme.spacing.md, gap: theme.spacing.sm,

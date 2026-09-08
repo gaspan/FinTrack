@@ -1,6 +1,6 @@
 import { Tabs, router } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -19,7 +19,8 @@ import {
 } from '@/features/notifications/localNotifications';
 import { bootCheckpoint, markBootOk, shouldShowBootDiagnostic, ackBootDiagnostic } from '@/lib/bootLog';
 import { SubscriptionQueries, NetWorthQueries } from '@/lib/queries';
-import { FAB } from '@/components/ui/FAB';
+import { DraggableFAB } from '@/components/ui/DraggableFAB';
+import { CustomTabBar } from '@/components/ui/CustomTabBar';
 import { waitForUnlock } from '@/lib/unlockGate';
 
 export default function TabLayout() {
@@ -81,24 +82,41 @@ export default function TabLayout() {
     <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
+          tabBarShowLabel: false,
           tabBarActiveTintColor: theme.colors.primary,
           tabBarInactiveTintColor: theme.colors.textSecondary,
           headerShown: true,
-          headerStyle: { backgroundColor: theme.colors.background },
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 0,
+          },
+          headerTitleStyle: {
+            fontFamily: theme.typography.h3.fontFamily,
+            fontSize: 18,
+          },
           headerTintColor: theme.colors.textPrimary,
-          tabBarStyle: Platform.select({
-            default: { backgroundColor: theme.colors.surfaceElevated, borderTopColor: theme.colors.border },
-          }),
-        }}>
+        }}
+        tabBar={(props) => <CustomTabBar {...props} />}
+      >
         <Tabs.Screen
           name="index"
-          options={{ title: 'Dashboard', headerShown: false, tabBarIcon: ({ color }) => <Ionicons name="pie-chart" size={24} color={color} /> }}
+          options={{
+            title: 'Dashboard',
+            headerShown: false,
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'grid' : 'grid-outline'} size={24} color={color} />
+            )
+          }}
         />
         <Tabs.Screen
           name="transactions"
           options={{
             title: 'Riwayat',
-            tabBarIcon: ({ color }) => <Ionicons name="list" size={24} color={color} />,
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={24} color={color} />
+            ),
             headerRight: () => (
               <Ionicons
                 name="calendar-outline"
@@ -116,14 +134,24 @@ export default function TabLayout() {
         />
         <Tabs.Screen
           name="budget"
-          options={{ title: 'Anggaran', tabBarIcon: ({ color }) => <Ionicons name="wallet" size={24} color={color} /> }}
+          options={{
+            title: 'Anggaran',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={24} color={color} />
+            )
+          }}
         />
         <Tabs.Screen
           name="settings"
-          options={{ title: 'Pengaturan', tabBarIcon: ({ color }) => <Ionicons name="settings" size={24} color={color} /> }}
+          options={{
+            title: 'Pengaturan',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
+            )
+          }}
         />
       </Tabs>
-      <FAB />
+      <DraggableFAB />
     </View>
   );
 }
