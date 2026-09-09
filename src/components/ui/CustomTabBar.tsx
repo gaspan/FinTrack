@@ -86,6 +86,9 @@ export const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarPro
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
+  const currentRoute = state.routes[state.index]?.name;
+  if (currentRoute === 'add') return null;
+
   return (
     <View style={styles.container}>
       <View style={styles.bar}>

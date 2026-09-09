@@ -130,7 +130,7 @@ export default function TabLayout() {
         />
         <Tabs.Screen
           name="add"
-          options={{ title: '', tabBarButton: () => null }}
+          options={{ title: '', headerShown: false, tabBarButton: () => null }}
         />
         <Tabs.Screen
           name="budget"
