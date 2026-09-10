@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
@@ -38,6 +38,14 @@ interface TransactionFormProps {
     attachmentPaths: string[];
   }) => void;
   loading?: boolean;
+  /** Hasil scan struk: hanya mengisi field yang masih kosong (amount 0, notes '', tanggal hari ini). */
+  scannedPatch?: {
+    amount: number | null;
+    transactionDate: string | null;
+    notes: string | null;
+    attachmentUri?: string | null;
+    patchId: number;
+  } | null;
 }
 
 export const TransactionForm: React.FC<TransactionFormProps> = ({
@@ -47,6 +55,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   wallets,
   onSubmit,
   loading = false,
+  scannedPatch = null,
 }) => {
   const isEditing = !!initialData;
   const { theme } = useTheme();
@@ -65,6 +74,31 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   );
   const [savingAttachment, setSavingAttachment] = useState(false);
   const tagInputRef = useRef<TagInputRef>(null);
+
+  // Terapkan hasil scan struk tanpa menimpa input user (fill-empty-only).
+  // Sengaja via effect: patch datang async dari parent setelah user mungkin
+  // sudah mengetik, jadi tidak bisa diinisialisasi sekali di useState.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!scannedPatch) return;
+    if (scannedPatch.amount !== null && scannedPatch.amount > 0) {
+      setAmount((prev) => (prev > 0 ? prev : scannedPatch.amount as number));
+    }
+    if (scannedPatch.transactionDate) {
+      const scanned = dayjs(scannedPatch.transactionDate);
+      if (scanned.isValid()) {
+        setDate((prev) => (prev.isSame(dayjs(), 'day') ? scanned : prev));
+      }
+    }
+    if (scannedPatch.notes) {
+      setNotes((prev) => (prev.trim() ? prev : (scannedPatch.notes as string)));
+    }
+    if (scannedPatch.attachmentUri) {
+      const uri = scannedPatch.attachmentUri;
+      setAttachmentUris((prev) => (prev.includes(uri) ? prev : [...prev, uri]));
+    }
+  }, [scannedPatch]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Filter categories based on selected type
   const filteredCategories = categories.filter(c => c.type === type);

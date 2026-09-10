@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text, Platform } from 'react-native';
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { useTheme, type Theme } from '@/constants/theme';
 import { useBook } from '@/constants/books';
@@ -13,6 +15,8 @@ import { checkBudgetAlerts } from '@/features/notifications/budgetReminder';
 import { hapticSuccess } from '@/utils/haptic';
 import { SuccessAnimation } from '@/components/ui/SuccessAnimation';
 import { findSalaryCategoryId } from '@/utils/payroll';
+import { useReceiptScan } from '@/features/receipt-scan/useReceiptScan';
+import { formatRupiah } from '@/utils/format';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
 
@@ -74,6 +78,15 @@ export default function AddTransactionScreen() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [scanPatchId, setScanPatchId] = useState(0);
+  const [scannedPatch, setScannedPatch] = useState<{
+    amount: number | null;
+    transactionDate: string | null;
+    notes: string | null;
+    attachmentUri?: string | null;
+    patchId: number;
+  } | null>(null);
+  const { scanning, scanFromCamera, scanFromGallery } = useReceiptScan();
 
   const loadData = useCallback(async () => {
     try {
@@ -102,6 +115,72 @@ export default function AddTransactionScreen() {
       loadData();
     }, [loadData])
   );
+
+  const applyScanResult = useCallback(async (result: {
+    amount: number | null;
+    date: Date | null;
+    merchantName: string | null;
+    imageUri: string;
+  }) => {
+    // Simpan foto struk sebagai lampiran persisten (pola sama seperti TransactionForm).
+    let attachmentUri: string | null = null;
+    try {
+      const fileName = `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+      const dest = FileSystem.documentDirectory + 'attachments/' + fileName;
+      await FileSystem.makeDirectoryAsync(FileSystem.documentDirectory + 'attachments/', { intermediates: true });
+      await FileSystem.copyAsync({ from: result.imageUri, to: dest });
+      attachmentUri = dest;
+    } catch {
+      attachmentUri = result.imageUri;
+    }
+    const patchId = scanPatchId + 1;
+    setScanPatchId(patchId);
+    setScannedPatch({
+      amount: result.amount,
+      transactionDate: result.date ? dayjs(result.date).format('YYYY-MM-DD') : null,
+      notes: result.merchantName ? `${result.merchantName} (Scan struk)` : null,
+      attachmentUri,
+      patchId,
+    });
+    hapticSuccess();
+    Alert.alert(
+      'Struk terpindai',
+      result.amount
+        ? `Nominal ${formatRupiah(result.amount)} terisi otomatis. Periksa kembali sebelum menyimpan.`
+        : 'Struk terbaca, tapi nominal tidak ditemukan. Silakan isi manual.',
+    );
+  }, [scanPatchId]);
+
+  const handleScanPress = useCallback(() => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Tidak didukung', 'Pindai struk hanya tersedia di aplikasi Android/iOS.');
+      return;
+    }
+    if (Constants.appOwnership === 'expo') {
+      Alert.alert(
+        'Butuh Development Build',
+        'Fitur scan struk memakai modul native yang tidak tersedia di Expo Go. Bangun development client dengan eas build --profile development, install APK-nya, lalu buka proyek dari Dev Client.',
+      );
+      return;
+    }
+    Alert.alert('Scan Struk', 'Pilih sumber foto struk belanja', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Kamera',
+        onPress: async () => {
+          const result = await scanFromCamera();
+          if (result) await applyScanResult(result);
+        },
+      },
+      {
+        text: 'Galeri',
+        onPress: async () => {
+          const result = await scanFromGallery();
+          if (result) await applyScanResult(result);
+        },
+      },
+    ]);
+  }, [applyScanResult, scanFromCamera, scanFromGallery]);
 
   const handleSubmit = async (data: {
     type: TransactionType;
@@ -163,6 +242,16 @@ export default function AddTransactionScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        {Platform.OS !== 'web' && (
+          <TouchableOpacity onPress={handleScanPress} disabled={scanning} style={styles.scanBtn}>
+            {scanning ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <Ionicons name="scan-outline" size={20} color={theme.colors.primary} />
+            )}
+            <Text style={styles.scanBtnText}>{scanning ? 'Memindai...' : 'Scan Struk'}</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <Ionicons name="close" size={28} color={theme.colors.textPrimary} />
         </TouchableOpacity>
@@ -172,6 +261,7 @@ export default function AddTransactionScreen() {
         wallets={wallets}
         onSubmit={handleSubmit}
         loading={submitting}
+        scannedPatch={scannedPatch}
       />
       <SuccessAnimation
         visible={showSuccess}
@@ -189,9 +279,26 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
+  },
+  scanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  scanBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.primary,
   },
   closeBtn: {
     width: 40,

@@ -129,4 +129,18 @@ jest.mock('xlsx', () => ({
   utils: { sheet_to_json: jest.fn().mockReturnValue([]) },
 }));
 
+jest.mock('@react-native-ml-kit/text-recognition', () => ({
+  __esModule: true,
+  default: { recognize: jest.fn().mockResolvedValue({ text: '', blocks: [] }) },
+}));
+
+jest.mock('expo-image-picker', () => ({
+  getCameraPermissionsAsync: jest.fn().mockResolvedValue({ granted: true, canAskAgain: true }),
+  requestCameraPermissionsAsync: jest.fn().mockResolvedValue({ granted: true, canAskAgain: true }),
+  getMediaLibraryPermissionsAsync: jest.fn().mockResolvedValue({ granted: true, canAskAgain: true }),
+  requestMediaLibraryPermissionsAsync: jest.fn().mockResolvedValue({ granted: true, canAskAgain: true }),
+  launchCameraAsync: jest.fn().mockResolvedValue({ canceled: true, assets: null }),
+  launchImageLibraryAsync: jest.fn().mockResolvedValue({ canceled: true, assets: null }),
+}));
+
 global.__DEV__ = true;
