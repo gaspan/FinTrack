@@ -14,6 +14,7 @@ import { hapticLight } from '@/utils/haptic';
 
 const HIDDEN_ON = ['add'];
 const FAB_SIZE = 60;
+const MINI_SIZE = 44;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Define safe areas for dragging
@@ -29,6 +30,7 @@ export const DraggableFAB = () => {
   const hidden = HIDDEN_ON.includes(segments[segments.length - 1] as string);
 
   const [pressed, setPressed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   // Use a standard animated value for position
   const pan = useRef(new Animated.ValueXY({ x: MAX_X, y: SCREEN_HEIGHT - 160 })).current;
@@ -48,6 +50,7 @@ export const DraggableFAB = () => {
         });
         pan.setValue({ x: 0, y: 0 });
         setPressed(true);
+        setExpanded(false);
       },
       onPanResponderMove: Animated.event(
         [null, { dx: pan.x, dy: pan.y }],
@@ -83,6 +86,18 @@ export const DraggableFAB = () => {
 
   if (hidden) return null;
 
+  const goAdd = () => {
+    hapticLight();
+    setExpanded(false);
+    router.push('/(tabs)/add' as any);
+  };
+
+  const goScan = () => {
+    hapticLight();
+    setExpanded(false);
+    router.push('/(tabs)/add?scan=1' as any);
+  };
+
   return (
     <Animated.View
       style={[
@@ -97,15 +112,32 @@ export const DraggableFAB = () => {
       ]}
       {...panResponder.panHandlers}
     >
+      {expanded && (
+        <TouchableOpacity
+          style={styles.miniFab}
+          activeOpacity={0.8}
+          onPress={goScan}
+          accessibilityLabel="Scan struk"
+        >
+          <Ionicons name="scan-outline" size={20} color={theme.colors.primary} />
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, pressed && styles.fabPressed]}
         activeOpacity={0.8}
-        onPress={() => {
+        onPress={() => (expanded ? setExpanded(false) : goAdd())}
+        onLongPress={() => {
           hapticLight();
-          router.push('/(tabs)/add' as any);
+          setExpanded((v) => !v);
         }}
+        delayLongPress={320}
       >
-        <Ionicons name="add" size={32} color={theme.colors.textOnPrimary} />
+        <Ionicons
+          name={expanded ? 'close' : 'add'}
+          size={32}
+          color={theme.colors.textOnPrimary}
+        />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -117,6 +149,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     left: 0,
     top: 0,
     zIndex: 9999, // Ensure it's above everything including tabs
+    alignItems: 'flex-end',
+    gap: 10,
     ...Platform.select({
       ios: {
         shadowColor: theme.colors.primary,
@@ -138,5 +172,17 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.15)',
-  }
+  },
+  fabPressed: { opacity: 0.9 },
+  miniFab: {
+    width: MINI_SIZE,
+    height: MINI_SIZE,
+    borderRadius: MINI_SIZE / 2,
+    backgroundColor: theme.colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadow.md,
+  },
 });

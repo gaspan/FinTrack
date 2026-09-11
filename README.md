@@ -13,13 +13,13 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 
 ## ✨ Fitur Utama
 
-- **📊 Dashboard Interaktif v2**: Pantau total saldo di **hero gradient full-bleed** dengan rangkuman pemasukan/pengeluaran, indikator tren, dan chip periode gaji. **4 aksi cepat** (Tambah, Transfer, Anggaran, Target) langsung dari dashboard. Analitik keuangan dalam **satu kartu bertab** (Ringkas/Kategori/Tren) — tidak perlu scroll 3 layar lagi. Dilengkapi **widget anggaran** (top-3 progress bar), **ring target menabung** (SVG progress ring horizontal), **sparkline kekayaan bersih** 12 bulan, dan wawasan finansial yang bisa dibuka/tutup.
+- **📊 Dashboard Interaktif v3**: Dashboard direstrukturisasi menjadi **5 layer tematik**: (1) **Operasional** — ringkasan periode gaji dengan cashflow badge + sparkline, dompet utama, kartu budget gabungan (progress bar total + sisa aman harian), 5 transaksi terakhir; (2) **Wawasan** — kartu kesehatan finansial gabungan (skor + alert + komparasi + tips) + kartu tagihan mendatang (recurring + bill reminder + langganan, 7 hari); (3) **Analitik** — bar chart bulanan + pie kategori dengan toggle; (4) **Kekayaan** — goals strip + net worth card; (5) **Makro** — market ticker emas & USD/IDR (tap ke layar detail dengan chart penuh) + accordion berita ekonomi (nasional/internasional, default tertutup). Hero gradient menampilkan saldo total + chip dompet utama sebagai satu unit utama.
 - **📈 Visualisasi Data (Charts)**: Analisis pengeluaran dan pemasukan dengan *Overview Donut Chart*, *Expense Category Donut Chart*, *Category Bar Chart*, dan *Grouped Monthly Trend Bar Chart* (6 bulan, menampilkan income & expense berdampingan — bukan hanya salah satu). Semua dalam satu kartu bertab yang menghemat ruang.
 - **📊 Kategori Bulan Ini**: Bar chart pengeluaran dan pemasukan per kategori untuk **bulan kalender berjalan** (terlepas dari filter periode gaji), diurutkan **terbesar dari kiri** (6 kategori teratas) lengkap dengan label nominal. Seksi otomatis sembunyi bila bulan ini belum ada transaksi.
 - **🪙 Harga Emas & 💵 Kurs USD/IDR**: Grafik area 1B/3B/6B (**default 3 bulan**) — emas per gram (Rupiah) dan kurs tengah USD→IDR. **Sentuh/geser grafik** untuk crosshair + tooltip tanggal & harga. Kartu bisa **dilipat/dibuka** (default terbuka). Sumber publik tanpa API key: Yahoo Finance (emas GC=F) & Frankfurter/ECB (kurs), dengan cache offline 6 jam.
 - **📰 Berita Ekonomi Nasional & Internasional**: Dua kartu carousel (satu berita per halaman + dots yang bisa diketuk) berisi berita ekonomi Indonesia dan global via Google News RSS (tanpa API key, cache 1 jam). Kartu bisa dilipat/dibuka; ketuk berita untuk dibaca di browser dalam aplikasi.
 - **✨ Animasi Dashboard**: Angka saldo/pemasukan/pengeluaran **count-up** yang meluncur, orb gradient melayang di hero, parallax hero + sticky pill saldo saat scroll, entrance stagger per seksi, progress bar & ring yang benar-benar beranimasi, dan skeleton loading yang selaras dengan layout asli.
-- **🧭 Custom Tab Bar & ➕ Draggable FAB**: Tab bar pil melayang tanpa label dengan indikator glow pada tab aktif dan ikon yang berubah saat fokus. Tombol tambah transaksi (+) **bisa digeser** ke posisi mana pun (dengan batas area aman) dan tampil sedikit transparan agar tidak menutupi konten.
+- **🧭 Custom Tab Bar & ➕ Draggable FAB**: Tab bar pil melayang tanpa label dengan indikator glow pada tab aktif dan ikon yang berubah saat fokus. Tombol tambah transaksi (+) **bisa digeser** ke posisi mana pun (dengan batas area aman) dan tampil sedikit transparan agar tidak menutupi konten. **Long-press** FAB memperluas opsi **Scan Struk** — tap ikon kamera langsung membuka dialog scan OCR.
 - **👛 Multi-Dompet (Wallets)**: Kelola berbagai sumber dana seperti Uang Tunai, Rekening Bank, dan E-Wallet dengan saldo yang terpisah. Tandai satu dompet sebagai **Dompet Utama** (primary), tambah dompet baru dengan pilihan ikon dan warna, **edit dompet** (nama/ikon/warna/saldo awal — perubahan saldo awal otomatis menggeser saldo berjalan tanpa mengubah transaksi), serta hapus dengan konfirmasi yang memberi tahu jumlah transaksi terdampak.
 - **🎯 Manajemen Anggaran (Budgeting)**: Cegah pemborosan dengan mengatur batas anggaran bulanan per kategori. Dilengkapi *progress bar* visual dengan indikator warna (hijau <70%, kuning 70–90%, merah >90%). **Widget anggaran di dashboard** menampilkan 3 kategori teratas yang paling mendekati batas.
 - **🔄 Budget Rollover**: Aktifkan toggle **"Teruskan sisa ke bulan depan"** per kategori anggaran — sisa yang tidak terpakai otomatis ditambahkan ke limit bulan berikutnya (envelope budgeting). Engine berjalan otomatis saat app dibuka & setelah simpan budget, dengan indikator "Sisa bulan lalu +Rp X" di layar Anggaran dan dashboard. Alert 90%/100% dihitung terhadap *effective limit* (limit + rollover).
@@ -65,6 +65,8 @@ Hadir dengan desain antarmuka (UI) modern bertema hijau-to-cyan yang elegan, dil
 - **🔔 Notifikasi Push Lokal**: Notifikasi sistem sungguhan (bukan sekadar Alert) via `expo-notifications`. Mencakup **Pengingat Harian** ("Catat pengeluaran hari ini") dengan **jam yang bisa diatur** di Pengaturan (stepper 30 menit, default 20.00) dan langsung dijadwalkan ulang tanpa perlu restart, peringatan anggaran 90%/100%, pengingat tagihan H-1 (pukul 09.00), dan pengingat perpanjangan langganan H-1. Android memakai *notification channels* terpisah (Peringatan Anggaran, Pengingat Tagihan, Pengingat Harian, Langganan) dan semua reminder di-reschedule otomatis setiap aplikasi dibuka.
 - **☁️ Backup Cloud Akun (Supabase)**: Layar **"Backup Cloud"** untuk menyimpan data ke Supabase Storage dengan **akun username & password** (tanpa email). Fitur: daftar/masuk akun, backup manual, daftar backup tersimpan (tanggal + ukuran file), restore dengan konfirmasi, hapus backup, dan toggle **"Unggah Otomatis"** yang mengikuti jadwal Backup Otomatis. Maksimal 10 backup terbaru disimpan — backup lama otomatis dihapus. Konfigurasi via `.env` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`) dengan panduan setup SQL di [`supabase-setup.sql`](./supabase-setup.sql).
 - **🧾 Rekonsiliasi Saldo Dompet Otomatis**: Setiap kali aplikasi dibuka, saldo semua dompet diverifikasi ulang dari `initial_balance + jumlah transaksi` dan dikoreksi otomatis jika selisih (mencegah drift saldo akibat data tidak konsisten).
+
+- **🚀 Upcoming Bills Aggregator**: Sistem pengingat tagihan yang lebih cerdas — menggabungkan tiga sumber data (recurring expenses, bill reminders, subscription renewals) dalam satu kartu terpadu di dashboard. Menampilkan label waktu "Terlewat" / "Hari ini" / "Besok" / "N hari lagi" dengan peringatan visual untuk item yang sudah lewat jatuh tempo.
 
 ---
 
@@ -236,6 +238,32 @@ FinTrack/
 ├── package.json                # Dependensi dan script NPM
 └── tsconfig.json               # Konfigurasi TypeScript
 ```
+
+---
+
+## 📝 Changelog
+
+### v3.0.0 — Dashboard Refactor & Scan Receipt (2026-09-11)
+
+**Dashboard Refactor (Ringkasan Tab)**
+- Direstrukturisasi dari 14 section tak terorganisasi menjadi **5 layer tematik**: Operasional, Wawasan, Analitik, Kekayaan, Makro
+- **Layer 1 (Operasional)**: Ringkasan periode gaji dengan date filter + cashflow badge + trend sparkline. CTA kosong yang lebih menarik jika belum ada data. Dompet Utama chip dipindahkan ke hero sebagai satu unit utama. Kartu budget gabungan (BudgetSafeToSpendCard) menggabungkan progress bar total + sisa aman harian. 5 transaksi terakhir (RecentTransactionsCard).
+- **Layer 2 (Wawasan)**: SmartInsightCard (skor kesehatan + alert + komparasi + tips dalam satu kartu collapsible). UpcomingBillsCard — gabungan 3 sumber (recurring, bills, subscriptions) 7 hari ke depan dengan label waktu "Terlewat/Hari ini/Besok/N hari lagi".
+- **Layer 3 (Analitik)**: Bar chart pengeluaran per kategori bulan ini + pie chart analitik dengan toggle.
+- **Layer 4 (Kekayaan)**: GoalsStrip horizontal scroll + NetWorthSummaryCard dengan sparkline.
+- **Layer 5 (Makro)**: MarketWatchCard — ticker compact emas + USD/IDR (tap ke `/market` detail). NewsSection — accordion berita nasional/internasional (default tertutup).
+
+**Data Layer Baru**
+- `RecurringQueries.getUpcoming(days)` + `BillReminderQueries.getUpcoming(days)` — query yang sebelumnya tidak ada
+- `features/dashboard/upcomingBills.ts` — aggregator 3 sumber + label waktu
+- `features/dashboard/useDashboardData.ts` — hook data loading terpusat
+
+**Scan Receipt via FAB**
+- Long-press FAB → opsi scan (ikon kamera) → navigasi ke `/(tabs)/add?scan=1`
+- Auto-trigger dialog scan struk OCR saat masuk via scan param
+
+**Dihapus**
+- `QuickActions.tsx` — redundant dengan FAB
 
 ---
 

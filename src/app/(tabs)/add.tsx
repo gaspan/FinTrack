@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text, Platform } from 'react-native';
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -181,6 +181,16 @@ export default function AddTransactionScreen() {
       },
     ]);
   }, [applyScanResult, scanFromCamera, scanFromGallery]);
+
+  // Buka dialog scan otomatis saat masuk lewat FAB "Scan Struk" (?scan=1)
+  const { scan } = useLocalSearchParams<{ scan?: string }>();
+  const autoScanFired = React.useRef(false);
+  React.useEffect(() => {
+    if (scan === '1' && !autoScanFired.current && !loading) {
+      autoScanFired.current = true;
+      handleScanPress();
+    }
+  }, [scan, loading, handleScanPress]);
 
   const handleSubmit = async (data: {
     type: TransactionType;

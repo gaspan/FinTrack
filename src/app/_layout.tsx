@@ -116,6 +116,7 @@ function NavigationStack() {
         <Stack.Screen name="categories" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Kategori' }} />
         <Stack.Screen name="books" options={{ presentation: 'modal', headerShown: true, title: 'Manajemen Pembukuan' }} />
         <Stack.Screen name="cloud-backup" options={{ presentation: 'modal', headerShown: true, title: 'Backup Cloud' }} />
+        <Stack.Screen name="market" options={{ presentation: 'modal', headerShown: true, title: 'Pantau Pasar' }} />
         <Stack.Screen name="debts" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack>

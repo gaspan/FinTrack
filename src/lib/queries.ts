@@ -787,6 +787,19 @@ export class RecurringQueries {
     `, [this.bookId]);
   }
 
+  /** Recurring aktif yang jatuh tempo dalam `days` hari ke depan (termasuk yang terlewat). */
+  async getUpcoming(days: number): Promise<(RecurringTransaction & { category_name: string; category_icon: string; category_color: string; wallet_name: string })[]> {
+    const until = dayjs().add(days, 'day').format('YYYY-MM-DD');
+    return this.db.getAllAsync(`
+      SELECT r.*, c.name as category_name, c.icon as category_icon, c.color as category_color, w.name as wallet_name
+      FROM recurring_transactions r
+      JOIN categories c ON r.category_id = c.id AND c.book_id = r.book_id
+      JOIN wallets w ON r.wallet_id = w.id AND w.book_id = r.book_id
+      WHERE r.book_id = ? AND r.is_active = 1 AND r.next_date <= ?
+      ORDER BY r.next_date ASC
+    `, [this.bookId, until]);
+  }
+
   async create(rt: Omit<RecurringTransaction, 'id' | 'is_active' | 'book_id'>) {
     await assertBookReference(this.db, 'categories', rt.category_id, this.bookId, 'Kategori');
     await assertBookReference(this.db, 'wallets', rt.wallet_id, this.bookId, 'Dompet');
@@ -1032,9 +1045,17 @@ export class BillReminderQueries {
     `, [this.bookId]);
   }
 
+  /** Tagihan belum lunas yang jatuh tempo dalam `days` hari ke depan (termasuk yang terlewat). */
+  async getUpcoming(days: number): Promise<BillReminder[]> {
+    const until = dayjs().add(days, 'day').format('YYYY-MM-DD');
+    return this.db.getAllAsync<BillReminder>(
+      'SELECT * FROM bill_reminders WHERE book_id = ? AND is_paid = 0 AND due_date <= ? ORDER BY due_date ASC',
+      [this.bookId, until]
+    );
+  }
+
   async create(data: Omit<BillReminder, 'id' | 'created_at' | 'book_id'>) {
-    if (data.category_id) await assertBookReference(this.db, 'categories', data.category_id, this.bookId, 'Kategori');
-    if (data.wallet_id) await assertBookReference(this.db, 'wallets', data.wallet_id, this.bookId, 'Dompet');
+    if (data.category_id) await assertBookReference(this.db, 'categories', data.category_id, this.bookId, 'Kategori');    if (data.wallet_id) await assertBookReference(this.db, 'wallets', data.wallet_id, this.bookId, 'Dompet');
     return this.db.runAsync(
       'INSERT INTO bill_reminders (name, amount, due_date, frequency, is_paid, category_id, wallet_id, notes, book_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [data.name, data.amount, data.due_date, data.frequency, data.is_paid, data.category_id, data.wallet_id, data.notes, this.bookId]

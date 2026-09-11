@@ -205,7 +205,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
 const makeStyles = (theme: Theme) => StyleSheet.create({
   hero: {
     paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl + 100, // Massive padding to allow QuickActions to float over it
+    paddingBottom: theme.spacing.xxl,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
     overflow: 'hidden',
