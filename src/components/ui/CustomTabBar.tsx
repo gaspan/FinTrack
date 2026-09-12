@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useAnimatedStyle,
@@ -27,6 +27,13 @@ interface BottomTabBarProps {
   };
 }
 
+const TAB_LABELS: Record<string, string> = {
+  index: 'Beranda',
+  transactions: 'Riwayat',
+  budget: 'Anggaran',
+  settings: 'Lainnya',
+};
+
 const TabBarIcon = ({
   routeName,
   isFocused,
@@ -38,21 +45,28 @@ const TabBarIcon = ({
   color: string;
   theme: Theme;
 }) => {
-  const scale = useSharedValue(isFocused ? 1.2 : 1);
-  const opacity = useSharedValue(isFocused ? 1 : 0);
+  const scale = useSharedValue(isFocused ? 1.15 : 1);
+  const glowOpacity = useSharedValue(isFocused ? 1 : 0);
+  const labelOpacity = useSharedValue(isFocused ? 1 : 0);
 
   useEffect(() => {
-    scale.value = withSpring(isFocused ? 1.2 : 1, { damping: 12, stiffness: 200 });
-    opacity.value = withTiming(isFocused ? 1 : 0, { duration: 250 });
-  }, [isFocused, scale, opacity]);
+    scale.value = withSpring(isFocused ? 1.15 : 1, { damping: 14, stiffness: 220 });
+    glowOpacity.value = withTiming(isFocused ? 1 : 0, { duration: 250 });
+    labelOpacity.value = withTiming(isFocused ? 1 : 0, { duration: 200 });
+  }, [isFocused, scale, glowOpacity, labelOpacity]);
 
   const animatedIconStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const animatedDotStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: opacity.value }],
+  const animatedGlowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+    transform: [{ scale: 0.8 + glowOpacity.value * 0.2 }],
+  }));
+
+  const animatedLabelStyle = useAnimatedStyle(() => ({
+    opacity: labelOpacity.value,
+    transform: [{ translateY: (1 - labelOpacity.value) * 4 }],
   }));
 
   let iconName = 'grid-outline';
@@ -69,15 +83,18 @@ const TabBarIcon = ({
   }
 
   return (
-    <View style={styles.iconWrap}>
-      <Animated.View style={[styles.activeGlow, { backgroundColor: `${theme.colors.primary}20` }, animatedDotStyle]} />
+    <View style={iconStyles.iconWrap}>
+      <Animated.View style={[iconStyles.activeGlow, { backgroundColor: `${theme.colors.primary}18` }, animatedGlowStyle]} />
       <Animated.View style={animatedIconStyle}>
         <Ionicons
           name={(isFocused ? activeIconName : iconName) as any}
-          size={24}
+          size={22}
           color={color}
         />
       </Animated.View>
+      <Animated.Text style={[iconStyles.label, { color }, animatedLabelStyle]}>
+        {TAB_LABELS[routeName] || ''}
+      </Animated.Text>
     </View>
   );
 };
@@ -119,7 +136,7 @@ export const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarPro
             });
           };
 
-          const color = isFocused ? theme.colors.primary : theme.colors.textSecondary;
+          const color = isFocused ? theme.colors.primary : theme.colors.textMuted;
 
           return (
             <TouchableOpacity
@@ -147,10 +164,10 @@ export const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarPro
   );
 };
 
-const styles = StyleSheet.create({
+const iconStyles = StyleSheet.create({
   iconWrap: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -159,7 +176,14 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-  }
+    top: -2,
+  },
+  label: {
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    marginTop: 2,
+  },
 });
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
@@ -168,7 +192,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     bottom: Platform.OS === 'ios' ? 24 : 16,
     left: 20,
     right: 20,
-    height: 64,
+    height: 68,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -176,22 +200,22 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     flexDirection: 'row',
     width: '100%',
     height: '100%',
-    backgroundColor: theme.colors.surfaceElevated,
-    borderRadius: 32,
+    backgroundColor: theme.colors.surfaceCard,
+    borderRadius: 34,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: theme.colors.glassBorder,
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 8,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.35,
+        shadowRadius: 24,
       },
       android: {
-        elevation: 16,
+        elevation: 20,
       }
     }),
   },

@@ -54,7 +54,7 @@ export const OverviewDonutChart: React.FC<OverviewDonutChartProps> = ({ income, 
         data={pieData}
         radius={110}
         innerRadius={70}
-        innerCircleColor={theme.colors.surface}
+        innerCircleColor={theme.colors.surfaceCard}
         showText
         textColor="#FFF"
         textSize={12}
@@ -98,7 +98,7 @@ export const OverviewDonutChart: React.FC<OverviewDonutChartProps> = ({ income, 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
   },
   emptyContainer: {
     height: 250,
@@ -112,6 +112,10 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     ...theme.typography.bodySmall,
     color: theme.colors.textSecondary,
     marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 10,
+    fontWeight: '600',
   },
   centerValue: {
     ...theme.typography.h3,
@@ -123,29 +127,38 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     justifyContent: 'center',
     marginTop: theme.spacing.lg,
     paddingHorizontal: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '45%', // Two columns
-    marginBottom: theme.spacing.sm,
-    marginRight: theme.spacing.xs,
+    backgroundColor: theme.colors.surfaceGlass,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.round,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     marginRight: theme.spacing.sm,
   },
   legendTextContainer: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
   },
   legendLabel: {
     ...theme.typography.caption,
     color: theme.colors.textPrimary,
+    fontWeight: '600',
   },
   legendValue: {
     ...theme.typography.caption,
     color: theme.colors.textSecondary,
+    fontWeight: '700',
   }
 });
+

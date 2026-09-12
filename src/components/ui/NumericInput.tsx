@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, TextInput, Text, StyleSheet, TextInputProps } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useTheme } from '@/constants/theme';
 import { formatRupiahNumberOnly } from '@/utils/format';
 
@@ -20,6 +22,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
 }) => {
   const { theme } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
+  const focusAnim = useSharedValue(0);
   
   const displayValue = value === 0 ? '' : formatRupiahNumberOnly(value);
 
@@ -29,39 +32,60 @@ export const NumericInput: React.FC<NumericInputProps> = ({
     onChangeValue(isNaN(num) ? 0 : num);
   };
 
+  const animatedBorder = useAnimatedStyle(() => ({
+    borderColor: focusAnim.value === 1
+      ? theme.colors.primary
+      : error ? theme.colors.danger : theme.colors.border,
+    shadowColor: theme.colors.primary,
+    shadowOpacity: focusAnim.value * 0.25,
+    shadowRadius: focusAnim.value * 16,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: focusAnim.value * 6,
+  }));
+
   const styles = useMemo(() => StyleSheet.create({
     container: {
       marginBottom: theme.spacing.md,
     },
     label: {
       ...theme.typography.bodySmall,
-      marginBottom: theme.spacing.xs,
+      fontWeight: '600',
+      marginBottom: theme.spacing.sm,
+      color: theme.colors.textSecondary,
     },
     inputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: theme.colors.surface,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderColor: theme.colors.border,
+      borderRadius: theme.radius.lg,
+      paddingRight: theme.spacing.md,
+      height: 72,
+    },
+    prefixContainer: {
       borderRadius: theme.radius.md,
+      marginLeft: theme.spacing.sm,
+      marginRight: theme.spacing.sm,
+      overflow: 'hidden',
+    },
+    prefixGradient: {
       paddingHorizontal: theme.spacing.md,
-      height: 64,
-    },
-    inputFocused: {
-      borderColor: theme.colors.primary,
-    },
-    inputError: {
-      borderColor: theme.colors.danger,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.radius.md,
     },
     prefix: {
-      ...theme.typography.h2,
-      color: theme.colors.textSecondary,
-      marginRight: theme.spacing.sm,
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.textOnPrimary,
+      letterSpacing: 0.5,
     },
     input: {
-      ...theme.typography.h2,
+      ...theme.typography.h1,
       flex: 1,
       paddingVertical: 0,
+      fontSize: 28,
+      letterSpacing: -0.5,
     },
     errorText: {
       ...theme.typography.caption,
@@ -73,31 +97,37 @@ export const NumericInput: React.FC<NumericInputProps> = ({
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <View style={[
-        styles.inputContainer,
-        error && styles.inputError,
-        isFocused && styles.inputFocused,
-        style as any,
-      ]}>
-        <Text style={styles.prefix}>Rp</Text>
+      <Animated.View style={[styles.inputContainer, animatedBorder, style as any]}>
+        <View style={styles.prefixContainer}>
+          <LinearGradient
+            colors={theme.colors.primaryGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.prefixGradient}
+          >
+            <Text style={styles.prefix}>Rp</Text>
+          </LinearGradient>
+        </View>
         <TextInput
           style={styles.input}
           placeholder="0"
-          placeholderTextColor={theme.colors.textSecondary}
+          placeholderTextColor={theme.colors.textMuted}
           keyboardType="numeric"
           value={displayValue}
           onChangeText={handleChangeText}
           onFocus={(e) => {
             setIsFocused(true);
+            focusAnim.value = withTiming(1, { duration: 200 });
             props.onFocus?.(e);
           }}
           onBlur={(e) => {
             setIsFocused(false);
+            focusAnim.value = withTiming(0, { duration: 200 });
             props.onBlur?.(e);
           }}
           {...props}
         />
-      </View>
+      </Animated.View>
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );

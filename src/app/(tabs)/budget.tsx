@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from 'expo-router';
 import dayjs from 'dayjs';
@@ -86,29 +87,47 @@ export default function BudgetScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
     >
       <View style={styles.header}>
+        <Ionicons name="calendar" size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />
         <Text style={styles.monthText}>{dayjs(currentMonth + '-01').format('MMMM YYYY')}</Text>
       </View>
 
       {/* Overall Summary Card */}
-      <View style={styles.overallCard}>
-        <View style={styles.overallRow}>
-          <View style={styles.overallItem}>
-            <Text style={styles.overallLabel}>Total Anggaran</Text>
-            <Text style={styles.overallValue}>{formatRp(overall.totalLimit)}</Text>
+      <View style={styles.overallCardWrapper}>
+        <LinearGradient
+          colors={[theme.colors.primary + '12', theme.colors.primary + '04']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.overallCard}
+        >
+          <View style={styles.overallRow}>
+            <View style={styles.overallItem}>
+              <Text style={styles.overallLabel}>Total Anggaran</Text>
+              <Text style={styles.overallValue}>{formatRp(overall.totalLimit)}</Text>
+            </View>
+            <View style={styles.overallDivider} />
+            <View style={styles.overallItem}>
+              <Text style={styles.overallLabel}>Terpakai</Text>
+              <Text style={[styles.overallValue, { color: theme.colors.expense }]}>{formatRp(overall.totalSpent)}</Text>
+            </View>
+            <View style={styles.overallDivider} />
+            <View style={styles.overallItem}>
+              <Text style={styles.overallLabel}>Sisa</Text>
+              <Text style={[styles.overallValue, { color: theme.colors.income }]}>{formatRp(overall.totalLimit - overall.totalSpent)}</Text>
+            </View>
           </View>
-          <View style={styles.overallItem}>
-            <Text style={styles.overallLabel}>Terpakai</Text>
-            <Text style={[styles.overallValue, { color: theme.colors.expense }]}>{formatRp(overall.totalSpent)}</Text>
+          <View style={styles.overallProgressBg}>
+            <LinearGradient
+              colors={overall.pct > 90 ? theme.colors.expenseGradient : overall.pct > 70 ? ['#FBBF24', '#F59E0B'] : theme.colors.primaryGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.overallProgress, { width: `${Math.min(overall.pct, 100)}%` as any }]}
+            />
           </View>
-          <View style={styles.overallItem}>
-            <Text style={styles.overallLabel}>Sisa</Text>
-            <Text style={[styles.overallValue, { color: theme.colors.income }]}>{formatRp(overall.totalLimit - overall.totalSpent)}</Text>
+          <View style={styles.overallPctRow}>
+            <Text style={styles.overallPctText}>{overall.pct.toFixed(0)}% terpakai</Text>
+            <Text style={styles.overallPctText}>{(100 - overall.pct).toFixed(0)}% tersisa</Text>
           </View>
-        </View>
-        <View style={styles.overallProgressBg}>
-          <View style={[styles.overallProgress, { width: `${Math.min(overall.pct, 100)}%`, backgroundColor: progressColor }]} />
-        </View>
-        <Text style={styles.overallPct}>{overall.pct.toFixed(0)}% terpakai</Text>
+        </LinearGradient>
       </View>
 
       {/* Category Budgets */}
@@ -134,9 +153,14 @@ export default function BudgetScreen() {
             >
               <View style={styles.budgetHeader}>
                 <View style={styles.categoryInfo}>
-                  <View style={[styles.iconContainer, { backgroundColor: category.color + '20' }]}>
+                  <LinearGradient
+                    colors={[category.color + '25', category.color + '08']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.iconContainer}
+                  >
                     <Ionicons name={category.icon as any} size={20} color={category.color} />
-                  </View>
+                  </LinearGradient>
                   <Text style={styles.categoryName}>{category.name}</Text>
                 </View>
                 <View style={styles.budgetAmountInfo}>
@@ -149,13 +173,22 @@ export default function BudgetScreen() {
               {effectiveLimit > 0 && (
                 <>
                   <View style={styles.progressBarContainer}>
-                    <View style={[styles.progressBar, { width: `${capped}%`, backgroundColor: barColor }]} />
+                    <LinearGradient
+                      colors={pct > 90 ? theme.colors.expenseGradient : pct > 70 ? ['#FBBF24', '#F59E0B'] : [theme.colors.success, '#22C55E']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[styles.progressBar, { width: `${capped}%` as any }]}
+                    />
                   </View>
-                  {rollover > 0 && (
-                    <Text style={styles.rolloverText}>
-                      <Ionicons name="arrow-down-circle-outline" size={12} color={theme.colors.income} /> Sisa bulan lalu +{formatRp(rollover)}
-                    </Text>
-                  )}
+                  <View style={styles.budgetFooter}>
+                    {rollover > 0 && (
+                      <View style={styles.rolloverChip}>
+                        <Ionicons name="arrow-down-circle-outline" size={12} color={theme.colors.income} />
+                        <Text style={styles.rolloverText}> +{formatRp(rollover)} sisa bulan lalu</Text>
+                      </View>
+                    )}
+                    <Text style={[styles.pctText, { color: barColor }]}>{pct.toFixed(0)}%</Text>
+                  </View>
                 </>
               )}
             </TouchableOpacity>
@@ -167,6 +200,7 @@ export default function BudgetScreen() {
       <Modal visible={showForm} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
             {selectedCategory && (
               <BudgetForm
                 category={selectedCategory}
@@ -180,46 +214,54 @@ export default function BudgetScreen() {
         </View>
       </Modal>
 
-      <View style={{ height: 40 }} />
+      <View style={{ height: 100 }} />
     </ScrollView>
   );
 }
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  header: { padding: theme.spacing.md, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  monthText: { ...theme.typography.h3, color: theme.colors.primary },
+  header: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    padding: theme.spacing.md, borderBottomWidth: 1, borderBottomColor: theme.colors.borderSubtle,
+  },
+  monthText: { ...theme.typography.h3, color: theme.colors.primary, fontSize: 18 },
+  overallCardWrapper: { padding: theme.spacing.lg },
   overallCard: {
-    margin: theme.spacing.lg, backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.xl, padding: theme.spacing.lg,
     borderWidth: 1, borderColor: theme.colors.border,
-    ...theme.shadow.md,
   },
-  overallRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.md },
+  overallRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.lg },
   overallItem: { alignItems: 'center', flex: 1 },
-  overallLabel: { ...theme.typography.caption, marginBottom: 4 },
-  overallValue: { ...theme.typography.body, fontWeight: '800', fontFamily: theme.typography.amount.fontFamily, fontSize: 16, marginTop: 4 },
+  overallDivider: { width: 1, backgroundColor: theme.colors.border },
+  overallLabel: { ...theme.typography.caption, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
+  overallValue: { ...theme.typography.body, fontWeight: '800', fontFamily: theme.typography.amount.fontFamily, fontSize: 15, marginTop: 4 },
   overallProgressBg: {
-    height: 12, backgroundColor: theme.colors.surface, borderRadius: 6, overflow: 'hidden', marginTop: theme.spacing.sm,
+    height: 10, backgroundColor: theme.colors.surface, borderRadius: 5, overflow: 'hidden',
   },
-  overallProgress: { height: '100%', borderRadius: 6 },
-  overallPct: { ...theme.typography.caption, textAlign: 'right', marginTop: 4 },
+  overallProgress: { height: '100%', borderRadius: 5 },
+  overallPctRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  overallPctText: { ...theme.typography.caption, fontWeight: '600' },
   list: { padding: theme.spacing.lg, paddingTop: 0 },
   budgetItem: {
-    backgroundColor: theme.colors.surfaceElevated, borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg, marginBottom: theme.spacing.lg,
-    ...theme.shadow.sm,
+    backgroundColor: theme.colors.surfaceCard, borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg, marginBottom: theme.spacing.md,
+    borderWidth: 1, borderColor: theme.colors.border,
   },
   budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm },
   categoryInfo: { flexDirection: 'row', alignItems: 'center' },
-  iconContainer: { width: 44, height: 44, borderRadius: theme.radius.xl, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
+  iconContainer: { width: 44, height: 44, borderRadius: theme.radius.lg, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   categoryName: { ...theme.typography.body, fontWeight: '700', fontSize: 15 },
   budgetAmountInfo: { alignItems: 'flex-end' },
-  spentAmount: { ...theme.typography.body, fontWeight: '800', fontFamily: theme.typography.amount.fontFamily, fontSize: 16 },
+  spentAmount: { ...theme.typography.body, fontWeight: '800', fontFamily: theme.typography.amount.fontFamily, fontSize: 15 },
   limitAmount: { ...theme.typography.caption },
-  progressBarContainer: { height: 10, backgroundColor: theme.colors.surface, borderRadius: 5, overflow: 'hidden', marginTop: theme.spacing.sm },
-  progressBar: { height: '100%', borderRadius: 5 },
-  rolloverText: { ...theme.typography.caption, color: theme.colors.income, marginTop: theme.spacing.xs },
+  progressBarContainer: { height: 8, backgroundColor: theme.colors.surface, borderRadius: 4, overflow: 'hidden', marginTop: theme.spacing.sm },
+  progressBar: { height: '100%', borderRadius: 4 },
+  budgetFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: theme.spacing.xs },
+  rolloverChip: { flexDirection: 'row', alignItems: 'center' },
+  rolloverText: { ...theme.typography.caption, color: theme.colors.income },
+  pctText: { ...theme.typography.caption, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: theme.colors.overlay, justifyContent: 'center', padding: theme.spacing.md },
-  modalContent: { backgroundColor: theme.colors.surfaceElevated, borderRadius: theme.radius.lg, padding: theme.spacing.sm },
+  modalContent: { backgroundColor: theme.colors.surfaceCard, borderRadius: theme.radius.xl, padding: theme.spacing.sm },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.textMuted, alignSelf: 'center', marginVertical: theme.spacing.sm },
 });

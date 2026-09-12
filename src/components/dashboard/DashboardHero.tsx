@@ -87,6 +87,8 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
         <Animated.View style={[styles.decoCircleA, floatA]} />
         <Animated.View style={[styles.decoCircleB, floatB]} />
         <View style={styles.decoRing} />
+        {/* Extra gold accent line */}
+        <View style={styles.decoGoldLine} />
       </View>
 
       <Animated.View entering={enter(0)} style={styles.topRow}>
@@ -145,7 +147,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
 
       <Animated.View entering={enter(180)} style={styles.chipRow}>
         <View style={styles.chip}>
-          <View style={[styles.statusDot, { backgroundColor: trend.isUp ? '#FFFFFF' : '#FFE08A' }]} />
+          <View style={[styles.statusDot, { backgroundColor: trend.isUp ? '#4ADE80' : '#FBBF24' }]} />
           <Ionicons
             name={trend.isUp ? 'trending-up' : 'trending-down'}
             size={12}
@@ -168,9 +170,14 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
       <Animated.View entering={enter(240)} style={styles.splitRow}>
         <View style={styles.splitCell}>
           <View style={styles.splitLabelRow}>
-            <View style={styles.inBadge}>
+            <LinearGradient
+              colors={theme.colors.incomeGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.inBadge}
+            >
               <Ionicons name="arrow-down" size={14} color="#FFFFFF" />
-            </View>
+            </LinearGradient>
             <Text style={styles.splitLabel}>Pemasukan</Text>
           </View>
           <Text
@@ -184,9 +191,14 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
         <View style={styles.splitDivider} />
         <View style={styles.splitCell}>
           <View style={styles.splitLabelRow}>
-            <View style={styles.outBadge}>
+            <LinearGradient
+              colors={theme.colors.expenseGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.outBadge}
+            >
               <Ionicons name="arrow-up" size={14} color="#FFFFFF" />
-            </View>
+            </LinearGradient>
             <Text style={styles.splitLabel}>Pengeluaran</Text>
           </View>
           <Text
@@ -220,7 +232,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: 160,
     top: -120,
     right: -100,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   decoCircleB: {
     position: 'absolute',
@@ -229,7 +241,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: 110,
     top: 60,
     left: -80,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
   decoRing: {
     position: 'absolute',
@@ -239,7 +251,15 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     bottom: -250,
     right: 20,
     borderWidth: 40,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  decoGoldLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: 'rgba(212, 165, 116, 0.3)',
   },
   flex: { flex: 1 },
   topRow: {
@@ -250,12 +270,12 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   greeting: {
     ...theme.typography.h3,
     color: theme.colors.textOnPrimary,
-    fontSize: 21,
+    fontSize: 22,
   },
   date: {
     ...theme.typography.bodySmall,
     color: theme.colors.textOnPrimary,
-    opacity: 0.82,
+    opacity: 0.75,
     marginTop: 2,
   },
   bookSelector: {
@@ -264,9 +284,9 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     padding: theme.spacing.sm,
     paddingRight: theme.spacing.sm,
     borderRadius: theme.radius.xl,
-    backgroundColor: 'rgba(255, 255, 255, 0.20)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: 'rgba(255,255,255,0.2)',
     marginBottom: theme.spacing.md,
   },
   bookIcon: {
@@ -280,9 +300,9 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   bookEyebrow: {
     ...theme.typography.caption,
     color: theme.colors.textOnPrimary,
-    opacity: 0.72,
+    opacity: 0.65,
     fontSize: 9,
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     fontWeight: '700',
   },
   bookName: {
@@ -297,35 +317,33 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: theme.radius.round,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     marginLeft: theme.spacing.sm,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
+    width: 42,
+    height: 42,
     borderRadius: theme.radius.round,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   balanceLabel: {
     ...theme.typography.bodySmall,
     color: theme.colors.textOnPrimary,
-    opacity: 0.85,
+    opacity: 0.75,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1.2,
     fontSize: 10,
     fontWeight: '600',
   },
   balanceValue: {
-    ...theme.typography.amount,
+    ...theme.typography.amountLarge,
     color: theme.colors.textOnPrimary,
     marginTop: 8,
-    fontSize: 52,
-    letterSpacing: -2,
-    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowColor: 'rgba(0,0,0,0.25)',
     textShadowOffset: { width: 0, height: 6 },
     textShadowRadius: 16,
   },
@@ -342,9 +360,9 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 8,
     borderRadius: theme.radius.round,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   statusDot: {
     width: 6,
@@ -362,39 +380,37 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'stretch',
     marginTop: theme.spacing.xl,
     padding: theme.spacing.lg,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: theme.radius.xl,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   splitCell: { flex: 1, paddingHorizontal: theme.spacing.xs },
   splitDivider: {
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     marginHorizontal: theme.spacing.xs,
   },
-  splitLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  splitLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   inBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   outBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   splitLabel: {
     ...theme.typography.caption,
     color: theme.colors.textOnPrimary,
-    opacity: 0.92,
-    fontWeight: '500',
+    opacity: 0.85,
+    fontWeight: '600',
   },
   splitValue: {
     ...theme.typography.subtitle,
@@ -402,6 +418,6 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.textOnPrimary,
     marginTop: 6,
-    fontSize: 15,
+    fontSize: 16,
   },
 });

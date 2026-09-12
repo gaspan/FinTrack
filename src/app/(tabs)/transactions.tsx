@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, SectionList, RefreshControl, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect, router } from 'expo-router';
 import dayjs from 'dayjs';
@@ -169,16 +170,21 @@ export default function TransactionsScreen() {
         ]);
       }}
     >
-      <View style={[styles.iconContainer, { backgroundColor: item.category_color + '20' }]}>
-        <Ionicons name={item.category_icon as any} size={24} color={item.category_color} />
-      </View>
+      <LinearGradient
+        colors={[item.category_color + '25', item.category_color + '08']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.iconContainer}
+      >
+        <Ionicons name={item.category_icon as any} size={22} color={item.category_color} />
+      </LinearGradient>
       <View style={styles.txDetails}>
         <Text style={styles.txCategory}>{item.category_name}</Text>
         <Text style={styles.txNotes} numberOfLines={1}>{item.notes || item.wallet_name}</Text>
         {item.tags && item.tags.length > 0 && (
           <View style={styles.itemTagRow}>
             {item.tags.slice(0, 3).map(tag => (
-              <View key={tag.id} style={[styles.itemTagChip, { backgroundColor: tag.color + '20', borderColor: tag.color }]}>
+              <View key={tag.id} style={[styles.itemTagChip, { backgroundColor: tag.color + '18', borderColor: tag.color + '40' }]}>
                 <Text style={[styles.itemTagText, { color: tag.color }]}>{tag.name}</Text>
               </View>
             ))}
@@ -224,17 +230,17 @@ export default function TransactionsScreen() {
     <View style={styles.container}>
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
+          <Ionicons name="search-outline" size={18} color={theme.colors.textMuted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Cari transaksi..."
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={theme.colors.textMuted}
             value={searchText}
             onChangeText={setSearchText}
           />
           {searchText.length > 0 && (
             <TouchableOpacity onPress={() => setSearchText('')}>
-              <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
+              <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -255,6 +261,7 @@ export default function TransactionsScreen() {
               key={t}
               style={[styles.filterChip, filterType === t && styles.filterChipActive]}
               onPress={() => setFilterType(t)}
+              activeOpacity={0.7}
             >
               <Text style={[styles.filterChipText, filterType === t && styles.filterChipTextActive]}>
                 {t === 'all' ? 'Semua' : t === 'income' ? 'Pemasukan' : 'Pengeluaran'}
@@ -266,6 +273,7 @@ export default function TransactionsScreen() {
               key={`cat-${cat.id}`}
               style={[styles.filterChip, filterCategory === cat.id && styles.filterChipActive]}
               onPress={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
+              activeOpacity={0.7}
             >
               <Ionicons name={cat.icon as any} size={14} color={filterCategory === cat.id ? theme.colors.textOnPrimary : cat.color} style={{ marginRight: 4 }} />
               <Text style={[styles.filterChipText, filterCategory === cat.id && styles.filterChipTextActive]}>{cat.name}</Text>
@@ -276,6 +284,7 @@ export default function TransactionsScreen() {
               key={`wal-${w.id}`}
               style={[styles.filterChip, filterWallet === w.id && styles.filterChipActive]}
               onPress={() => setFilterWallet(filterWallet === w.id ? null : w.id)}
+              activeOpacity={0.7}
             >
               {w.icon && <Ionicons name={w.icon as any} size={14} color={filterWallet === w.id ? theme.colors.textOnPrimary : w.color || theme.colors.textSecondary} style={{ marginRight: 4 }} />}
               <Text style={[styles.filterChipText, filterWallet === w.id && styles.filterChipTextActive]}>{w.name}</Text>
@@ -290,6 +299,7 @@ export default function TransactionsScreen() {
               key={`tag-${tag.id}`}
               style={[styles.filterChip, filterTagIds.includes(tag.id) && { backgroundColor: tag.color, borderColor: tag.color }]}
               onPress={() => toggleTagFilter(tag.id)}
+              activeOpacity={0.7}
             >
               <Text style={[styles.filterChipText, filterTagIds.includes(tag.id) && styles.filterChipTextActive]}>{tag.name}</Text>
             </TouchableOpacity>
@@ -299,21 +309,25 @@ export default function TransactionsScreen() {
 
       {transactions.length > 0 && (
         <View style={styles.summaryBar}>
-          <Text style={styles.summaryText}>
-            {summaryTotal.count} transaksi
-          </Text>
+          <View style={styles.summaryChip}>
+            <Ionicons name="layers-outline" size={12} color={theme.colors.textSecondary} />
+            <Text style={styles.summaryText}>
+              {summaryTotal.count} transaksi
+            </Text>
+          </View>
           <View style={styles.summaryDivider} />
-          <Text style={[styles.summaryText, { color: theme.colors.income }]}>
+          <Text style={[styles.summaryText, { color: theme.colors.income, fontWeight: '700' }]}>
             +{formatRp(summaryTotal.income)}
           </Text>
-          <Text style={[styles.summaryText, { color: theme.colors.textPrimary }]}>
+          <Text style={[styles.summaryText, { color: theme.colors.expense, fontWeight: '700' }]}>
             -{formatRp(summaryTotal.expense)}
           </Text>
         </View>
       )}
 
       {hasActiveFilter && (
-        <TouchableOpacity style={styles.clearBtn} onPress={clearFilters}>
+        <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} activeOpacity={0.7}>
+          <Ionicons name="close-circle-outline" size={14} color={theme.colors.primary} />
           <Text style={styles.clearBtnText}>Hapus semua filter</Text>
         </TouchableOpacity>
       )}
@@ -329,6 +343,7 @@ export default function TransactionsScreen() {
           renderItem={renderItem}
           renderSectionHeader={({ section: { title } }) => (
             <View style={styles.sectionHeader}>
+              <View style={styles.sectionAccent} />
               <Text style={styles.sectionTitle}>{title}</Text>
             </View>
           )}
@@ -339,7 +354,7 @@ export default function TransactionsScreen() {
           stickySectionHeadersEnabled={true}
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
-          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: theme.colors.border, marginLeft: 84 }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: theme.colors.borderSubtle, marginLeft: 84 }} />}
           ListFooterComponent={renderFooter}
         />
       )}
@@ -352,49 +367,62 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   searchContainer: { paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.sm },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface,
-    borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.md, height: 40,
+    borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.lg,
+    paddingHorizontal: theme.spacing.md, height: 44,
   },
   searchInput: { flex: 1, ...theme.typography.body, color: theme.colors.textPrimary, marginLeft: theme.spacing.sm, paddingVertical: 0 },
   dateRangeRow: { paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.xs },
   filterRow: { paddingVertical: theme.spacing.sm, paddingLeft: theme.spacing.md, marginBottom: 4 },
   filterChip: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: theme.spacing.md,
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.round, backgroundColor: theme.colors.surface, borderWidth: 1,
     borderColor: theme.colors.border, marginRight: theme.spacing.sm,
   },
   filterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  filterChipText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '500' },
+  filterChipText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '600' },
   filterChipTextActive: { color: theme.colors.textOnPrimary },
-  clearBtn: { alignSelf: 'center', marginBottom: theme.spacing.xs },
-  clearBtnText: { ...theme.typography.caption, color: theme.colors.primary, textDecorationLine: 'underline' },
+  clearBtn: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: 4, marginBottom: theme.spacing.xs, paddingVertical: 4, paddingHorizontal: theme.spacing.sm },
+  clearBtnText: { ...theme.typography.caption, color: theme.colors.primary, fontWeight: '600' },
   summaryBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.surfaceElevated, gap: theme.spacing.sm,
+    backgroundColor: theme.colors.surfaceGlass, gap: theme.spacing.sm,
+    marginHorizontal: theme.spacing.md, borderRadius: theme.radius.md,
+    borderWidth: 1, borderColor: theme.colors.border,
+    marginBottom: theme.spacing.xs,
   },
+  summaryChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   summaryText: { ...theme.typography.caption, fontWeight: '600' },
   summaryDivider: { width: 1, height: 12, backgroundColor: theme.colors.border },
-  listContent: { paddingBottom: theme.spacing.xl },
+  listContent: { paddingBottom: theme.spacing.xl + 80 },
   sectionHeader: {
-    backgroundColor: theme.colors.surfaceElevated + 'E6', // 90% opacity for glass effect, adapts to theme
+    backgroundColor: theme.colors.surfaceElevated + 'F0',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: theme.colors.borderSubtle,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  sectionTitle: { ...theme.typography.caption, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, color: theme.colors.primary },
+  sectionAccent: {
+    width: 3,
+    height: 14,
+    borderRadius: 1.5,
+    backgroundColor: theme.colors.primary,
+    marginRight: theme.spacing.sm,
+  },
+  sectionTitle: { ...theme.typography.caption, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: theme.colors.primary },
   txItem: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg,
     backgroundColor: theme.colors.background,
   },
   iconContainer: {
-    width: 52, height: 52, borderRadius: theme.radius.xl, justifyContent: 'center', alignItems: 'center',
+    width: 50, height: 50, borderRadius: theme.radius.lg, justifyContent: 'center', alignItems: 'center',
     marginRight: theme.spacing.md,
   },
   txDetails: { flex: 1 },
-  txCategory: { ...theme.typography.body, fontWeight: '700', marginBottom: 4, fontSize: 15 },
-  txNotes: { ...theme.typography.bodySmall },
+  txCategory: { ...theme.typography.body, fontWeight: '700', marginBottom: 3, fontSize: 15 },
+  txNotes: { ...theme.typography.bodySmall, color: theme.colors.textMuted },
   itemTagRow: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4,
   },
@@ -409,7 +437,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 10, color: theme.colors.textSecondary,
   },
   txAmountContainer: { alignItems: 'flex-end', marginLeft: theme.spacing.sm },
-  txAmount: { ...theme.typography.subtitle, fontWeight: '800', fontFamily: theme.typography.h1.fontFamily },
+  txAmount: { ...theme.typography.subtitle, fontWeight: '800', fontFamily: theme.typography.h1.fontFamily, fontSize: 15 },
   footerLoader: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     paddingVertical: theme.spacing.md, gap: theme.spacing.sm,

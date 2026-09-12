@@ -1,12 +1,14 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import {
-  Animated,
+  Animated as RNAnimated,
   PanResponder,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
   Platform,
+  View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
 import { useTheme, type Theme } from '@/constants/theme';
@@ -32,8 +34,22 @@ export const DraggableFAB = () => {
   const [pressed, setPressed] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
+  // Pulse animation for the FAB ring
+  const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(pulseAnim, { toValue: 1.25, duration: 2000, useNativeDriver: true }),
+        RNAnimated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
   // Use a standard animated value for position
-  const pan = useRef(new Animated.ValueXY({ x: MAX_X, y: SCREEN_HEIGHT - 160 })).current;
+  const pan = useRef(new RNAnimated.ValueXY({ x: MAX_X, y: SCREEN_HEIGHT - 160 })).current;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -52,7 +68,7 @@ export const DraggableFAB = () => {
         setPressed(true);
         setExpanded(false);
       },
-      onPanResponderMove: Animated.event(
+      onPanResponderMove: RNAnimated.event(
         [null, { dx: pan.x, dy: pan.y }],
         { useNativeDriver: false }
       ),
@@ -72,7 +88,7 @@ export const DraggableFAB = () => {
         // Constrain vertical bounds
         const snapY = Math.min(Math.max(currentY, MIN_Y), MAX_Y);
 
-        Animated.spring(pan, {
+        RNAnimated.spring(pan, {
           toValue: { x: snapX, y: snapY },
           useNativeDriver: false,
           friction: 6,
@@ -99,7 +115,7 @@ export const DraggableFAB = () => {
   };
 
   return (
-    <Animated.View
+    <RNAnimated.View
       style={[
         styles.fabContainer,
         {
@@ -123,23 +139,45 @@ export const DraggableFAB = () => {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity
-        style={[styles.fab, pressed && styles.fabPressed]}
-        activeOpacity={0.8}
-        onPress={() => (expanded ? setExpanded(false) : goAdd())}
-        onLongPress={() => {
-          hapticLight();
-          setExpanded((v) => !v);
-        }}
-        delayLongPress={320}
-      >
-        <Ionicons
-          name={expanded ? 'close' : 'add'}
-          size={32}
-          color={theme.colors.textOnPrimary}
+      <View style={styles.fabWrapper}>
+        {/* Pulse ring */}
+        <RNAnimated.View
+          style={[
+            styles.pulseRing,
+            {
+              transform: [{ scale: pulseAnim }],
+              opacity: pulseAnim.interpolate({
+                inputRange: [1, 1.25],
+                outputRange: [0.4, 0],
+              }),
+            },
+          ]}
         />
-      </TouchableOpacity>
-    </Animated.View>
+        <TouchableOpacity
+          style={styles.fabTouchable}
+          activeOpacity={0.85}
+          onPress={() => (expanded ? setExpanded(false) : goAdd())}
+          onLongPress={() => {
+            hapticLight();
+            setExpanded((v) => !v);
+          }}
+          delayLongPress={320}
+        >
+          <LinearGradient
+            colors={theme.colors.primaryGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.fab, pressed && styles.fabPressed]}
+          >
+            <Ionicons
+              name={expanded ? 'close' : 'add'}
+              size={30}
+              color={theme.colors.textOnPrimary}
+            />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </RNAnimated.View>
   );
 };
 
@@ -151,15 +189,34 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     zIndex: 9999, // Ensure it's above everything including tabs
     alignItems: 'flex-end',
     gap: 10,
+  },
+  fabWrapper: {
+    width: FAB_SIZE + 20,
+    height: FAB_SIZE + 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: FAB_SIZE + 16,
+    height: FAB_SIZE + 16,
+    borderRadius: (FAB_SIZE + 16) / 2,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+  },
+  fabTouchable: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
     ...Platform.select({
       ios: {
         shadowColor: theme.colors.primary,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.45,
+        shadowRadius: 16,
       },
       android: {
-        elevation: 10,
+        elevation: 12,
       }
     }),
   },
@@ -167,22 +224,23 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   fabPressed: { opacity: 0.9 },
   miniFab: {
     width: MINI_SIZE,
     height: MINI_SIZE,
     borderRadius: MINI_SIZE / 2,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceCard,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
     ...theme.shadow.md,
+    alignSelf: 'center',
+    marginRight: 8,
   },
 });

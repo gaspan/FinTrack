@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert, TextInput } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, FadeInDown } from 'react-native-reanimated';
 import dayjs from 'dayjs';
 import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -48,6 +50,8 @@ interface TransactionFormProps {
   } | null;
 }
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 export const TransactionForm: React.FC<TransactionFormProps> = ({
   initialType = 'expense',
   initialData,
@@ -75,6 +79,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [savingAttachment, setSavingAttachment] = useState(false);
   const tagInputRef = useRef<TagInputRef>(null);
   const [walletSearchQuery, setWalletSearchQuery] = useState('');
+
+  // Animated sliding indicator for type switcher
+  const switcherIndicatorX = useSharedValue(type === 'income' ? 0 : 1);
+  const switcherIndicatorStyle = useAnimatedStyle(() => ({
+    left: `${switcherIndicatorX.value * 50}%` as any,
+  }));
 
   const filteredWallets = useMemo(() => {
     if (!walletSearchQuery.trim()) return wallets;
@@ -113,6 +123,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     if (newType === type) return;
     hapticLight();
     setType(newType);
+    switcherIndicatorX.value = withSpring(newType === 'income' ? 0 : 1, { damping: 18, stiffness: 200 });
     const newFiltered = categories.filter(c => c.type === newType);
     if (newFiltered.length > 0) {
       setCategoryId(newFiltered[0].id);
@@ -183,22 +194,42 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Type Switcher */}
+      {/* Type Switcher — Animated sliding indicator */}
       <View style={styles.typeSwitcher}>
+        <Animated.View style={[styles.typeIndicator, switcherIndicatorStyle]}>
+          <LinearGradient
+            colors={type === 'income' ? theme.colors.incomeGradient : theme.colors.expenseGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.typeIndicatorGradient}
+          />
+        </Animated.View>
         <TouchableOpacity
-          style={[styles.typeTab, type === 'income' && styles.typeTabActiveIncome]}
+          style={styles.typeTab}
           onPress={() => handleTypeChange('income')}
           activeOpacity={0.8}
         >
+          <Ionicons
+            name="arrow-down-circle"
+            size={16}
+            color={type === 'income' ? theme.colors.textOnPrimary : theme.colors.textSecondary}
+            style={{ marginRight: 6 }}
+          />
           <Text style={[styles.typeText, type === 'income' && styles.typeTextActive]}>
             Pemasukan
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.typeTab, type === 'expense' && styles.typeTabActiveExpense]}
+          style={styles.typeTab}
           onPress={() => handleTypeChange('expense')}
           activeOpacity={0.8}
         >
+          <Ionicons
+            name="arrow-up-circle"
+            size={16}
+            color={type === 'expense' ? theme.colors.textOnPrimary : theme.colors.textSecondary}
+            style={{ marginRight: 6 }}
+          />
           <Text style={[styles.typeText, type === 'expense' && styles.typeTextActive]}>
             Pengeluaran
           </Text>
@@ -220,6 +251,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 key={q}
                 style={[styles.quickChip, amount === q && styles.quickChipActive]}
                 onPress={() => { setAmount(q); hapticLight(); }}
+                activeOpacity={0.7}
               >
                 <Text style={[styles.quickChipText, amount === q && styles.quickChipTextActive]}>
                   {q >= 1000 ? `${(q / 1000).toLocaleString('id')}K` : String(q)}
@@ -237,10 +269,13 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             onPress={() => setShowDatePicker(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+            <View style={styles.dateIconContainer}>
+              <Ionicons name="calendar" size={18} color={theme.colors.primary} />
+            </View>
             <Text style={styles.dateText}>
               {date.isSame(dayjs(), 'day') ? 'Hari ini, ' : ''}{date.format('DD MMMM YYYY')}
             </Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
           </TouchableOpacity>
         </View>
 
@@ -248,35 +283,43 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Kategori</Text>
           <View style={styles.categoryGrid}>
-            {filteredCategories.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                activeOpacity={0.7}
-                style={[
-                  styles.categoryItem,
-                  categoryId === cat.id && styles.categoryItemActive,
-                  categoryId === cat.id && { borderColor: cat.color }
-                ]}
-                onPress={() => { setCategoryId(cat.id); hapticLight(); }}
-              >
-                <View style={[
-                  styles.categoryIconContainer,
-                  { backgroundColor: categoryId === cat.id ? cat.color : theme.colors.surfaceElevated }
-                ]}>
-                  <Ionicons 
-                    name={cat.icon as any} 
-                    size={24} 
-                    color={categoryId === cat.id ? theme.colors.textOnPrimary : cat.color} 
-                  />
-                </View>
-                <Text style={[
-                  styles.categoryLabel,
-                  categoryId === cat.id && { color: theme.colors.textPrimary, fontWeight: '600' }
-                ]} numberOfLines={1}>
-                  {cat.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {filteredCategories.map((cat, idx) => {
+              const isActive = categoryId === cat.id;
+              return (
+                <Animated.View
+                  key={cat.id}
+                  entering={FadeInDown.duration(200).delay(idx * 30)}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.categoryItem,
+                      isActive && styles.categoryItemActive,
+                    ]}
+                    onPress={() => { setCategoryId(cat.id); hapticLight(); }}
+                  >
+                    <View style={[
+                      styles.categoryIconContainer,
+                      isActive
+                        ? { backgroundColor: cat.color, ...theme.shadow.sm }
+                        : { backgroundColor: cat.color + '15' }
+                    ]}>
+                      <Ionicons 
+                        name={cat.icon as any} 
+                        size={24} 
+                        color={isActive ? theme.colors.textOnPrimary : cat.color} 
+                      />
+                    </View>
+                    <Text style={[
+                      styles.categoryLabel,
+                      isActive && { color: theme.colors.textPrimary, fontWeight: '700' }
+                    ]} numberOfLines={1}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
           </View>
         </View>
 
@@ -285,17 +328,17 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           <Text style={styles.sectionTitle}>Dompet</Text>
           
           <View style={styles.walletSearchContainer}>
-            <Ionicons name="search" size={16} color={theme.colors.textSecondary} style={styles.walletSearchIcon} />
+            <Ionicons name="search" size={16} color={theme.colors.textMuted} style={styles.walletSearchIcon} />
             <TextInput
               style={styles.walletSearchInput}
               placeholder="Cari dompet..."
-              placeholderTextColor={theme.colors.textSecondary}
+              placeholderTextColor={theme.colors.textMuted}
               value={walletSearchQuery}
               onChangeText={setWalletSearchQuery}
             />
             {walletSearchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setWalletSearchQuery('')} style={styles.walletSearchClear}>
-                <Ionicons name="close-circle" size={16} color={theme.colors.textSecondary} />
+                <Ionicons name="close-circle" size={16} color={theme.colors.textMuted} />
               </TouchableOpacity>
             )}
           </View>
@@ -306,32 +349,36 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 Dompet tidak ditemukan
               </Text>
             ) : (
-              filteredWallets.map(wallet => (
-                <TouchableOpacity
-                key={wallet.id}
-                activeOpacity={0.7}
-                style={[
-                  styles.walletChip,
-                  walletId === wallet.id && styles.walletChipActive
-                ]}
-                onPress={() => { setWalletId(wallet.id); hapticLight(); }}
-              >
-                {wallet.icon && (
-                  <Ionicons 
-                    name={wallet.icon as any} 
-                    size={16} 
-                    color={walletId === wallet.id ? theme.colors.textOnPrimary : wallet.color || theme.colors.textSecondary}
-                    style={{ marginRight: 6 }}
-                  />
-                )}
-                <Text style={[
-                  styles.walletChipText,
-                  walletId === wallet.id && styles.walletChipTextActive
-                ]}>
-                  {wallet.name}
-                </Text>
-              </TouchableOpacity>
-            )))}
+              filteredWallets.map(wallet => {
+                const isActive = walletId === wallet.id;
+                return (
+                  <TouchableOpacity
+                    key={wallet.id}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.walletChip,
+                      isActive && styles.walletChipActive
+                    ]}
+                    onPress={() => { setWalletId(wallet.id); hapticLight(); }}
+                  >
+                    {wallet.icon && (
+                      <Ionicons 
+                        name={wallet.icon as any} 
+                        size={16} 
+                        color={isActive ? theme.colors.textOnPrimary : wallet.color || theme.colors.textSecondary}
+                        style={{ marginRight: 6 }}
+                      />
+                    )}
+                    <Text style={[
+                      styles.walletChipText,
+                      isActive && styles.walletChipTextActive
+                    ]}>
+                      {wallet.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </ScrollView>
         </View>
 
@@ -366,20 +413,22 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     style={styles.attachmentRemove}
                     onPress={() => removeAttachment(idx)}
                   >
-                    <Ionicons name="close-circle" size={20} color={theme.colors.danger} />
+                    <View style={styles.attachmentRemoveBg}>
+                      <Ionicons name="close" size={14} color={theme.colors.textOnPrimary} />
+                    </View>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
           )}
           <View style={styles.attachmentButtons}>
-            <TouchableOpacity style={styles.attachmentBtn} onPress={handlePickImage}>
+            <TouchableOpacity style={styles.attachmentBtn} onPress={handlePickImage} activeOpacity={0.7}>
               <Ionicons name="images-outline" size={20} color={theme.colors.primary} />
-              <Text style={styles.attachmentBtnText}>Pilih dari Galeri</Text>
+              <Text style={styles.attachmentBtnText}>Galeri</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.attachmentBtn} onPress={handleTakePhoto}>
+            <TouchableOpacity style={styles.attachmentBtn} onPress={handleTakePhoto} activeOpacity={0.7}>
               <Ionicons name="camera-outline" size={20} color={theme.colors.primary} />
-              <Text style={styles.attachmentBtnText}>Ambil Foto</Text>
+              <Text style={styles.attachmentBtnText}>Kamera</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -390,13 +439,20 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
       {/* Submit Button */}
       <View style={styles.footer}>
-        <Button 
-          title={isEditing ? "Simpan Perubahan" : "Simpan Transaksi"} 
-          fullWidth 
-          disabled={!isFormValid}
-          loading={loading}
-          onPress={handleSubmit}
+        <LinearGradient
+          colors={['transparent', theme.colors.surfaceElevated]}
+          style={styles.footerGradient}
+          pointerEvents="none"
         />
+        <View style={styles.footerContent}>
+          <Button 
+            title={isEditing ? "Simpan Perubahan" : "Simpan Transaksi"} 
+            fullWidth 
+            disabled={!isFormValid}
+            loading={loading}
+            onPress={handleSubmit}
+          />
+        </View>
       </View>
 
       {/* Date Picker Modal */}
@@ -408,10 +464,14 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Pilih Tanggal</Text>
-              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons name="close" size={20} color={theme.colors.textPrimary} />
               </TouchableOpacity>
             </View>
             <View style={styles.pickerContainer}>
@@ -433,9 +493,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   weekday_label: { color: theme.colors.primary, fontWeight: '600' },
                   day: { backgroundColor: theme.colors.surface },
                   day_label: { color: theme.colors.textPrimary },
-                  selected: { backgroundColor: theme.colors.primary, borderRadius: 8 },
+                  selected: { backgroundColor: theme.colors.primary, borderRadius: 10 },
                   selected_label: { color: theme.colors.textOnPrimary, fontWeight: '700' },
-                  today: { borderColor: theme.colors.primary, borderWidth: 2, borderRadius: 8 },
+                  today: { borderColor: theme.colors.primary, borderWidth: 2, borderRadius: 10 },
                   today_label: { color: theme.colors.primary, fontWeight: '700' },
                   days: { backgroundColor: theme.colors.surface },
                 }}
@@ -458,54 +518,73 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     marginHorizontal: theme.spacing.md,
     marginTop: theme.spacing.md,
     backgroundColor: theme.colors.surfaceElevated,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     padding: 4,
+    position: 'relative',
+  },
+  typeIndicator: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    width: '50%',
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    zIndex: 0,
+  },
+  typeIndicatorGradient: {
+    flex: 1,
+    borderRadius: theme.radius.md,
   },
   typeTab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    borderRadius: theme.radius.sm,
-  },
-  typeTabActiveIncome: {
-    backgroundColor: theme.colors.income,
-  },
-  typeTabActiveExpense: {
-    backgroundColor: theme.colors.expense,
+    borderRadius: theme.radius.md,
+    zIndex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   typeText: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   typeTextActive: {
     color: theme.colors.textOnPrimary,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   scrollContent: {
     padding: theme.spacing.md,
   },
   amountContainer: {
-    marginTop: theme.spacing.md,
+    marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.lg,
   },
   quickAmountRow: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs,
-    marginTop: theme.spacing.sm, justifyContent: 'center',
+    flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm,
+    marginTop: theme.spacing.md, justifyContent: 'center',
   },
   quickChip: {
-    paddingVertical: 6, paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8, paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.radius.round, backgroundColor: theme.colors.surface,
     borderWidth: 1, borderColor: theme.colors.border,
   },
-  quickChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  quickChipText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '600' },
+  quickChipActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+    ...theme.shadow.glow,
+  },
+  quickChipText: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, fontWeight: '600' },
   quickChipTextActive: { color: theme.colors.textOnPrimary },
   section: {
     marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
-    ...theme.typography.subtitle,
+    ...theme.typography.bodySmall,
+    fontWeight: '700',
+    color: theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
     marginBottom: theme.spacing.md,
   },
   dateSelector: {
@@ -514,13 +593,23 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
+  },
+  dateIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.md,
   },
   dateText: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
-    marginLeft: theme.spacing.sm,
+    fontWeight: '600',
+    flex: 1,
   },
   categoryGrid: {
     flexDirection: 'row',
@@ -528,27 +617,26 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     marginHorizontal: -theme.spacing.xs,
   },
   categoryItem: {
-    width: '25%',
+    width: 88,
     alignItems: 'center',
     padding: theme.spacing.xs,
     marginBottom: theme.spacing.md,
   },
   categoryItemActive: {
-    // Add subtle background or border if needed
+    // Handled inline with glow
   },
   categoryIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.radius.round,
+    width: 60,
+    height: 60,
+    borderRadius: theme.radius.xl,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.xs,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   categoryLabel: {
     ...theme.typography.caption,
     textAlign: 'center',
+    color: theme.colors.textSecondary,
   },
   walletSearchContainer: {
     flexDirection: 'row',
@@ -557,12 +645,12 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-    height: 40,
+    height: 44,
   },
   walletSearchIcon: {
-    marginRight: theme.spacing.xs,
+    marginRight: theme.spacing.sm,
   },
   walletSearchInput: {
     flex: 1,
@@ -591,17 +679,28 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   walletChipActive: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
+    ...theme.shadow.glow,
   },
   walletChipText: {
     ...theme.typography.bodySmall,
     color: theme.colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   walletChipTextActive: {
     color: theme.colors.textOnPrimary,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   footer: {
+    position: 'relative',
+  },
+  footerGradient: {
+    position: 'absolute',
+    top: -24,
+    left: 0,
+    right: 0,
+    height: 24,
+  },
+  footerContent: {
     padding: theme.spacing.md,
     paddingBottom: theme.spacing.xl,
     backgroundColor: theme.colors.surfaceElevated,
@@ -614,11 +713,19 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.surfaceElevated,
+    backgroundColor: theme.colors.surfaceCard,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.textMuted,
+    alignSelf: 'center',
+    marginBottom: theme.spacing.md,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -629,30 +736,44 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   modalTitle: {
     ...theme.typography.h3,
   },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   pickerContainer: {
     marginHorizontal: -theme.spacing.sm,
   },
   attachmentPreviewRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: theme.spacing.sm,
+    gap: 10,
+    marginBottom: theme.spacing.md,
   },
   attachmentItem: {
     position: 'relative',
   },
   attachmentThumb: {
-    width: 72,
-    height: 72,
-    borderRadius: theme.radius.sm,
+    width: 80,
+    height: 80,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surfaceElevated,
   },
   attachmentRemove: {
     position: 'absolute',
     top: -6,
     right: -6,
-    backgroundColor: theme.colors.background,
-    borderRadius: 10,
+  },
+  attachmentRemoveBg: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: theme.colors.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   attachmentButtons: {
     flexDirection: 'row',
@@ -661,10 +782,10 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   attachmentBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
@@ -672,8 +793,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     justifyContent: 'center',
   },
   attachmentBtnText: {
-    ...theme.typography.caption,
+    ...theme.typography.bodySmall,
     color: theme.colors.primary,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
