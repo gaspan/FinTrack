@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import DateTimePicker, { useDefaultStyles } from 'react-native-ui-datepicker';
@@ -74,6 +74,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   );
   const [savingAttachment, setSavingAttachment] = useState(false);
   const tagInputRef = useRef<TagInputRef>(null);
+  const [walletSearchQuery, setWalletSearchQuery] = useState('');
+
+  const filteredWallets = useMemo(() => {
+    if (!walletSearchQuery.trim()) return wallets;
+    return wallets.filter(w => w.name.toLowerCase().includes(walletSearchQuery.toLowerCase()));
+  }, [wallets, walletSearchQuery]);
 
   // Terapkan hasil scan struk tanpa menimpa input user (fill-empty-only).
   // Sengaja via effect: patch datang async dari parent setelah user mungkin
@@ -277,9 +283,31 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         {/* Wallet Selector */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Dompet</Text>
+          
+          <View style={styles.walletSearchContainer}>
+            <Ionicons name="search" size={16} color={theme.colors.textSecondary} style={styles.walletSearchIcon} />
+            <TextInput
+              style={styles.walletSearchInput}
+              placeholder="Cari dompet..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={walletSearchQuery}
+              onChangeText={setWalletSearchQuery}
+            />
+            {walletSearchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setWalletSearchQuery('')} style={styles.walletSearchClear}>
+                <Ionicons name="close-circle" size={16} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.walletScroll}>
-            {wallets.map(wallet => (
-              <TouchableOpacity
+            {filteredWallets.length === 0 ? (
+              <Text style={{ color: theme.colors.textSecondary, fontStyle: 'italic', paddingHorizontal: theme.spacing.md }}>
+                Dompet tidak ditemukan
+              </Text>
+            ) : (
+              filteredWallets.map(wallet => (
+                <TouchableOpacity
                 key={wallet.id}
                 activeOpacity={0.7}
                 style={[
@@ -303,7 +331,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   {wallet.name}
                 </Text>
               </TouchableOpacity>
-            ))}
+            )))}
           </ScrollView>
         </View>
 
@@ -521,6 +549,29 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   categoryLabel: {
     ...theme.typography.caption,
     textAlign: 'center',
+  },
+  walletSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    height: 40,
+  },
+  walletSearchIcon: {
+    marginRight: theme.spacing.xs,
+  },
+  walletSearchInput: {
+    flex: 1,
+    ...theme.typography.body,
+    paddingVertical: 0,
+    color: theme.colors.textPrimary,
+  },
+  walletSearchClear: {
+    padding: theme.spacing.xs,
   },
   walletScroll: {
     marginHorizontal: -theme.spacing.md,
