@@ -679,6 +679,56 @@ export async function resolveBookingTarget(
   return { walletId: wallet, categoryId: category };
 }
 
+/**
+ * Cek apakah nama kategori mengindikasikan transfer antar rekening/dompet/bank.
+ * Kategori biaya admin transfer (misal: "Biaya Transfer") tetap diizinkan sebagai pengeluaran.
+ */
+export function isTransferCategoryName(categoryName?: string | null): boolean {
+  if (!categoryName) return false;
+  const normalized = categoryName.trim().toLowerCase();
+  if (normalized.includes('biaya') || normalized.includes('fee') || normalized.includes('admin')) {
+    return false;
+  }
+  if (normalized === 'transfer') return true;
+  return (
+    normalized.includes('transfer antar rekening') ||
+    normalized.includes('transfer antar-rekening') ||
+    normalized.includes('transfer antar dompet') ||
+    normalized.includes('transfer antar-dompet') ||
+    normalized.includes('transfer antar bank') ||
+    normalized.includes('transfer antar-bank') ||
+    normalized.includes('transfer antar akun') ||
+    normalized.includes('transfer antar-akun') ||
+    normalized.includes('transfer rekening') ||
+    normalized === 'transfer dana' ||
+    normalized === 'transfer saldo' ||
+    normalized === 'transfer masuk' ||
+    normalized === 'transfer keluar'
+  );
+}
+
+/**
+ * Klausa SQL untuk mengecualikan transaksi dengan kategori transfer antar rekening.
+ * Mengharuskan tabel categories di-join dengan alias `c`.
+ */
+export const EXCLUDE_TRANSFER_CATEGORY_SQL = `(c.name IS NULL OR NOT (
+  (
+    LOWER(c.name) LIKE '%transfer antar rekening%'
+    OR LOWER(c.name) LIKE '%transfer antar-rekening%'
+    OR LOWER(c.name) LIKE '%transfer antar dompet%'
+    OR LOWER(c.name) LIKE '%transfer antar-dompet%'
+    OR LOWER(c.name) LIKE '%transfer antar bank%'
+    OR LOWER(c.name) LIKE '%transfer antar-bank%'
+    OR LOWER(c.name) LIKE '%transfer antar akun%'
+    OR LOWER(c.name) LIKE '%transfer antar-akun%'
+    OR LOWER(c.name) LIKE '%transfer rekening%'
+    OR LOWER(TRIM(c.name)) IN ('transfer', 'transfer dana', 'transfer saldo', 'transfer masuk', 'transfer keluar')
+  )
+  AND LOWER(c.name) NOT LIKE '%biaya%'
+  AND LOWER(c.name) NOT LIKE '%fee%'
+  AND LOWER(c.name) NOT LIKE '%admin%'
+))`;
+
 export class ChartQueries {
   constructor(private db: SQLiteDatabase, private bookId: number) {}
 
@@ -690,7 +740,9 @@ export class ChartQueries {
         c.color 
       FROM transactions t
       JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
-      WHERE t.book_id = ? AND t.type = ? AND t.transaction_date >= ? AND t.transaction_date <= ? AND t.transfer_id IS NULL AND t.is_internal = 0
+      WHERE t.book_id = ? AND t.type = ? AND t.transaction_date >= ? AND t.transaction_date <= ?
+        AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
       GROUP BY c.id
       ORDER BY total DESC
     `, [this.bookId, type, startDate, endDate]);
@@ -698,10 +750,21 @@ export class ChartQueries {
 
   async getSummary(startDate: string, endDate: string) {
     const income = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT SUM(amount) as total FROM transactions WHERE book_id = ? AND type = 'income' AND transaction_date >= ? AND transaction_date <= ? AND transfer_id IS NULL AND is_internal = 0
+      SELECT COALESCE(SUM(t.amount), 0) as total
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
+      WHERE t.book_id = ? AND t.type = 'income' AND t.transaction_date >= ? AND t.transaction_date <= ?
+        AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
     `, [this.bookId, startDate, endDate]);
+
     const expense = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT SUM(amount) as total FROM transactions WHERE book_id = ? AND type = 'expense' AND transaction_date >= ? AND transaction_date <= ? AND transfer_id IS NULL AND is_internal = 0
+      SELECT COALESCE(SUM(t.amount), 0) as total
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
+      WHERE t.book_id = ? AND t.type = 'expense' AND t.transaction_date >= ? AND t.transaction_date <= ?
+        AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
     `, [this.bookId, startDate, endDate]);
 
     return {
@@ -1260,6 +1323,7 @@ export class InsightQueries {
         AND t.transfer_id IS NULL AND t.is_internal = 0
         AND (strftime('%Y-%m', t.transaction_date) = ? OR strftime('%Y-%m', t.transaction_date) = ?)
       WHERE c.type = 'expense' AND c.book_id = ? AND t.book_id = ?
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
       GROUP BY c.id
       HAVING current_total > 0 OR prev_total > 0
       ORDER BY current_total DESC
@@ -1293,6 +1357,7 @@ export class InsightQueries {
       LEFT JOIN transactions t ON c.id = t.category_id AND t.book_id = c.book_id AND t.type = 'expense'
         AND t.transfer_id IS NULL AND t.is_internal = 0
       WHERE c.type = 'expense' AND c.book_id = ? AND t.book_id = ?
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
       GROUP BY c.id
       HAVING current_amount > avg_amount * 2 AND avg_amount > 0
     `, [startLookback, month, month, this.bookId, this.bookId]);
@@ -1310,11 +1375,13 @@ export class InsightQueries {
   async getDeficitAlerts(): Promise<SpendingAlert[]> {
     const monthlyFlow = await this.db.getAllAsync<{ month: string; flow: number }>(`
       SELECT 
-        strftime('%Y-%m', transaction_date) as month,
-        SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as flow
-      FROM transactions
-      WHERE book_id = ? AND transaction_date >= date('now', '-5 months') AND transfer_id IS NULL AND is_internal = 0
-      GROUP BY strftime('%Y-%m', transaction_date)
+        strftime('%Y-%m', t.transaction_date) as month,
+        SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE -t.amount END) as flow
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
+      WHERE t.book_id = ? AND t.transaction_date >= date('now', '-5 months') AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
+      GROUP BY strftime('%Y-%m', t.transaction_date)
       ORDER BY month ASC
     `, [this.bookId]);
 
@@ -1347,18 +1414,24 @@ export class InsightQueries {
     const threeMosAgo = dayjs().subtract(3, 'month').format('YYYY-MM');
 
     const income = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE book_id = ? AND type = 'income' AND strftime('%Y-%m', transaction_date) = ? AND transfer_id IS NULL AND is_internal = 0
+      SELECT COALESCE(SUM(t.amount), 0) as total FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
+      WHERE t.book_id = ? AND t.type = 'income' AND strftime('%Y-%m', t.transaction_date) = ? AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
     `, [this.bookId, currentMonth]);
 
     const expense = await this.db.getFirstAsync<{ total: number }>(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE book_id = ? AND type = 'expense' AND strftime('%Y-%m', transaction_date) = ? AND transfer_id IS NULL AND is_internal = 0
+      SELECT COALESCE(SUM(t.amount), 0) as total FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
+      WHERE t.book_id = ? AND t.type = 'expense' AND strftime('%Y-%m', t.transaction_date) = ? AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
     `, [this.bookId, currentMonth]);
 
     const avgExpense = await this.db.getFirstAsync<{ avg: number; total: number }>(`
-      SELECT COALESCE(SUM(amount), 0) / 3.0 as avg, COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE book_id = ? AND type = 'expense' AND strftime('%Y-%m', transaction_date) >= ? AND transfer_id IS NULL AND is_internal = 0
+      SELECT COALESCE(SUM(t.amount), 0) / 3.0 as avg, COALESCE(SUM(t.amount), 0) as total FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
+      WHERE t.book_id = ? AND t.type = 'expense' AND strftime('%Y-%m', t.transaction_date) >= ? AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
     `, [this.bookId, threeMosAgo]);
 
     const balance = await this.db.getFirstAsync<{ total: number }>(`
@@ -1384,6 +1457,7 @@ export class InsightQueries {
       FROM transactions t
       JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
       WHERE t.book_id = ? AND t.type = 'expense' AND strftime('%Y-%m', t.transaction_date) = ? AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
       GROUP BY c.id
       ORDER BY total DESC
     `, [this.bookId, currentMonth]);
@@ -1413,12 +1487,14 @@ export class TrendQueries {
   async getMonthlyTrend(months: number = 12): Promise<MonthlyTrendPoint[]> {
     return this.db.getAllAsync<MonthlyTrendPoint>(`
       SELECT 
-        strftime('%Y-%m', transaction_date) as month,
-        SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
-        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
-      FROM transactions
-      WHERE book_id = ? AND transaction_date >= date('now', ?||' months') AND transfer_id IS NULL AND is_internal = 0
-      GROUP BY strftime('%Y-%m', transaction_date)
+        strftime('%Y-%m', t.transaction_date) as month,
+        SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END) as income,
+        SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END) as expense
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
+      WHERE t.book_id = ? AND t.transaction_date >= date('now', ?||' months') AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
+      GROUP BY strftime('%Y-%m', t.transaction_date)
       ORDER BY month ASC
     `, [this.bookId, `-${months}`]);
   }
@@ -1426,11 +1502,13 @@ export class TrendQueries {
   async getCashFlow(): Promise<{ month: string; flow: number }[]> {
     return this.db.getAllAsync(`
       SELECT 
-        strftime('%Y-%m', transaction_date) as month,
-        SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as flow
-      FROM transactions
-      WHERE book_id = ? AND transaction_date >= date('now', '-12 months') AND transfer_id IS NULL AND is_internal = 0
-      GROUP BY strftime('%Y-%m', transaction_date)
+        strftime('%Y-%m', t.transaction_date) as month,
+        SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE -t.amount END) as flow
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id AND c.book_id = t.book_id
+      WHERE t.book_id = ? AND t.transaction_date >= date('now', '-12 months') AND t.transfer_id IS NULL AND t.is_internal = 0
+        AND ${EXCLUDE_TRANSFER_CATEGORY_SQL}
+      GROUP BY strftime('%Y-%m', t.transaction_date)
       ORDER BY month ASC
     `, [this.bookId]);
   }

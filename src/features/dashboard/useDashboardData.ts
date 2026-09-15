@@ -13,6 +13,7 @@ import {
   NetWorthQueries,
   BudgetQueries,
   SavingsGoalQueries,
+  isTransferCategoryName,
 } from '@/lib/queries';
 import { getPayrollPeriod, getPreviousPayrollPeriod, findSalaryCategoryId } from '@/utils/payroll';
 import { loadInsights } from '@/features/insights';
@@ -207,9 +208,9 @@ export function useDashboardData() {
       setLastMonthSummary(prevMonthData);
       setTrendData(trend);
       setCashFlow(cFlow.reduce((acc, c) => acc + c.flow, 0));
-      setChartData(breakdown.map(toPoint));
-      setMonthExpense(monthExp.map(toPoint));
-      setMonthIncome(monthInc.map(toPoint));
+      setChartData(breakdown.filter(i => !isTransferCategoryName(i.category_name)).map(toPoint));
+      setMonthExpense(monthExp.filter(i => !isTransferCategoryName(i.category_name)).map(toPoint));
+      setMonthIncome(monthInc.filter(i => !isTransferCategoryName(i.category_name)).map(toPoint));
       setRecentTransactions(txs.slice(0, 5));
       setNetWorthData(nw);
       setNetWorthHistory(nwHistory.map(s => s.net_worth).reverse());
