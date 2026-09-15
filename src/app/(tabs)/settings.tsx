@@ -23,6 +23,8 @@ import { hapticError, hapticLight, hapticSuccess } from '@/utils/haptic';
 import { Category, PayrollSettings } from '@/types';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
+import { GameState, loadGameState, getLevelProgress } from '@/features/game/gameStore';
+import { ACHIEVEMENTS } from '@/features/game/data';
 
 const SAFE_TO_SPEND_KEY = 'safe_to_spend_enabled';
 const PAYROLL_ENABLED_KEY = 'payroll_enabled';
@@ -50,8 +52,10 @@ export default function SettingsScreen() {
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [dailyReminder, setDailyReminder] = useState(false);
   const [dailyReminderTime, setDailyReminderTime] = useState('20:00');
+  const [gameState, setGameState] = useState<GameState | null>(null);
 
   useFocusEffect(useCallback(() => {
+    loadGameState().then(setGameState);
     AsyncStorage.getItem(SAFE_TO_SPEND_KEY).then((val) => {
       setSafeToSpendEnabled(val !== 'false');
     });
@@ -284,6 +288,29 @@ export default function SettingsScreen() {
               <Ionicons name="people-outline" size={20} color="#F97316" />
             </View>
             <Text style={styles.itemTitle}>Utang & Piutang</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/game' as any)}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
+              {gameState ? (
+                <Text style={{ fontSize: 20 }}>{getLevelProgress(gameState).current.icon}</Text>
+              ) : (
+                <Ionicons name="game-controller-outline" size={20} color="#8B5CF6" />
+              )}
+            </View>
+            <View>
+              <Text style={styles.itemTitle}>Arena Finansial</Text>
+              <Text style={styles.itemSub}>
+                {gameState 
+                  ? `Level ${gameState.level} • ${gameState.unlockedBadges.length}/${ACHIEVEMENTS.length} Badge`
+                  : 'Main kuis & survival budget'}
+              </Text>
+            </View>
           </View>
           <View style={styles.itemRight}>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
