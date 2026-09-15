@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import dayjs from 'dayjs';
+import { router } from 'expo-router';
 
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { AnimatedSection } from '@/components/dashboard/AnimatedSection';
@@ -26,7 +27,12 @@ export const AnalyticsLayer: React.FC<AnalyticsLayerProps> = ({ data }) => (
 
     <AnimatedSection index={1}>
       <View>
-        <SectionHeader title="Analisis finansial" icon="analytics-outline" />
+        <SectionHeader
+          title="Analisis finansial"
+          icon="analytics-outline"
+          actionLabel="Bandingkan"
+          onAction={() => router.push('/comparison')}
+        />
         <AnalyticsCard
           income={data.summary.totalIncome}
           expense={data.summary.totalExpense}
