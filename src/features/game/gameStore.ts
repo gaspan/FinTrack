@@ -13,6 +13,9 @@ export interface GameState {
   pricePerfect: boolean;
   survivalCount: number;
   survivalBest: number;
+  survivalTierBest: Record<number, number>; // best score per tier
+  survivalMaxTier: number; // highest tier unlocked (progressive)
+  frugalSurvival: boolean; // survived with >=80% salary
   dataCount: number;
   dataBest: number;
   dataPerfect: boolean;
@@ -35,6 +38,9 @@ const DEFAULT_STATE: GameState = {
   pricePerfect: false,
   survivalCount: 0,
   survivalBest: 0,
+  survivalTierBest: {},
+  survivalMaxTier: 1, // start unlocked at tier 1
+  frugalSurvival: false,
   dataCount: 0,
   dataBest: 0,
   dataPerfect: false,
@@ -119,6 +125,12 @@ export async function saveGameState(state: GameState): Promise<void> {
   }
 }
 
+export async function resetGameState(): Promise<GameState> {
+  const fresh = { ...DEFAULT_STATE, modesPlayed: [], unlockedBadges: [] };
+  await AsyncStorage.setItem(GAME_STATE_KEY, JSON.stringify(fresh));
+  return fresh;
+}
+
 export function calculateLevel(xp: number): number {
   let currentLevel = 1;
   for (const l of LEVELS) {
@@ -183,6 +195,10 @@ export function checkAchievements(state: GameState): { newState: GameState; newl
         case 'total_1000': unlocked = state.totalXp >= 1000; break;
         case 'data_challenge': unlocked = state.dataCount >= 1; break;
         case 'data_perfect': unlocked = state.dataPerfect === true; break;
+        // New survival tier achievements
+        case 'survival_tier3': unlocked = (state.survivalTierBest[3] ?? 0) > 0; break;
+        case 'survival_tier5': unlocked = (state.survivalTierBest[5] ?? 0) > 0; break;
+        case 'survival_frugal': unlocked = state.frugalSurvival === true; break;
       }
       
       if (unlocked) {

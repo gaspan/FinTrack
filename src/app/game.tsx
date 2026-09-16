@@ -1,20 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext, SQLiteDatabase } from 'expo-sqlite';
 import { useBook } from '@/constants/books';
 import { useTheme, type Theme } from '@/constants/theme';
 import { Card } from '@/components/ui/Card';
 import { formatRupiah } from '@/utils/format';
 import { hapticError, hapticLight, hapticSuccess } from '@/utils/haptic';
-import { PRICE_ITEMS, QUIZ_QUESTIONS, SURVIVAL_EVENTS, rankFor, shuffle, ACHIEVEMENTS, Achievement } from '@/features/game/data';
+import { PRICE_ITEMS, QUIZ_QUESTIONS, SURVIVAL_EVENTS, SURVIVAL_TIERS, SurvivalTier, rankFor, shuffle, ACHIEVEMENTS, Achievement } from '@/features/game/data';
 import { GameState, loadGameState, saveGameState, checkAchievements, getLevelProgress } from '@/features/game/gameStore';
 import { generateDataQuestions, DataQuestion } from '@/features/game/dataChallenge';
+import { GameSettings, DEFAULT_SETTINGS, loadGameSettings, saveGameSettings, difficultyOf } from '@/features/game/gameSettings';
 
-type Mode = 'menu' | 'quiz' | 'price' | 'survival' | 'data';
-const QUIZ_TIME = 15;
-const ROUNDS = 10;
+type Mode = 'menu' | 'quiz' | 'price' | 'survival-select' | 'survival' | 'data';
 
 export default function GamePage() {
   const { theme } = useTheme();
@@ -25,21 +24,32 @@ export default function GamePage() {
 
   const [mode, setMode] = useState<Mode>('menu');
   const [state, setState] = useState<GameState | null>(null);
+  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [newBadges, setNewBadges] = useState<Achievement[]>([]);
+  const [settingsReady, setSettingsReady] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
+    loadGameSettings().then((s) => { setSettings(s); setSettingsReady(true); });
     loadGameState().then(setState);
-  }, []);
+  }, []));
 
-  const handleGameEnd = useCallback(async (mode: Mode, score: number, isPerfect: boolean) => {
+  const handleGameEnd = useCallback(async (mode: Mode, score: number, isPerfect: boolean, streak = 0, survivalTierNum?: number, survivalSalary?: number) => {
     if (!state) return;
     
-    // XP Calculation
-    const xpEarned = Math.floor(score * 0.5); // 1 XP per 2 score points
+    // XP Calculation scaled by difficulty
+    let xpMult = difficultyOf(settings).xpMult;
+    // For survival, use tier-specific XP multiplier
+    if (mode === 'survival' && survivalTierNum) {
+      const tierDef = SURVIVAL_TIERS.find(t => t.tier === survivalTierNum);
+      if (tierDef) xpMult = tierDef.xpMult;
+    }
+    const xpEarned = Math.floor(score * 0.5 * xpMult);
     
     const nextState = { ...state };
     nextState.totalXp += xpEarned;
-    if (!nextState.modesPlayed.includes(mode)) nextState.modesPlayed.push(mode);
+    if (streak > nextState.maxStreak) nextState.maxStreak = streak;
+    const modeKey = mode === 'survival-select' ? 'survival' : mode;
+    if (!nextState.modesPlayed.includes(modeKey)) nextState.modesPlayed.push(modeKey);
     
     if (mode === 'quiz') {
       nextState.quizCount += 1;
@@ -51,6 +61,23 @@ export default function GamePage() {
     } else if (mode === 'survival') {
       nextState.survivalCount += 1;
       nextState.survivalBest = Math.max(state.survivalBest, score);
+      
+      // Track tier-specific best
+      if (survivalTierNum) {
+        const tierBests = { ...nextState.survivalTierBest };
+        tierBests[survivalTierNum] = Math.max(tierBests[survivalTierNum] ?? 0, score);
+        nextState.survivalTierBest = tierBests;
+        
+        // Progressive unlock: survive (score > 0) to unlock next tier
+        if (score > 0 && survivalTierNum >= nextState.survivalMaxTier && survivalTierNum < 5) {
+          nextState.survivalMaxTier = survivalTierNum + 1;
+        }
+        
+        // Frugal check: survived with >=80% salary
+        if (survivalSalary && score >= survivalSalary * 0.8) {
+          nextState.frugalSurvival = true;
+        }
+      }
     } else if (mode === 'data') {
       nextState.dataCount += 1;
       nextState.dataBest = Math.max(state.dataBest, score);
@@ -67,11 +94,11 @@ export default function GamePage() {
     setState(achCheck.newState);
     
     return { xpEarned, newlyUnlocked: achCheck.newlyUnlocked };
-  }, [state]);
+  }, [state, settings]);
 
   const clearBadges = () => setNewBadges([]);
 
-  if (!state) return null; // Loading
+  if (!state || !settingsReady) return null; // Loading
 
   return (
     <View style={styles.container}>
@@ -83,19 +110,16 @@ export default function GamePage() {
         <View style={{ width: 40 }} />
       </View>
 
-      {mode === 'menu' && <MenuView styles={styles} state={state} go={setMode} />}
-      {mode === 'quiz' && <QuizView styles={styles} onEnd={(score, streak) => {
-        if (state && streak > state.maxStreak) {
-          state.maxStreak = streak; // update streak before saving
-        }
-        return handleGameEnd('quiz', score, false);
-      }} quit={() => setMode('menu')} />}
+      {mode === 'menu' && <MenuView styles={styles} state={state} settings={settings} go={setMode} />}
+      {mode === 'quiz' && <QuizView styles={styles} settings={settings} onEnd={(score, streak) => handleGameEnd('quiz', score, false, streak)} quit={() => setMode('menu')} />}
       
-      {mode === 'price' && <PriceView styles={styles} onEnd={(score, perfect) => handleGameEnd('price', score, perfect)} quit={() => setMode('menu')} />}
+      {mode === 'price' && <PriceView styles={styles} settings={settings} onEnd={(score, perfect) => handleGameEnd('price', score, perfect)} quit={() => setMode('menu')} />}
       
-      {mode === 'survival' && <SurvivalView styles={styles} onEnd={(score) => handleGameEnd('survival', score, false)} quit={() => setMode('menu')} />}
+      {mode === 'survival-select' && <SurvivalSelectView styles={styles} state={state} settings={settings} setSettings={setSettings} go={setMode} />}
       
-      {mode === 'data' && <DataChallengeView styles={styles} db={db} bookId={bookId} onEnd={(score, perfect) => handleGameEnd('data', score, perfect)} quit={() => setMode('menu')} />}
+      {mode === 'survival' && <SurvivalView styles={styles} settings={settings} onEnd={(score, tierNum, salary) => handleGameEnd('survival', score, false, 0, tierNum, salary)} quit={() => setMode('survival-select')} />}
+      
+      {mode === 'data' && <DataChallengeView styles={styles} settings={settings} db={db} bookId={bookId} onEnd={(score, perfect) => handleGameEnd('data', score, perfect)} quit={() => setMode('menu')} />}
       
       {/* Badges Overlay */}
       {newBadges.length > 0 && mode === 'menu' && (
@@ -126,15 +150,18 @@ export default function GamePage() {
 // Menu View
 // ─────────────────────────────────────────────────────────────────
 
-function MenuView({ styles, state, go }: { styles: any, state: GameState, go: (m: Mode) => void }) {
+function MenuView({ styles, state, settings, go }: { styles: any, state: GameState, settings: GameSettings, go: (m: Mode) => void }) {
   const { theme } = useTheme();
   const { current, next, progress } = getLevelProgress(state);
+  const diff = difficultyOf(settings);
   
+  const currentTier = SURVIVAL_TIERS.find(t => t.tier === settings.survivalTier) ?? SURVIVAL_TIERS[1];
+
   const items = [
     { mode: 'data', icon: 'analytics-outline', color: '#E11D48', title: 'Tantangan Data Asli', desc: 'Uji wawasan dari catatan pengeluaranmu sendiri.', best: state.dataBest },
-    { mode: 'quiz', icon: 'bulb-outline', color: theme.colors.warning, title: 'Kuis Cerdas Finansial', desc: '10 soal literasi keuangan, 15 detik/soal.', best: state.quizBest },
+    { mode: 'quiz', icon: 'bulb-outline', color: theme.colors.warning, title: 'Kuis Cerdas Finansial', desc: `${settings.rounds} soal literasi keuangan, ${diff.time} detik/soal.`, best: state.quizBest },
     { mode: 'price', icon: 'pricetag-outline', color: theme.colors.info, title: 'Tebak Harga Pasar', desc: 'Asah feeling harga biar tak overbudget.', best: state.priceBest },
-    { mode: 'survival', icon: 'wallet-outline', color: theme.colors.success, title: 'Survival Gajian 3 Jt', desc: 'Bertahan 10 kejadian sebulan penuh.', best: state.survivalBest },
+    { mode: 'survival-select', icon: 'wallet-outline', color: currentTier.color, title: `Survival Gajian ${currentTier.icon}`, desc: `Tier ${currentTier.tier}: ${currentTier.name} — ${currentTier.desc}`, best: state.survivalBest },
   ];
 
   return (
@@ -148,6 +175,9 @@ function MenuView({ styles, state, go }: { styles: any, state: GameState, go: (m
           <View style={{ flex: 1 }}>
             <Text style={styles.heroSub}>Level {current.level}</Text>
             <Text style={styles.heroTitle}>{current.title}</Text>
+          </View>
+          <View style={styles.diffChip}>
+            <Text style={styles.diffChipText}>{diff.icon} {diff.label}</Text>
           </View>
         </View>
         <View style={{ marginTop: 20 }}>
@@ -215,11 +245,12 @@ function TimerBar({ secs, left, styles }: any) {
 // Quiz View
 // ─────────────────────────────────────────────────────────────────
 
-function QuizView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number, streak: number) => Promise<any>, quit: () => void }) {
+function QuizView({ styles, settings, onEnd, quit }: { styles: any, settings: GameSettings, onEnd: (score: number, streak: number) => Promise<any>, quit: () => void }) {
   const { theme } = useTheme();
+  const quizTime = difficultyOf(settings).time;
   // Transform questions to shuffle options immediately
   const [qs] = useState(() => {
-    const selected = shuffle(QUIZ_QUESTIONS).slice(0, ROUNDS);
+    const selected = shuffle(QUIZ_QUESTIONS).slice(0, settings.rounds);
     return selected.map(q => {
       const correctStr = q.options[q.answer];
       const newOpts = shuffle([...q.options]);
@@ -233,7 +264,7 @@ function QuizView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number,
   const [picked, setPicked] = useState<number | null>(null);
   const [done, setDone] = useState(false);
   const [endResult, setEndResult] = useState<any>(null);
-  const [left, setLeft] = useState(QUIZ_TIME);
+  const [left, setLeft] = useState(quizTime);
   const q = qs[idx];
 
   useEffect(() => {
@@ -242,7 +273,7 @@ function QuizView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number,
       const t = setTimeout(() => pick(-1), 0);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => setLeft(v => v - 1), 1000);
+    const t = setTimeout(() => setLeft((v: number) => v - 1), 1000);
     return () => clearTimeout(t);
   }, [left, picked, done]);
 
@@ -253,10 +284,10 @@ function QuizView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number,
       const pts = 100 + left * 5 + (streak >= 2 ? 50 : 0);
       setScore(s => s + pts);
       setStreak(s => s + 1);
-      hapticSuccess();
+      if (settings.haptics) hapticSuccess();
     } else {
       setStreak(0);
-      hapticError();
+      if (settings.haptics) hapticError();
     }
   }
 
@@ -269,7 +300,7 @@ function QuizView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number,
     } else {
       setIdx(v => v + 1);
       setPicked(null);
-      setLeft(QUIZ_TIME);
+      setLeft(quizTime);
     }
   }
 
@@ -282,7 +313,7 @@ function QuizView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number,
         <Text style={styles.meta}>Skor {score}</Text>
         <Text style={[styles.meta, { color: theme.colors.warning }]}>Streak x{streak}</Text>
       </View>
-      <TimerBar secs={QUIZ_TIME} left={left} styles={styles} />
+      <TimerBar secs={quizTime} left={left} styles={styles} />
       <Card style={styles.qCard}>
         <Text style={styles.qText}>{q.q}</Text>
       </Card>
@@ -304,7 +335,10 @@ function QuizView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number,
       })}
       {picked !== null && (
         <Card style={styles.tipCard}>
-          <Text style={styles.tipText}>{picked === q.answer ? 'Benar! ' : picked === -1 ? 'Waktu habis! ' : 'Kurang tepat. '}{q.tip}</Text>
+          <Text style={styles.tipText}>
+            {picked === q.answer ? 'Benar! ' : picked === -1 ? 'Waktu habis! ' : 'Kurang tepat. '}
+            {settings.showTips ? q.tip : ''}
+          </Text>
           <TouchableOpacity style={styles.nextBtn} onPress={next}>
             <Text style={styles.nextText}>{idx + 1 >= qs.length ? 'Lihat Hasil' : 'Lanjut'}</Text>
           </TouchableOpacity>
@@ -318,20 +352,62 @@ function QuizView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number,
 // Price View
 // ─────────────────────────────────────────────────────────────────
 
-function PriceView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number, perfect: boolean) => Promise<any>, quit: () => void }) {
+function PriceView({ styles, settings, onEnd, quit }: { styles: any, settings: GameSettings, onEnd: (score: number, perfect: boolean) => Promise<any>, quit: () => void }) {
   const { theme } = useTheme();
-  const [items] = useState(() => shuffle(PRICE_ITEMS).slice(0, ROUNDS));
+  const quizTime = difficultyOf(settings).time;
+  
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [done, setDone] = useState(false);
   const [endResult, setEndResult] = useState<any>(null);
-  const [left, setLeft] = useState(QUIZ_TIME);
+  const [left, setLeft] = useState(quizTime);
+  
+  // Fetch products from DummyJSON and combine with local PRICE_ITEMS
+  useEffect(() => {
+    async function fetchItems() {
+      try {
+        const res = await fetch('https://dummyjson.com/products?limit=100');
+        const data = await res.json();
+        const apiItems = data.products.map((p: any) => {
+          // Convert USD to IDR (approximate 15000) and round to nearest 1000
+          const idrPrice = Math.round((p.price * 15000) / 1000) * 1000;
+          let icon = 'cube-outline';
+          if (p.category.includes('beauty') || p.category.includes('fragrance')) icon = 'sparkles-outline';
+          if (p.category.includes('furniture')) icon = 'bed-outline';
+          if (p.category.includes('grocery')) icon = 'basket-outline';
+          if (p.category.includes('electronics') || p.category.includes('laptop') || p.category.includes('phone')) icon = 'laptop-outline';
+          if (p.category.includes('vehicle') || p.category.includes('motor')) icon = 'car-sport-outline';
+          if (p.category.includes('clothing') || p.category.includes('shirt') || p.category.includes('dress') || p.category.includes('shoes')) icon = 'shirt-outline';
+          
+          return {
+            name: p.title,
+            icon,
+            price: idrPrice,
+            tip: p.description,
+          };
+        });
+        
+        const combined = shuffle([...PRICE_ITEMS, ...apiItems]).slice(0, settings.rounds);
+        setItems(combined);
+      } catch (e) {
+        // Fallback to local data if API fails
+        setItems(shuffle(PRICE_ITEMS).slice(0, settings.rounds));
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchItems();
+  }, [settings.rounds]);
+
   const item = items[idx];
   
   // Deduplicate and randomize options
   const options = useMemo(() => {
+    if (!item) return [];
     const opts = new Set<number>();
     opts.add(item.price);
     const mults = [0.6, 0.8, 1.2, 1.4, 1.6];
@@ -343,17 +419,17 @@ function PriceView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number
     // Fallback if needed
     while (opts.size < 4) opts.add(item.price + opts.size * 500);
     return shuffle(Array.from(opts));
-  }, [item.price]);
+  }, [item?.price]);
 
   useEffect(() => {
-    if (done || picked !== null) return;
+    if (loading || done || picked !== null) return;
     if (left <= 0) {
       const t = setTimeout(() => pick(-1), 0);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => setLeft(v => v - 1), 1000);
+    const t = setTimeout(() => setLeft((v: number) => v - 1), 1000);
     return () => clearTimeout(t);
-  }, [left, picked, done]);
+  }, [left, picked, done, loading]);
 
   function pick(v: number) {
     if (picked !== null || done) return;
@@ -361,8 +437,8 @@ function PriceView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number
     if (v === item.price) {
       setScore(s => s + 100 + left * 5);
       setCorrectCount(c => c + 1);
-      hapticSuccess();
-    } else hapticError();
+      if (settings.haptics) hapticSuccess();
+    } else if (settings.haptics) hapticError();
   }
 
   async function next() {
@@ -374,11 +450,22 @@ function PriceView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number
     } else {
       setIdx(v => v + 1);
       setPicked(null);
-      setLeft(QUIZ_TIME);
+      setLeft(quizTime);
     }
   }
 
+  if (loading) {
+    return (
+      <View style={[styles.play, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.meta, { marginTop: 16 }]}>Mengambil data pasar terbaru...</Text>
+      </View>
+    );
+  }
+
   if (done) return <ResultView styles={styles} score={score} result={endResult} title="Tebakan Selesai!" quit={quit} unit="pts" rank={rankFor(score)} />;
+
+  if (!item) return null;
 
   return (
     <View style={styles.play}>
@@ -387,7 +474,7 @@ function PriceView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number
         <Text style={styles.meta}>Skor {score}</Text>
         <Text style={styles.meta}>{left}s</Text>
       </View>
-      <TimerBar secs={QUIZ_TIME} left={left} styles={styles} />
+      <TimerBar secs={quizTime} left={left} styles={styles} />
       <Card style={styles.qCard}>
         <Ionicons name={item.icon as any} size={40} color={theme.colors.info} />
         <Text style={styles.qText}>{item.name}</Text>
@@ -404,7 +491,10 @@ function PriceView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number
       })}
       {picked !== null && (
         <Card style={styles.tipCard}>
-          <Text style={styles.tipText}>{picked === item.price ? 'Tepat! ' : `Harga benar ${formatRupiah(item.price)}. `}{item.tip}</Text>
+          <Text style={styles.tipText}>
+            {picked === item.price ? 'Tepat! ' : `Harga benar ${formatRupiah(item.price)}. `}
+            {settings.showTips ? item.tip : ''}
+          </Text>
           <TouchableOpacity style={styles.nextBtn} onPress={next}>
             <Text style={styles.nextText}>{idx + 1 >= items.length ? 'Lihat Hasil' : 'Lanjut'}</Text>
           </TouchableOpacity>
@@ -415,88 +505,263 @@ function PriceView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Survival View
+// Survival Tier Select View
 // ─────────────────────────────────────────────────────────────────
 
-function SurvivalView({ styles, onEnd, quit }: { styles: any, onEnd: (score: number) => Promise<any>, quit: () => void }) {
+function SurvivalSelectView({ styles, state, settings, setSettings, go }: { styles: any, state: GameState, settings: GameSettings, setSettings: (s: GameSettings) => void, go: (m: Mode) => void }) {
   const { theme } = useTheme();
-  // Randomize 10 events
-  const [events] = useState(() => shuffle(SURVIVAL_EVENTS).slice(0, 10));
+
+  async function selectTier(tier: number) {
+    hapticLight();
+    const newSettings = { ...settings, survivalTier: tier };
+    setSettings(newSettings);
+    await saveGameSettings(newSettings);
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.scroll}>
+      <Text style={[styles.menuTitle, { fontSize: 18, marginBottom: 4 }]}>Pilih Tier Survival</Text>
+      <Text style={styles.menuDesc}>Selesaikan tier saat ini (saldo {'>'} 0) untuk membuka tier berikutnya.</Text>
+      
+      {SURVIVAL_TIERS.map(tier => {
+        const isSelected = settings.survivalTier === tier.tier;
+        const isLocked = tier.tier > state.survivalMaxTier;
+        const best = state.survivalTierBest[tier.tier] ?? 0;
+        return (
+          <TouchableOpacity
+            key={tier.tier}
+            disabled={isLocked}
+            onPress={() => selectTier(tier.tier)}
+            activeOpacity={0.7}
+          >
+            <Card style={[styles.menuCard, isSelected && { borderColor: tier.color, borderWidth: 2 }, isLocked && { opacity: 0.4 }]}>
+              <View style={[styles.iconBg, { backgroundColor: tier.color + '20' }]}>
+                <Text style={{ fontSize: 22 }}>{isLocked ? '🔒' : tier.icon}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.menuTitle}>Tier {tier.tier}: {tier.name}</Text>
+                  {isSelected && <View style={[styles.diffChip, { backgroundColor: tier.color + '30' }]}><Text style={[styles.diffChipText, { color: tier.color }]}>Dipilih</Text></View>}
+                </View>
+                <Text style={styles.menuDesc}>{tier.desc}</Text>
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                  <Text style={[styles.bestText, { color: tier.color }]}>XP x{tier.xpMult}</Text>
+                  {tier.hideEffect && <Text style={styles.meta}>🎭 Hidden</Text>}
+                  {tier.hasChainEvents && <Text style={styles.meta}>🔗 Chain</Text>}
+                  {tier.hasTimer && <Text style={styles.meta}>⏱ Timer</Text>}
+                </View>
+                {best > 0 && <Text style={styles.bestText}>Terbaik: {formatRupiah(best)}</Text>}
+              </View>
+              {!isLocked && <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />}
+            </Card>
+          </TouchableOpacity>
+        );
+      })}
+
+      <TouchableOpacity
+        style={[styles.nextBtn, { marginTop: 8, backgroundColor: (SURVIVAL_TIERS.find(t => t.tier === settings.survivalTier) ?? SURVIVAL_TIERS[1]).color }]}
+        onPress={() => { hapticLight(); go('survival'); }}
+      >
+        <Text style={styles.nextText}>Mulai Survival Tier {settings.survivalTier}!</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={[styles.ghostBtn, { marginTop: 4 }]} onPress={() => go('menu')}>
+        <Text style={styles.ghostText}>Kembali ke Menu</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Survival View (with tier mechanics)
+// ─────────────────────────────────────────────────────────────────
+
+function SurvivalView({ styles, settings, onEnd, quit }: { styles: any, settings: GameSettings, onEnd: (score: number, tierNum: number, salary: number) => Promise<any>, quit: () => void }) {
+  const { theme } = useTheme();
+  const tier = SURVIVAL_TIERS.find(t => t.tier === settings.survivalTier) ?? SURVIVAL_TIERS[1];
+  
+  // Build event list: shuffle and pick based on tier eventCount, include chain events for tier 4-5
+  const [events] = useState(() => {
+    let pool = shuffle(SURVIVAL_EVENTS);
+    if (!tier.hasChainEvents) {
+      // Strip chain events for lower tiers
+      pool = pool.map(e => ({ ...e, chainEvent: undefined }));
+    }
+    return pool.slice(0, tier.eventCount);
+  });
+  
   const [idx, setIdx] = useState(0);
-  const [balance, setBalance] = useState(3000000);
+  const [balance, setBalance] = useState(tier.salary);
   const [saved, setSaved] = useState(0);
   const [log, setLog] = useState<string[]>([]);
   const [done, setDone] = useState(false);
   const [lastNote, setLastNote] = useState<string | null>(null);
   const [endResult, setEndResult] = useState<any>(null);
-  const ev = events[idx];
+  const [chainQueue, setChainQueue] = useState<typeof SURVIVAL_EVENTS>([]);
+  const [timerLeft, setTimerLeft] = useState(tier.hasTimer ? tier.timerSeconds : 0);
+  const [revealed, setRevealed] = useState(false); // for hidden effect reveal after choice
+
+  // Current event: check chain queue first, then main events
+  const currentEvent = chainQueue.length > 0 ? chainQueue[0] : events[idx];
+  const isChainEvent = chainQueue.length > 0;
+
+  // Timer effect for tier 5
+  useEffect(() => {
+    if (!tier.hasTimer || done || revealed) return;
+    if (timerLeft <= 0) {
+      // Auto-choose the more expensive option
+      const aAbs = Math.abs(currentEvent.aEffect);
+      const bAbs = Math.abs(currentEvent.bEffect);
+      const worstSide = aAbs >= bAbs ? 'a' : 'b';
+      choose(worstSide);
+      return;
+    }
+    const t = setTimeout(() => setTimerLeft(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [timerLeft, done, revealed, tier.hasTimer]);
 
   async function choose(side: 'a' | 'b') {
-    hapticLight();
+    if (settings.haptics) hapticLight();
+    const ev = currentEvent;
     const eff = side === 'a' ? ev.aEffect : ev.bEffect;
     const note = side === 'a' ? ev.aNote : ev.bNote;
     const nb = balance + eff;
-    if (idx === 0 && side === 'a' && eff === -600000) setSaved(600000);
+    if (idx === 0 && !isChainEvent && side === 'a' && eff === -600000) setSaved(600000);
     setBalance(nb);
     setLastNote(note);
+    setRevealed(true);
     setLog((l) => [...l, `${ev.day}: ${ev.title} (${eff >= 0 ? '+' : ''}${formatRupiah(eff)})`]);
     
     if (nb < 0) {
       setDone(true);
-      setEndResult(await onEnd(0));
+      if (settings.haptics) hapticError();
+      setEndResult(await onEnd(0, tier.tier, tier.salary));
       return;
     }
-    if (idx + 1 >= events.length) {
-      setDone(true);
-      setEndResult(await onEnd(nb));
-    } else {
-      setIdx((v) => v + 1);
+
+    // Queue chain event if applicable (only trigger on tier 4+)
+    if (tier.hasChainEvents && ev.chainEvent && !isChainEvent) {
+      // 60% chance chain event fires
+      if (Math.random() < 0.6) {
+        setChainQueue([ev.chainEvent]);
+      }
     }
   }
 
-  function restart() {
-    setIdx(0); setBalance(3000000); setSaved(0); setLog([]); setDone(false); setLastNote(null);
+  function advance() {
+    hapticLight();
+    setRevealed(false);
+    setLastNote(null);
+    
+    if (isChainEvent) {
+      // Dequeue chain event
+      setChainQueue(q => q.slice(1));
+      setTimerLeft(tier.hasTimer ? tier.timerSeconds : 0);
+      return;
+    }
+    
+    if (idx + 1 >= events.length) {
+      setDone(true);
+      onEnd(balance, tier.tier, tier.salary).then(setEndResult);
+    } else {
+      setIdx(v => v + 1);
+      setTimerLeft(tier.hasTimer ? tier.timerSeconds : 0);
+    }
   }
 
   if (done) {
-    const grade = balance <= 0 ? 'Bangkrut! Coba lagi.' : balance >= 2200000 ? 'Sultan Bertahan!' : balance >= 1200000 ? 'Hemat Mantap!' : 'Pas-pasan!';
+    const pct = balance / tier.salary;
+    const grade = balance <= 0 ? 'Bangkrut! Coba lagi.' : pct >= 0.8 ? '👑 Raja Hemat!' : pct >= 0.6 ? 'Sultan Bertahan!' : pct >= 0.4 ? 'Hemat Mantap!' : 'Pas-pasan!';
     return (
       <ScrollView contentContainerStyle={styles.scroll}>
         <Card gradient={theme.colors.heroGradient} glow>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Text style={{ fontSize: 20 }}>{tier.icon}</Text>
+            <Text style={styles.heroSub}>Tier {tier.tier}: {tier.name}</Text>
+          </View>
           <Text style={styles.heroTitle}>{grade}</Text>
-          <Text style={styles.heroSub}>Sisa saldo: {formatRupiah(Math.max(0, balance))}</Text>
-          {endResult?.xpEarned > 0 && <Text style={styles.heroSub}>+{endResult.xpEarned} XP Earned!</Text>}
+          <Text style={styles.heroSub}>Sisa saldo: {formatRupiah(Math.max(0, balance))} / {formatRupiah(tier.salary)}</Text>
+          <Text style={styles.heroSub}>{Math.round(Math.max(0, balance) / tier.salary * 100)}% saldo tersisa</Text>
+          {endResult?.xpEarned > 0 && <Text style={[styles.heroSub, { color: theme.colors.warning, fontWeight: 'bold', marginTop: 4 }]}>+{endResult.xpEarned} XP (x{tier.xpMult})</Text>}
+          {balance > 0 && tier.tier < 5 && tier.tier >= (endResult?.newlyUnlocked ? 1 : 0) && (
+            <Text style={[styles.heroSub, { marginTop: 4 }]}>🔓 Tier {tier.tier + 1} terbuka!</Text>
+          )}
         </Card>
         {log.map((l, i) => (
           <View key={i} style={styles.logRow}><Text style={styles.logText}>{l}</Text></View>
         ))}
         <View style={styles.rowBtns}>
-          {/* <TouchableOpacity style={styles.nextBtn} onPress={restart}><Text style={styles.nextText}>Main Lagi</Text></TouchableOpacity> */}
-          <TouchableOpacity style={styles.ghostBtn} onPress={quit}><Text style={styles.ghostText}>Menu Game</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.ghostBtn} onPress={quit}><Text style={styles.ghostText}>Pilih Tier</Text></TouchableOpacity>
         </View>
       </ScrollView>
     );
   }
 
+  const ev = currentEvent;
+  const balPct = Math.max(0, Math.min(100, (balance / tier.salary) * 100));
+  const eventProgress = `Event ${idx + 1}/${events.length}${isChainEvent ? ' 🔗' : ''}`;
+
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
-      <Card style={styles.qCard}>
-        <Text style={styles.meta}>Event {idx+1}/{events.length} • Saldo {formatRupiah(balance)}</Text>
-        <View style={styles.balBar}>
-          <View style={[styles.balFill, { width: `${Math.max(0, Math.min(100, (balance / 3000000) * 100))}%` }]} />
+      {/* Tier indicator */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 16 }}>{tier.icon}</Text>
+          <Text style={[styles.meta, { color: tier.color }]}>Tier {tier.tier}: {tier.name}</Text>
         </View>
+        {tier.hasTimer && !revealed && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="timer-outline" size={16} color={timerLeft <= 5 ? theme.colors.danger : tier.color} />
+            <Text style={[styles.meta, { color: timerLeft <= 5 ? theme.colors.danger : tier.color, fontSize: 16, fontWeight: '800' }]}>{timerLeft}s</Text>
+          </View>
+        )}
+      </View>
+
+      {tier.hasTimer && !revealed && (
+        <TimerBar secs={tier.timerSeconds} left={timerLeft} styles={styles} />
+      )}
+
+      <Card style={[styles.qCard, isChainEvent && { borderColor: theme.colors.warning, borderWidth: 2 }]}>
+        <Text style={styles.meta}>{eventProgress} • Saldo {formatRupiah(balance)}</Text>
+        <View style={styles.balBar}>
+          <View style={[styles.balFill, { width: `${balPct}%`, backgroundColor: balPct < 20 ? theme.colors.danger : balPct < 50 ? theme.colors.warning : theme.colors.success }]} />
+        </View>
+        {isChainEvent && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <Text style={{ fontSize: 14 }}>🔗</Text>
+            <Text style={[styles.meta, { color: theme.colors.warning }]}>CHAIN EVENT!</Text>
+          </View>
+        )}
         <Text style={styles.qText}>{ev.title}</Text>
         <Text style={styles.menuDesc}>{ev.desc}</Text>
-        {lastNote && <Text style={styles.tipText}>{lastNote}</Text>}
+        {revealed && lastNote && (
+          <Card style={styles.tipCard}>
+            <Text style={styles.tipText}>{lastNote}</Text>
+            <TouchableOpacity style={styles.nextBtn} onPress={advance}>
+              <Text style={styles.nextText}>Lanjut</Text>
+            </TouchableOpacity>
+          </Card>
+        )}
       </Card>
-      <TouchableOpacity style={styles.opt} onPress={() => choose('a')}>
-        <Text style={styles.optText}>{ev.aLabel}</Text>
-        <Text style={styles.menuDesc}>{formatRupiah(ev.aEffect)}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.opt} onPress={() => choose('b')}>
-        <Text style={styles.optText}>{ev.bLabel}</Text>
-        <Text style={styles.menuDesc}>{formatRupiah(ev.bEffect)}</Text>
-      </TouchableOpacity>
+
+      {!revealed && (
+        <>
+          <TouchableOpacity style={[styles.opt, { borderColor: tier.color + '40' }]} onPress={() => choose('a')}>
+            <Text style={styles.optText}>{ev.aLabel}</Text>
+            {tier.hideEffect
+              ? <Text style={[styles.menuDesc, { color: tier.color, fontWeight: '700' }]}>???</Text>
+              : <Text style={styles.menuDesc}>{formatRupiah(ev.aEffect)}</Text>
+            }
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.opt, { borderColor: tier.color + '40' }]} onPress={() => choose('b')}>
+            <Text style={styles.optText}>{ev.bLabel}</Text>
+            {tier.hideEffect
+              ? <Text style={[styles.menuDesc, { color: tier.color, fontWeight: '700' }]}>???</Text>
+              : <Text style={styles.menuDesc}>{formatRupiah(ev.bEffect)}</Text>
+            }
+          </TouchableOpacity>
+        </>
+      )}
       {saved > 0 && <Text style={styles.bestText}>Tabungan diamankan: {formatRupiah(saved)}</Text>}
     </ScrollView>
   );
@@ -507,7 +772,7 @@ function SurvivalView({ styles, onEnd, quit }: { styles: any, onEnd: (score: num
 // Data Challenge View
 // ─────────────────────────────────────────────────────────────────
 
-function DataChallengeView({ styles, db, bookId, onEnd, quit }: { styles: any, db: SQLiteDatabase, bookId: number, onEnd: (score: number, perfect: boolean) => Promise<any>, quit: () => void }) {
+function DataChallengeView({ styles, settings, db, bookId, onEnd, quit }: { styles: any, settings: GameSettings, db: SQLiteDatabase, bookId: number, onEnd: (score: number, perfect: boolean) => Promise<any>, quit: () => void }) {
   const { theme } = useTheme();
   const [qs, setQs] = useState<DataQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -521,12 +786,12 @@ function DataChallengeView({ styles, db, bookId, onEnd, quit }: { styles: any, d
 
   useEffect(() => {
     generateDataQuestions(db, bookId).then(questions => {
-      // Pick up to 10 random questions
-      const selected = shuffle(questions).slice(0, 10);
+      // Pick random questions based on settings
+      const selected = shuffle(questions).slice(0, settings.rounds);
       setQs(selected);
       setLoading(false);
     });
-  }, [db, bookId]);
+  }, [db, bookId, settings.rounds]);
 
   function pick(i: number) {
     if (picked !== null || done) return;
@@ -534,14 +799,14 @@ function DataChallengeView({ styles, db, bookId, onEnd, quit }: { styles: any, d
     if (i === qs[idx].answer) {
       setScore(s => s + 200); // 200 pts for correct data answer
       setCorrectCount(c => c + 1);
-      hapticSuccess();
+      if (settings.haptics) hapticSuccess();
     } else {
-      hapticError();
+      if (settings.haptics) hapticError();
     }
   }
 
   async function next() {
-    hapticLight();
+    if (settings.haptics) hapticLight();
     if (idx + 1 >= qs.length) {
       setDone(true);
       const res = await onEnd(score, correctCount === qs.length);
@@ -611,7 +876,10 @@ function DataChallengeView({ styles, db, bookId, onEnd, quit }: { styles: any, d
       })}
       {picked !== null && (
         <Card style={styles.tipCard}>
-          <Text style={styles.tipText}>{picked === q.answer ? 'Benar! ' : 'Kurang tepat. '}{q.tip}</Text>
+          <Text style={styles.tipText}>
+            {picked === q.answer ? 'Benar! ' : 'Kurang tepat. '}
+            {settings.showTips ? q.tip : ''}
+          </Text>
           <TouchableOpacity style={styles.nextBtn} onPress={next}>
             <Text style={styles.nextText}>{idx + 1 >= qs.length ? 'Lihat Hasil' : 'Lanjut'}</Text>
           </TouchableOpacity>
@@ -656,6 +924,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   play: { flex: 1, padding: theme.spacing.lg, gap: theme.spacing.md },
   heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
   heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
+  diffChip: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: theme.radius.round },
+  diffChipText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   bigScore: { fontSize: 40, fontWeight: '800', color: '#fff', marginVertical: 4 },
   menuCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
   iconBg: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
