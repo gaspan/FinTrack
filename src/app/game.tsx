@@ -18,6 +18,7 @@ import { getDailyChallenge, DailyChallenge } from '@/features/game/dataDaily';
 import Slider from '@react-native-community/slider';
 import dayjs from 'dayjs';
 import { ADVENTURE_EPISODES, AdventureEpisode } from '@/features/game/dataAdventure';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type Mode = 'menu' | 'quiz' | 'price' | 'survival-select' | 'survival' | 'data' | 'journey' | 'daily' | 'budget' | 'stats' | 'shop' | 'adventure';
 
@@ -1634,22 +1635,44 @@ function AdventureView({ styles, settings, onEnd, quit }: any) {
   const [episode, setEpisode] = useState<AdventureEpisode | null>(null);
   const [locIdx, setLocIdx] = useState(0);
   const [balance, setBalance] = useState(0);
-  const [phase, setPhase] = useState<'pick' | 'walking' | 'event' | 'result' | 'done'>('pick');
+  const [phase, setPhase] = useState<'pick' | 'walking' | 'arriving' | 'event' | 'result' | 'done'>('pick');
   const [picked, setPicked] = useState<0 | 1 | null>(null);
   const [wiseCount, setWiseCount] = useState(0);
   const bobAnim = useRef(new Animated.Value(0)).current;
   const moveAnim = useRef(new Animated.Value(-150)).current;
   const wobbleAnim = useRef(new Animated.Value(0)).current;
+  const parallaxAnim = useRef(new Animated.Value(0)).current; // Ground
+  const skyAnim = useRef(new Animated.Value(0)).current;      // Sky/Clouds
+  const horizonAnim = useRef(new Animated.Value(0)).current;  // Skyline/Trees
+  const destAnim = useRef(new Animated.Value(300)).current;   // Destination Icon sliding from right
+  const cardScaleAnim = useRef(new Animated.Value(0)).current; // Event Card popping up
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [displayScore, setDisplayScore] = useState(0);
   const [dots, setDots] = useState('');
 
-  // Walking bobbing animation
+  // Pulsing Map Node Animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.2, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true })
+      ])
+    ).start();
+  }, []);
+
+  // Walking bobbing & parallax animation
   useEffect(() => {
     if (phase !== 'walking') return;
     
-    // Reset values
+    // Reset values for a new walk
     bobAnim.setValue(0);
     moveAnim.setValue(-150);
     wobbleAnim.setValue(0);
+    parallaxAnim.setValue(0);
+    skyAnim.setValue(0);
+    horizonAnim.setValue(0);
+    destAnim.setValue(400); // Start off-screen right
+    cardScaleAnim.setValue(0);
 
     const walkAnim = Animated.loop(
       Animated.parallel([
@@ -1664,17 +1687,70 @@ function AdventureView({ styles, settings, onEnd, quit }: any) {
       ])
     );
     
-    Animated.timing(moveAnim, {
-      toValue: 0,
-      duration: 2000,
-      useNativeDriver: true,
-    }).start();
+    // Parallax Loops (moving left)
+    const roadAnim = Animated.loop(Animated.timing(parallaxAnim, { toValue: -100, duration: 400, useNativeDriver: true }));
+    const horizAnim = Animated.loop(Animated.timing(horizonAnim, { toValue: -100, duration: 1500, useNativeDriver: true }));
+    const cloudAnim = Animated.loop(Animated.timing(skyAnim, { toValue: -100, duration: 4000, useNativeDriver: true }));
+
+    // Character entrance
+    Animated.timing(moveAnim, { toValue: 0, duration: 1000, useNativeDriver: true }).start();
 
     walkAnim.start();
+    roadAnim.start();
+    horizAnim.start();
+    cloudAnim.start();
+    
     const dotsInterval = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 400);
-    const timer = setTimeout(() => { walkAnim.stop(); setPhase('event'); }, 2000);
-    return () => { walkAnim.stop(); clearInterval(dotsInterval); clearTimeout(timer); };
+    
+    // Switch to arriving phase after walking for a while
+    const timer = setTimeout(() => { 
+      setPhase('arriving'); 
+    }, 2000);
+    
+    return () => { walkAnim.stop(); roadAnim.stop(); horizAnim.stop(); cloudAnim.stop(); clearInterval(dotsInterval); clearTimeout(timer); };
   }, [phase, locIdx]);
+
+  // Arriving Phase (Destination slides in, character stops, then Event pops up)
+  useEffect(() => {
+    if (phase !== 'arriving') return;
+    
+    // Stop the bobbing and background loops (let them freeze in place)
+    // We animate the destination icon sliding in from 400 to 80 (in front of character)
+    Animated.timing(destAnim, {
+      toValue: 80,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start(() => {
+      // Once destination arrives, spring the card up
+      setPhase('event');
+      Animated.spring(cardScaleAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    });
+
+  }, [phase]);
+
+  // Score Ticker Animation
+  useEffect(() => {
+    if (phase === 'done') {
+      const finalScore = wiseCount * 200;
+      let current = 0;
+      const step = Math.max(1, Math.floor(finalScore / 40));
+      const interval = setInterval(() => {
+        current += step;
+        if (current >= finalScore) {
+          setDisplayScore(finalScore);
+          clearInterval(interval);
+        } else {
+          setDisplayScore(current);
+        }
+      }, 30);
+      return () => clearInterval(interval);
+    }
+  }, [phase, wiseCount]);
 
   function startEpisode(ep: AdventureEpisode) {
     setEpisode(ep);
@@ -1690,8 +1766,12 @@ function AdventureView({ styles, settings, onEnd, quit }: any) {
     const choice = episode.locations[locIdx].choices[idx];
     setPicked(idx);
     setBalance(b => b + choice.effect);
-    if (choice.isWise) setWiseCount(w => w + 1);
-    hapticLight();
+    if (choice.isWise) {
+      setWiseCount(w => w + 1);
+      hapticSuccess();
+    } else {
+      hapticError();
+    }
     setPhase('result');
   }
 
@@ -1706,6 +1786,46 @@ function AdventureView({ styles, settings, onEnd, quit }: any) {
       setPhase('walking');
     }
   }
+
+  // Helper to render the Node Map (used in multiple phases)
+  const renderMapNodes = () => {
+    if (!episode) return null;
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+        {episode.locations.map((l, i) => {
+          const isPast = i < locIdx;
+          const isCurrent = i === locIdx;
+          const nodeColor = isPast ? theme.colors.success : isCurrent ? theme.colors.primary : theme.colors.border;
+          
+          return (
+            <React.Fragment key={l.id}>
+              <Animated.View style={{ 
+                width: 32, height: 32, borderRadius: 16, 
+                backgroundColor: isPast ? theme.colors.success + '40' : isCurrent ? theme.colors.primary : theme.colors.border,
+                borderWidth: isCurrent ? 2 : 0,
+                borderColor: theme.colors.primary,
+                justifyContent: 'center', alignItems: 'center',
+                transform: isCurrent ? [{ scale: pulseAnim }] : []
+              }}>
+                <Text style={{ fontSize: isCurrent ? 16 : 12 }}>{isPast ? '✓' : isCurrent ? l.icon : '🔒'}</Text>
+              </Animated.View>
+              {/* Connection Line */}
+              {i < episode.locations.length - 1 && (
+                <View style={{ width: 12, height: 4, backgroundColor: isPast ? theme.colors.success : theme.colors.border, marginHorizontal: 2 }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </View>
+    );
+  };
+
+  // Episode Gradients
+  const bgGradients: Record<string, [string, string]> = {
+    payday: ['#0ea5e9', '#38bdf8'], // Morning Blue
+    weekend: ['#f59e0b', '#fbbf24'], // Sunny Yellow
+    newmonth: ['#6366f1', '#818cf8'], // Twilight Purple
+  };
 
   // ── Episode Picker ──
   if (phase === 'pick') {
@@ -1735,60 +1855,168 @@ function AdventureView({ styles, settings, onEnd, quit }: any) {
 
   if (!episode) return null;
   const loc = episode.locations[locIdx];
+  const choice = picked !== null ? loc.choices[picked] : null;
 
-  // ── Walking Animation ──
-  if (phase === 'walking') {
+  // ── Diorama Engine (Walking, Arriving, Event, Result) ──
+  const isDiorama = phase === 'walking' || phase === 'arriving' || phase === 'event' || phase === 'result';
+  if (isDiorama) {
+    const activeGradient = bgGradients[episode.id] || ['#3b82f6', '#60a5fa'];
+    const horizonEmojis = episode.id === 'weekend' ? ['🌲', '⛰️', '🌲', '🏕️', '🌲', '⛰️'] : ['🏢', '🏦', '🏨', '🏬', '🏢', '🏦'];
+    const isResult = phase === 'result';
+    const resultBg = isResult && choice ? (choice.isWise ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)') : 'transparent';
+
     return (
-      <View style={[styles.play, { justifyContent: 'center', alignItems: 'center' }]}>
-        {/* Path progress */}
-        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 32, flexWrap: 'wrap', justifyContent: 'center' }}>
-          {episode.locations.map((l, i) => (
-            <View key={l.id} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: i < locIdx ? theme.colors.success + '40' : i === locIdx ? theme.colors.primary : theme.colors.border, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ fontSize: i === locIdx ? 16 : 12 }}>{i < locIdx ? '✓' : l.icon}</Text>
+      <LinearGradient colors={activeGradient} style={styles.container}>
+        <View style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={{ padding: 20, flexGrow: 1 }}>
+            {renderMapNodes()}
+
+            <View style={{ height: 260, width: '100%', justifyContent: 'flex-end', alignItems: 'center', overflow: 'hidden', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+              {/* Sky / Clouds Layer */}
+              <Animated.View style={{ position: 'absolute', top: 20, left: 0, flexDirection: 'row', transform: [{ translateX: skyAnim }] }}>
+                {Array.from({ length: 8 }).map((_, i) => <Text key={i} style={{ fontSize: 40, opacity: 0.6, marginRight: 60 }}>☁️</Text>)}
+              </Animated.View>
+
+              {/* Horizon Layer */}
+              <Animated.View style={{ position: 'absolute', bottom: 50, left: 0, flexDirection: 'row', transform: [{ translateX: horizonAnim }] }}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <View key={i} style={{ flexDirection: 'row' }}>
+                    {horizonEmojis.map((emoji, j) => <Text key={j} style={{ fontSize: 50, opacity: 0.8, marginRight: 20 }}>{emoji}</Text>)}
+                  </View>
+                ))}
+              </Animated.View>
+
+              {/* Ground Parallax */}
+              <Animated.View style={{ position: 'absolute', bottom: 0, left: 0, right: -400, flexDirection: 'row', transform: [{ translateX: parallaxAnim }] }}>
+                {Array.from({ length: 20 }).map((_, i) => (
+                  <View key={i} style={{ width: 80, alignItems: 'center', justifyContent: 'flex-end', height: 40 }}>
+                    <Text style={{ fontSize: 18, opacity: 0.5, marginBottom: 4 }}>👣</Text>
+                    <View style={{ width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }} />
+                  </View>
+                ))}
+              </Animated.View>
+
+              {/* Destination Icon Layer (Slides in during Arriving) */}
+              <Animated.View style={{ position: 'absolute', bottom: 30, transform: [{ translateX: destAnim }] }}>
+                <View style={{ backgroundColor: 'white', padding: 10, borderRadius: 20, borderWidth: 3, borderColor: theme.colors.primary, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10 }}>
+                  <Text style={{ fontSize: 48 }}>{loc.icon}</Text>
+                </View>
+              </Animated.View>
+
+              {/* Actor Layer (Character) */}
+              <Animated.View style={{ 
+                zIndex: 10,
+                transform: [
+                  { translateX: moveAnim }, 
+                  { translateY: bobAnim },
+                  { rotate: wobbleAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-15deg', '15deg'] }) }
+                ],
+                marginBottom: 20
+              }}>
+                <Text style={{ fontSize: 96, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 8 }, textShadowRadius: 8 }}>
+                  {episode.character}
+                </Text>
+              </Animated.View>
+
+              {/* Result Overlay Glow */}
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: resultBg, pointerEvents: 'none' }} />
             </View>
-          ))}
+
+            {/* Status / UI Cards */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}>
+                <Text style={[styles.meta, { color: theme.colors.textPrimary }]}>Menuju {loc.name}</Text>
+              </View>
+              <View style={{ backgroundColor: theme.colors.success, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}>
+                <Text style={[styles.meta, { color: '#fff', fontWeight: 'bold' }]}>{formatRupiah(balance)}</Text>
+              </View>
+            </View>
+
+            {/* Event Card (Springs up) */}
+            {(phase === 'event' || phase === 'result') && (
+              <Animated.View style={{ transform: [{ scale: cardScaleAnim }], marginTop: 20 }}>
+                <Card style={[styles.qCard, { borderColor: theme.colors.primary, borderWidth: 2, backgroundColor: 'rgba(255,255,255,0.95)' }]}>
+                  <Text style={[styles.menuTitle, { fontSize: 20, textAlign: 'center' }]}>{loc.name}</Text>
+                  <Text style={[styles.menuDesc, { textAlign: 'center', fontSize: 15, marginTop: 4 }]}>{loc.desc}</Text>
+                </Card>
+
+                {/* Choices (Arcade 3D Buttons) */}
+                {phase === 'event' && (
+                  <View style={{ gap: 16, marginTop: 16 }}>
+                    {loc.choices.map((c, i) => (
+                      <TouchableOpacity key={i} onPress={() => choose(i as 0 | 1)} activeOpacity={0.7} style={{
+                        backgroundColor: i === 0 ? theme.colors.primary : '#6b7280',
+                        borderRadius: 16,
+                        paddingBottom: 6, // 3D Bottom Lip
+                      }}>
+                        <View style={{ backgroundColor: i === 0 ? '#60a5fa' : '#9ca3af', borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center' }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{c.label}</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 4 }}>{formatRupiah(c.effect)}</Text>
+                          </View>
+                          <Ionicons name="chevron-forward-circle" size={28} color="#fff" />
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Result Glow Card */}
+                {phase === 'result' && choice && (
+                  <Card style={[styles.tipCard, { marginTop: 16, borderColor: choice.isWise ? theme.colors.success : theme.colors.danger, borderWidth: 2, backgroundColor: '#fff' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center', marginBottom: 10 }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: choice.isWise ? theme.colors.success : theme.colors.danger, justifyContent: 'center', alignItems: 'center' }}>
+                        <Ionicons name={choice.isWise ? "checkmark" : "close"} size={24} color="#fff" />
+                      </View>
+                      <Text style={{ fontSize: 22, fontWeight: '800', color: choice.isWise ? theme.colors.success : theme.colors.danger }}>
+                        {choice.isWise ? 'Keputusan Bijak!' : 'Kurang Bijak'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.tipText, { textAlign: 'center', fontSize: 15 }]}>{choice.message}</Text>
+                    
+                    <View style={{ backgroundColor: theme.colors.background, padding: 16, borderRadius: 12, marginTop: 16, borderLeftWidth: 4, borderLeftColor: theme.colors.info }}>
+                      <Text style={[styles.meta, { color: theme.colors.info, fontWeight: 'bold' }]}>💡 Tips Keuangan:</Text>
+                      <Text style={[styles.meta, { marginTop: 4, fontSize: 13, lineHeight: 20 }]}>{choice.tip}</Text>
+                    </View>
+                    
+                    <TouchableOpacity style={[styles.nextBtn, { marginTop: 20 }]} onPress={nextLoc}>
+                      <Text style={styles.nextText}>{locIdx + 1 >= episode.locations.length ? '📊 Lihat Hasil Akhir' : '🚶 Lanjut Perjalanan'}</Text>
+                    </TouchableOpacity>
+                  </Card>
+                )}
+              </Animated.View>
+            )}
+
+            {/* Walking Indicator text */}
+            {phase === 'walking' && (
+              <Text style={{ textAlign: 'center', color: 'rgba(255,255,255,0.8)', marginTop: 20, fontSize: 16, fontWeight: 'bold' }}>
+                Sedang di jalan{dots}
+              </Text>
+            )}
+            
+          </ScrollView>
         </View>
-        <View style={{ height: 160, width: '100%', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-          <Animated.View style={{ 
-            transform: [
-              { translateX: moveAnim }, 
-              { translateY: bobAnim },
-              { rotate: wobbleAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-10deg', '10deg'] }) }
-            ] 
-          }}>
-            <Text style={{ fontSize: 80 }}>{episode.character}</Text>
-          </Animated.View>
-          
-          <View style={{ flexDirection: 'row', gap: 15, marginTop: 10, opacity: 0.5 }}>
-             <Text style={{ fontSize: 16 }}>👣</Text>
-             <Text style={{ fontSize: 16 }}>👣</Text>
-             <Text style={{ fontSize: 16 }}>👣</Text>
-             <Text style={{ fontSize: 16 }}>👣</Text>
-             <Text style={{ fontSize: 16 }}>👣</Text>
-          </View>
-          <View style={{ width: '60%', height: 4, backgroundColor: theme.colors.border, marginTop: 8, borderRadius: 2 }} />
-        </View>
-        <Text style={[styles.menuTitle, { marginTop: 20, fontSize: 17 }]}>Menuju {loc.icon} {loc.name}{dots}</Text>
-        <Text style={[styles.menuDesc, { marginTop: 8 }]}>Saldo: {formatRupiah(balance)}</Text>
-      </View>
+      </LinearGradient>
     );
   }
 
-  const choice = picked !== null ? loc.choices[picked] : null;
-
   // ── Done Screen ──
   if (phase === 'done') {
-    const finalScore = wiseCount * 200;
     const pct = Math.round((balance / episode.startBalance) * 100);
     return (
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Card gradient={theme.colors.heroGradient} glow>
-          <Text style={{ fontSize: 48, textAlign: 'center' }}>{episode.character}</Text>
-          <Text style={styles.heroTitle}>Petualangan Selesai!</Text>
-          <Text style={styles.bigScore}>{finalScore} pts</Text>
-          <Text style={styles.heroSub}>Keputusan bijak: {wiseCount}/{episode.locations.length} ✅</Text>
+        <Card gradient={theme.colors.heroGradient} glow style={{ alignItems: 'center', paddingVertical: 40 }}>
+          <Text style={{ fontSize: 64 }}>{episode.character}</Text>
+          <Text style={[styles.heroTitle, { fontSize: 28 }]}>Petualangan Selesai!</Text>
+          <Text style={[styles.bigScore, { fontSize: 56, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 4 }]}>
+            {displayScore} pts
+          </Text>
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginTop: 10 }}>
+            <Text style={styles.heroSub}>Keputusan bijak: {wiseCount} / {episode.locations.length} ✅</Text>
+          </View>
         </Card>
-        <Card style={{ gap: 8 }}>
+        
+        <Card style={{ gap: 12 }}>
           <Text style={styles.menuTitle}>📊 Laporan Keuangan</Text>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Text style={styles.menuDesc}>Saldo Awal</Text>
@@ -1796,69 +2024,18 @@ function AdventureView({ styles, settings, onEnd, quit }: any) {
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Text style={styles.menuDesc}>Saldo Akhir</Text>
-            <Text style={[styles.menuTitle, { color: pct >= 50 ? theme.colors.success : theme.colors.danger }]}>{formatRupiah(balance)}</Text>
+            <Text style={[styles.menuTitle, { fontSize: 18, color: pct >= 50 ? theme.colors.success : theme.colors.danger }]}>{formatRupiah(balance)}</Text>
           </View>
-          <View style={styles.timerTrack}>
-            <View style={[styles.timerFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: pct >= 50 ? theme.colors.success : theme.colors.danger }]} />
+          <View style={[styles.timerTrack, { height: 12, borderRadius: 6 }]}>
+            <View style={[styles.timerFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: pct >= 50 ? theme.colors.success : theme.colors.danger, borderRadius: 6 }]} />
           </View>
-          <Text style={[styles.meta, { textAlign: 'center' }]}>Sisa {pct}% dari saldo awal</Text>
+          <Text style={[styles.meta, { textAlign: 'center', fontWeight: 'bold' }]}>Sisa {pct}% dari saldo awal</Text>
         </Card>
-        <View style={styles.rowBtns}>
-          <TouchableOpacity style={styles.nextBtn} onPress={quit}><Text style={styles.nextText}>Selesai</Text></TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.nextBtn} onPress={quit}><Text style={styles.nextText}>Selesai</Text></TouchableOpacity>
       </ScrollView>
     );
   }
 
-  // ── Event + Result Screen ──
-  return (
-    <ScrollView contentContainerStyle={styles.scroll}>
-      {/* Path progress */}
-      <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
-        {episode.locations.map((l, i) => (
-          <View key={l.id} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: i < locIdx ? theme.colors.success + '40' : i === locIdx ? theme.colors.primary : theme.colors.border, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ fontSize: i === locIdx ? 16 : 12 }}>{i < locIdx ? '✓' : l.icon}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={styles.meta}>Lokasi {locIdx + 1}/{episode.locations.length}</Text>
-        <Text style={[styles.meta, { color: theme.colors.success }]}>Saldo: {formatRupiah(balance)}</Text>
-      </View>
-
-      {/* Location card */}
-      <Card style={[styles.qCard, { borderColor: '#F59E0B', borderWidth: 1 }]}>
-        <Text style={{ fontSize: 44 }}>{loc.icon}</Text>
-        <Text style={[styles.menuTitle, { fontSize: 17 }]}>{loc.name}</Text>
-        <Text style={[styles.menuDesc, { textAlign: 'center' }]}>{loc.desc}</Text>
-      </Card>
-
-      {/* Choices */}
-      {phase === 'event' && loc.choices.map((c, i) => (
-        <TouchableOpacity key={i} onPress={() => choose(i as 0 | 1)} style={[styles.opt, { gap: 4 }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optText}>{c.label}</Text>
-            <Text style={[styles.meta, { color: theme.colors.textSecondary }]}>{formatRupiah(c.effect)}</Text>
-          </View>
-        </TouchableOpacity>
-      ))}
-
-      {/* Result */}
-      {phase === 'result' && choice && (
-        <Card style={[styles.tipCard, { borderColor: choice.isWise ? theme.colors.success : theme.colors.warning, borderWidth: 1 }]}>
-          <Text style={{ fontSize: 28, textAlign: 'center' }}>{choice.isWise ? '✅ Keputusan Bijak!' : '⚠️ Kurang Bijak'}</Text>
-          <Text style={styles.tipText}>{choice.message}</Text>
-          <View style={{ backgroundColor: theme.colors.background, padding: 10, borderRadius: 8 }}>
-            <Text style={[styles.meta, { color: theme.colors.info }]}>💡 Tips: {choice.tip}</Text>
-          </View>
-          <TouchableOpacity style={styles.nextBtn} onPress={nextLoc}>
-            <Text style={styles.nextText}>{locIdx + 1 >= episode.locations.length ? '📊 Lihat Hasil' : '🚶 Lanjut Jalan'}</Text>
-          </TouchableOpacity>
-        </Card>
-      )}
-    </ScrollView>
-  );
 }
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
