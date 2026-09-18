@@ -245,6 +245,8 @@ export const LEVELS: Level[] = [
   { level: 6, title: 'Ahli Finansial', xpRequired: 10000, icon: '🏆' },
   { level: 7, title: 'Guru Keuangan', xpRequired: 16000, icon: '🎓' },
   { level: 8, title: 'Sultan Finansial', xpRequired: 25000, icon: '👑' },
+  { level: 9, title: 'Naga Finansial', xpRequired: 35000, icon: '🐉' },
+  { level: 10, title: 'Dewa Finansial', xpRequired: 50000, icon: '🌌' },
 ];
 
 export interface Achievement {
@@ -261,7 +263,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'survivor', title: 'Survivor Sejati', desc: 'Selesaikan survival dengan saldo 2jt+', icon: '🛡️' },
   { id: 'streak_5', title: 'Otak Encer', desc: 'Streak 5x berturut-turut di kuis', icon: '🔥' },
   { id: 'perfect_price', title: 'Pedagang Ulung', desc: 'Tebak harga benar 10x beruntun', icon: '💎' },
-  { id: 'all_modes', title: 'Petualang Lengkap', desc: 'Main semua 4 mode game', icon: '🗺️' },
+  { id: 'all_modes', title: 'Petualang Lengkap', desc: 'Main semua 5 mode game', icon: '🗺️' },
   { id: 'level_5', title: 'Setengah Jalan', desc: 'Capai level 5', icon: '⭐' },
   { id: 'total_1000', title: 'Seribu Poin', desc: 'Kumpulkan 1000 XP total', icon: '🎉' },
   { id: 'data_challenge', title: 'Cermin Diri', desc: 'Selesaikan tantangan data asli pertama', icon: '🪞' },
@@ -270,4 +272,39 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'survival_tier3', title: 'Pejuang Gajian', desc: 'Survive di tier Sulit (saldo > 0)', icon: '⚔️' },
   { id: 'survival_tier5', title: 'Legenda Bertahan', desc: 'Survive di tier Menantang Sangat', icon: '☠️' },
   { id: 'survival_frugal', title: 'Raja Hemat', desc: 'Selesai survival dengan ≥80% saldo awal', icon: '👑' },
+  { id: 'journey_first', title: 'Seperjalanan Hidup', desc: 'Selesaikan 1x Perjalanan Hidup', icon: '🎒' },
+  { id: 'journey_comfort', title: 'Tua Bahagia', desc: 'Raih ending Pensiun Nyaman atau lebih', icon: '🌳' },
+  { id: 'journey_sultan', title: 'Sultan Pensiun', desc: 'Raih ending Sultan Pensiun', icon: '👑' },
+  { id: 'journey_legenda', title: 'Legenda Abadi', desc: 'Raih ending Legenda Abadi (15M+)', icon: '🏛️' },
+  { id: 'journey_zen', title: 'Pertapa Bahagia', desc: 'Temukan SECRET ending bahagia 90+', icon: '🧘' },
+  { id: 'journey_kolektor', title: 'Kolektor Takdir', desc: 'Kumpulkan 6+ ending berbeda', icon: '🗺️' },
+  // NEW ACHIEVEMENTS
+  { id: 'daily_3', title: 'Rajin Latihan', desc: 'Main Daily Challenge 3 hari berturut-turut', icon: '📅' },
+  { id: 'daily_7', title: 'Konsisten Keuangan', desc: 'Main Daily Challenge 7 hari berturut-turut', icon: '📆' },
+  { id: 'quiz_perfect', title: 'Sempurna', desc: 'Jawab semua benar di kuis', icon: '✨' },
+  { id: 'speed_demon', title: 'Kilat Finansial', desc: 'Jawab benar dalam <3 detik di kuis', icon: '⚡' },
+  { id: 'budget_master', title: 'Ahli Budget', desc: 'Skor 95+ di Budget Challenge', icon: '📊' },
+  { id: 'all_endings', title: 'Takdir Lengkap', desc: 'Kumpulkan semua 8 ending Journey', icon: '📚' },
+  { id: 'total_5000', title: 'Lima Ribu XP', desc: 'Kumpulkan 5000 XP total', icon: '🥈' },
+  { id: 'total_10000', title: 'Sepuluh Ribu XP', desc: 'Kumpulkan 10000 XP total', icon: '🥇' },
+  { id: 'coin_100', title: 'Kolektor Koin', desc: 'Kumpulkan 100 koin Arena', icon: '🪙' },
+  { id: 'survival_all_tiers', title: 'Master Survival', desc: 'Survive di semua 5 tier Survival Gajian', icon: '🧗' },
+  { id: 'adventure_wise', title: 'Petualang Bijak', desc: 'Buat 6+ keputusan bijak dalam 1 episode Petualangan', icon: '🧭' },
+];
+
+export interface ShopItem {
+  id: string;
+  name: string;
+  desc: string;
+  icon: string;
+  price: number;
+  type: 'consumable' | 'theme';
+}
+
+export const SHOP_ITEMS: ShopItem[] = [
+  { id: 'hint_token', name: 'Token Bantuan', desc: 'Hapus 2 jawaban salah saat Kuis atau Tebak Harga.', icon: '💡', price: 50, type: 'consumable' },
+  { id: 'time_extend', name: 'Waktu Ekstra', desc: '+10 detik untuk 1 pertanyaan di Kuis.', icon: '⏱️', price: 30, type: 'consumable' },
+  { id: 'safety_net', name: 'Jaring Pengaman', desc: 'Batalkan efek negatif di 1 event Survival (Tier 1-3).', icon: '🛡️', price: 100, type: 'consumable' },
+  { id: 'theme_dark', name: 'Tema Gelap Arena', desc: 'Tema gelap eksklusif untuk layar permainan Arena.', icon: '🌙', price: 500, type: 'theme' },
+  { id: 'theme_gold', name: 'Tema Sultan', desc: 'Aksen emas mewah untuk Arena.', icon: '✨', price: 1000, type: 'theme' },
 ];

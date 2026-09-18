@@ -435,7 +435,7 @@ export default function SettingsScreen() {
                 <Text style={styles.statLabel}>Streak Kuis</Text>
               </View>
               <View style={styles.statBox}>
-                <Text style={styles.statValue}>{gameState.modesPlayed.length}/4</Text>
+                <Text style={styles.statValue}>{gameState.modesPlayed.length}/5</Text>
                 <Text style={styles.statLabel}>Mode Dimainkan</Text>
               </View>
             </View>

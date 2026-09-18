@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Level, LEVELS, Achievement, ACHIEVEMENTS, BEST_KEYS } from './data';
+import { rankOfEnding } from './dataJourney';
 import dayjs from 'dayjs';
 
 export interface GameState {
@@ -19,10 +20,26 @@ export interface GameState {
   dataCount: number;
   dataBest: number;
   dataPerfect: boolean;
+  journeyCount: number;
+  journeyBest: number;
+  journeyBestEnding: string;
+  journeyEndings: string[];
+  journeyBestNetWorth: number;
   modesPlayed: string[];
   unlockedBadges: string[];
   lastPlayDate: string | null;
   dailyStreak: number;
+  // Expansion fields
+  coins: number;
+  dailyChallengeDone: string | null; // stores date string e.g. 'YYYY-MM-DD'
+  dailyChallengeStreak: number;
+  shopPurchases: string[];
+  budgetCount: number;
+  budgetBest: number;
+  fastestCorrectMs: number; // lowest time taken to answer correctly
+  quizPerfect: boolean;
+  adventureCount: number;
+  adventureBest: number;
 }
 
 const GAME_STATE_KEY = 'arena_game_state_v1';
@@ -44,10 +61,25 @@ const DEFAULT_STATE: GameState = {
   dataCount: 0,
   dataBest: 0,
   dataPerfect: false,
+  journeyCount: 0,
+  journeyBest: 0,
+  journeyBestEnding: '',
+  journeyEndings: [],
+  journeyBestNetWorth: 0,
   modesPlayed: [],
   unlockedBadges: [],
   lastPlayDate: null,
   dailyStreak: 0,
+  coins: 0,
+  dailyChallengeDone: null,
+  dailyChallengeStreak: 0,
+  shopPurchases: [],
+  budgetCount: 0,
+  budgetBest: 0,
+  fastestCorrectMs: 999999,
+  quizPerfect: false,
+  adventureCount: 0,
+  adventureBest: 0,
 };
 
 // Migrate old best scores to new state
@@ -190,7 +222,7 @@ export function checkAchievements(state: GameState): { newState: GameState; newl
         case 'survivor': unlocked = state.survivalBest >= 2000000; break;
         case 'streak_5': unlocked = state.maxStreak >= 5; break;
         case 'perfect_price': unlocked = state.pricePerfect === true; break;
-        case 'all_modes': unlocked = state.modesPlayed.length >= 4; break;
+        case 'all_modes': unlocked = state.modesPlayed.length >= 5; break;
         case 'level_5': unlocked = state.level >= 5; break;
         case 'total_1000': unlocked = state.totalXp >= 1000; break;
         case 'data_challenge': unlocked = state.dataCount >= 1; break;
@@ -199,6 +231,24 @@ export function checkAchievements(state: GameState): { newState: GameState; newl
         case 'survival_tier3': unlocked = (state.survivalTierBest[3] ?? 0) > 0; break;
         case 'survival_tier5': unlocked = (state.survivalTierBest[5] ?? 0) > 0; break;
         case 'survival_frugal': unlocked = state.frugalSurvival === true; break;
+        case 'journey_first': unlocked = state.journeyCount >= 1; break;
+        case 'journey_comfort': unlocked = rankOfEnding(state.journeyBestEnding) >= 3; break;
+        case 'journey_sultan': unlocked = rankOfEnding(state.journeyBestEnding) >= 5 && state.journeyBestEnding !== 'bahagia_sejati'; break;
+        case 'journey_legenda': unlocked = state.journeyBestEnding === 'legenda'; break;
+        case 'journey_zen': unlocked = state.journeyEndings.includes('bahagia_sejati'); break;
+        case 'journey_kolektor': unlocked = state.journeyEndings.length >= 6; break;
+        // New achievements
+        case 'daily_3': unlocked = state.dailyChallengeStreak >= 3; break;
+        case 'daily_7': unlocked = state.dailyChallengeStreak >= 7; break;
+        case 'quiz_perfect': unlocked = state.quizPerfect === true; break;
+        case 'speed_demon': unlocked = state.fastestCorrectMs <= 3000; break;
+        case 'budget_master': unlocked = state.budgetBest >= 95; break;
+        case 'all_endings': unlocked = state.journeyEndings.length >= 8; break;
+        case 'total_5000': unlocked = state.totalXp >= 5000; break;
+        case 'total_10000': unlocked = state.totalXp >= 10000; break;
+        case 'coin_100': unlocked = state.coins >= 100; break;
+        case 'survival_all_tiers': unlocked = Object.keys(state.survivalTierBest).length >= 5 && Object.values(state.survivalTierBest).every(score => score > 0); break;
+        case 'adventure_wise': unlocked = state.adventureBest >= 1200; break;
       }
       
       if (unlocked) {
