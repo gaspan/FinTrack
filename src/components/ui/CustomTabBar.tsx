@@ -31,6 +31,7 @@ const TAB_LABELS: Record<string, string> = {
   index: 'Beranda',
   transactions: 'Riwayat',
   budget: 'Anggaran',
+  arena: 'Arena',
   settings: 'Lainnya',
 };
 
@@ -77,6 +78,9 @@ const TabBarIcon = ({
   } else if (routeName === 'budget') {
     iconName = 'wallet-outline';
     activeIconName = 'wallet';
+  } else if (routeName === 'arena') {
+    iconName = 'game-controller-outline';
+    activeIconName = 'game-controller';
   } else if (routeName === 'settings') {
     iconName = 'settings-outline';
     activeIconName = 'settings';

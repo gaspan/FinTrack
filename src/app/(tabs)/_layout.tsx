@@ -142,6 +142,15 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="arena"
+          options={{
+            title: 'Arena',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'game-controller' : 'game-controller-outline'} size={24} color={color} />
+            )
+          }}
+        />
+        <Tabs.Screen
           name="settings"
           options={{
             title: 'Pengaturan',

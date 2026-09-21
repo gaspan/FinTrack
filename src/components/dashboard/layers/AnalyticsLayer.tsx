@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { router } from 'expo-router';
 
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection';
 import { AnimatedSection } from '@/components/dashboard/AnimatedSection';
 import { MonthBarsCard } from '@/components/dashboard/MonthBarsCard';
 import { AnalyticsCard } from '@/components/dashboard/AnalyticsCard';
@@ -18,10 +19,13 @@ export const AnalyticsLayer: React.FC<AnalyticsLayerProps> = ({ data }) => (
   <>
     {(data.monthExpense.length > 0 || data.monthIncome.length > 0) && (
       <AnimatedSection index={0}>
-        <View>
-          <SectionHeader title={`Bulan Ini · ${dayjs().format('MMMM')}`} icon="bar-chart-outline" />
+        <CollapsibleSection
+          title={`Bulan Ini · ${dayjs().format('MMMM')}`}
+          icon="bar-chart-outline"
+          subtitle="Pengeluaran & pemasukan per kategori"
+        >
           <MonthBarsCard expense={data.monthExpense} income={data.monthIncome} />
-        </View>
+        </CollapsibleSection>
       </AnimatedSection>
     )}
 

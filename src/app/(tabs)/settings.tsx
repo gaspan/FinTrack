@@ -23,17 +23,6 @@ import { hapticError, hapticLight, hapticSuccess } from '@/utils/haptic';
 import { Category, PayrollSettings } from '@/types';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
-import { GameState, loadGameState, getLevelProgress, resetGameState } from '@/features/game/gameStore';
-import { ACHIEVEMENTS } from '@/features/game/data';
-import {
-  GameSettings,
-  DEFAULT_SETTINGS,
-  DIFFICULTIES,
-  ROUND_OPTIONS,
-  loadGameSettings,
-  saveGameSettings,
-  difficultyOf,
-} from '@/features/game/gameSettings';
 
 const SAFE_TO_SPEND_KEY = 'safe_to_spend_enabled';
 const PAYROLL_ENABLED_KEY = 'payroll_enabled';
@@ -61,12 +50,8 @@ export default function SettingsScreen() {
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [dailyReminder, setDailyReminder] = useState(false);
   const [dailyReminderTime, setDailyReminderTime] = useState('20:00');
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [gameSettings, setGameSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
 
   useFocusEffect(useCallback(() => {
-    loadGameState().then(setGameState);
-    loadGameSettings().then(setGameSettings);
     AsyncStorage.getItem(SAFE_TO_SPEND_KEY).then((val) => {
       setSafeToSpendEnabled(val !== 'false');
     });
@@ -141,34 +126,6 @@ export default function SettingsScreen() {
       }
       return next;
     });
-  }, []);
-
-  const updateGameSetting = useCallback(<K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
-    hapticLight();
-    setGameSettings(prev => {
-      const next = { ...prev, [key]: value };
-      saveGameSettings(next);
-      return next;
-    });
-  }, []);
-
-  const handleResetGame = useCallback(() => {
-    Alert.alert(
-      'Reset Progres Game?',
-      'Semua level, XP, badge, dan skor terbaik akan hilang permanen.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            const fresh = await resetGameState();
-            setGameState(fresh);
-            hapticSuccess();
-          },
-        },
-      ]
-    );
   }, []);
 
   useFocusEffect(useCallback(() => {}, []));
@@ -386,155 +343,6 @@ export default function SettingsScreen() {
           <View style={styles.itemRight}>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
           </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Arena Finansial Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Arena Finansial</Text>
-
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/game' as any)}>
-          <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: '#8B5CF620' }]}>
-              {gameState ? (
-                <Text style={{ fontSize: 20 }}>{getLevelProgress(gameState).current.icon}</Text>
-              ) : (
-                <Ionicons name="game-controller-outline" size={20} color="#8B5CF6" />
-              )}
-            </View>
-            <View>
-              <Text style={styles.itemTitle}>Main Sekarang</Text>
-              <Text style={styles.itemSub}>
-                {gameState
-                  ? `Level ${gameState.level} • ${gameState.unlockedBadges.length}/${ACHIEVEMENTS.length} Badge`
-                  : 'Main kuis & survival budget'}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.itemRight}>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
-          </View>
-        </TouchableOpacity>
-
-        {gameState && (
-          <View style={styles.payrollConfig}>
-            <View style={styles.payrollRow}>
-              <Text style={styles.payrollLabel}>Level {gameState.level}</Text>
-              <Text style={styles.itemSub}>{gameState.totalXp} XP</Text>
-            </View>
-            <View style={styles.xpTrack}>
-              <View style={[styles.xpFill, { width: `${getLevelProgress(gameState).progress}%` }]} />
-            </View>
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{gameState.dailyStreak}</Text>
-                <Text style={styles.statLabel}>Hari Streak</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{gameState.maxStreak}</Text>
-                <Text style={styles.statLabel}>Streak Kuis</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{gameState.modesPlayed.length}/5</Text>
-                <Text style={styles.statLabel}>Mode Dimainkan</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.payrollConfig}>
-          <Text style={styles.payrollLabel}>Tingkat Kesulitan</Text>
-          <View style={styles.categoryChips}>
-            {DIFFICULTIES.map(d => (
-              <TouchableOpacity
-                key={d.key}
-                style={[
-                  styles.categoryChip,
-                  gameSettings.difficulty === d.key && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary },
-                ]}
-                onPress={() => updateGameSetting('difficulty', d.key)}
-              >
-                <Text style={{ fontSize: 13 }}>{d.icon}</Text>
-                <Text style={[
-                  styles.categoryChipText,
-                  gameSettings.difficulty === d.key && { color: theme.colors.primary, fontWeight: '600' },
-                ]}>
-                  {d.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.itemSub}>
-            {`${difficultyOf(gameSettings).time} detik/soal • Bonus XP x${difficultyOf(gameSettings).xpMult}`}
-          </Text>
-
-          <Text style={[styles.payrollLabel, { marginTop: 4 }]}>Jumlah Soal per Ronde</Text>
-          <View style={styles.categoryChips}>
-            {ROUND_OPTIONS.map(r => (
-              <TouchableOpacity
-                key={r}
-                style={[
-                  styles.categoryChip,
-                  gameSettings.rounds === r && { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary },
-                ]}
-                onPress={() => updateGameSetting('rounds', r)}
-              >
-                <Text style={[
-                  styles.categoryChipText,
-                  gameSettings.rounds === r && { color: theme.colors.primary, fontWeight: '600' },
-                ]}>
-                  {r} soal
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.item} onPress={() => updateGameSetting('haptics', !gameSettings.haptics)}>
-          <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: theme.colors.warning + '20' }]}>
-              <Ionicons name={gameSettings.haptics ? 'pulse' : 'pulse-outline'} size={20} color={theme.colors.warning} />
-            </View>
-            <View>
-              <Text style={styles.itemTitle}>Getaran Feedback</Text>
-              <Text style={styles.itemSub}>Getar saat jawaban benar / salah</Text>
-            </View>
-          </View>
-          <Ionicons
-            name={gameSettings.haptics ? 'checkbox' : 'square-outline'}
-            size={24}
-            color={theme.colors.primary}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.item} onPress={() => updateGameSetting('showTips', !gameSettings.showTips)}>
-          <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: theme.colors.info + '20' }]}>
-              <Ionicons name="bulb-outline" size={20} color={theme.colors.info} />
-            </View>
-            <View>
-              <Text style={styles.itemTitle}>Tampilkan Tips Edukasi</Text>
-              <Text style={styles.itemSub}>Penjelasan setelah menjawab soal</Text>
-            </View>
-          </View>
-          <Ionicons
-            name={gameSettings.showTips ? 'checkbox' : 'square-outline'}
-            size={24}
-            color={theme.colors.primary}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.item} onPress={handleResetGame}>
-          <View style={styles.itemLeft}>
-            <View style={[styles.iconBg, { backgroundColor: theme.colors.danger + '20' }]}>
-              <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
-            </View>
-            <View>
-              <Text style={[styles.itemTitle, { color: theme.colors.danger }]}>Reset Progres Game</Text>
-              <Text style={styles.itemSub}>Hapus level, XP, dan semua badge</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
         </TouchableOpacity>
       </View>
 

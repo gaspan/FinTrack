@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import dayjs from 'dayjs';
@@ -70,6 +70,7 @@ export function useDashboardData() {
 
   const [initialLoad, setInitialLoad] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const cancelRef = useRef(0);
   const [startDate, setStartDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
   const [endDate, setEndDate] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));
   const [isManualDateRange, setIsManualDateRange] = useState(false);
@@ -137,6 +138,7 @@ export function useDashboardData() {
   }, [db, isManualDateRange, bookId]);
 
   const loadData = useCallback(async (options?: LoadOptions) => {
+    const gen = ++cancelRef.current;
     try {
       const chartQueries = new ChartQueries(db, bookId);
       const trendQueries = new TrendQueries(db, bookId);
@@ -204,6 +206,8 @@ export function useDashboardData() {
         loadUpcomingBills(db, bookId, 7),
       ]);
 
+      if (cancelRef.current !== gen) return;
+
       setSummary(summaryData);
       setLastMonthSummary(prevMonthData);
       setTrendData(trend);
@@ -238,7 +242,23 @@ export function useDashboardData() {
     } : undefined);
   }, [initPayrollPeriod, loadData]);
 
-  useFocusEffect(useCallback(() => { reload(); }, [reload]));
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    cancelRef.current++;
+    const run = async () => {
+      const config = await initPayrollPeriod();
+      if (cancelled) return;
+      await loadData(config ? {
+        startDate: config.startDate,
+        endDate: config.endDate,
+        payrollEnabled: config.payrollEnabled,
+        salaryDay: config.salaryDay,
+        salaryCategoryId: config.salaryCategoryId,
+      } : undefined);
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [initPayrollPeriod, loadData]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

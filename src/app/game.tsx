@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext, SQLiteDatabase } from 'expo-sqlite';
 import { useBook } from '@/constants/books';
 import { useTheme, type Theme } from '@/constants/theme';
@@ -139,9 +139,13 @@ export default function GamePage() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => (mode === 'menu' ? router.back() : setMode('menu'))} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
-        </TouchableOpacity>
+        {mode !== 'menu' ? (
+          <TouchableOpacity onPress={() => setMode('menu')} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
         <Text style={styles.headerTitle}>Arena Finansial</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -2043,8 +2047,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.xxl, paddingBottom: theme.spacing.md, backgroundColor: theme.colors.surface },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { ...theme.typography.h2, fontSize: 20 },
-  scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 40 },
-  play: { flex: 1, padding: theme.spacing.lg, gap: theme.spacing.md },
+  scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 100 },
+  play: { flex: 1, padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 100 },
   heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
   heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
   diffChip: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: theme.radius.round },
